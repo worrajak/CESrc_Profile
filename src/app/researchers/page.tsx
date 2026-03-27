@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'นักวิจัย | CESRU - RMUTL',

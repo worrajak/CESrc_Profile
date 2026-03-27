@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
 import Link from 'next/link';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 async function getHomeData() {
   const [researchersRes, pubCountRes, grantCountRes, areasRes] = await Promise.all([

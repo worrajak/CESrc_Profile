@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'ทุนวิจัย | CESRU - RMUTL',
