@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -35,8 +36,9 @@ export default async function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white py-20">
+      <section className="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
+          <Image src="/logo-cesru.jpeg" alt="CESRU Logo" width={120} height={120} className="mx-auto mb-6 rounded-2xl bg-white p-2 shadow-lg" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Clean Energy System Research Unit
           </h1>
