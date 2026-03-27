@@ -67,10 +67,10 @@ export default async function HomePage() {
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">สาขาวิจัย</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {areas.map((area: { id: string; name_th: string; name_en: string }) => (
-            <div key={area.id} className="bg-white rounded-lg p-4 shadow-sm border text-center hover:shadow-md transition">
+            <Link key={area.id} href={`/research-areas/${area.id}`} className="bg-white rounded-lg p-4 shadow-sm border text-center hover:shadow-md hover:border-blue-300 transition block">
               <p className="font-medium text-gray-800 text-sm">{area.name_th}</p>
               <p className="text-xs text-gray-500 mt-1">{area.name_en}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
