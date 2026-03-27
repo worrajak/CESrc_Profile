@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase';
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   AlignmentType, TabStopPosition, TabStopType,
-  BorderStyle, convertMillimetersToTwip
+  BorderStyle, convertMillimetersToTwip,
+  Table, TableRow, TableCell, WidthType, TableBorders
 } from 'docx';
 
 interface PubWithRole {
@@ -21,274 +22,359 @@ interface PubWithRole {
     year: number;
     doi: string | null;
     pub_type: string;
+    scopus_indexed: boolean;
+    wos_indexed: boolean;
   };
 }
 
-function formatIEEE(pub: PubWithRole['publications'], idx: number): string {
-  const parts: string[] = [];
-  parts.push(`[${idx}]`);
-  parts.push(pub.authors_raw);
-  const isBook = pub.pub_type === 'book' || pub.pub_type === 'book_chapter';
-  parts.push(isBook ? pub.title : `"${pub.title}"`);
-  if (pub.journal_name) parts.push(pub.journal_name);
-  if (pub.volume) {
-    let vol = `vol. ${pub.volume}`;
-    if (pub.issue) vol += `, no. ${pub.issue}`;
-    parts.push(vol);
-  }
-  if (pub.pages) parts.push(pub.pages.startsWith('pp.') ? pub.pages : `pp. ${pub.pages}`);
-  parts.push(pub.year.toString());
-  if (pub.doi) parts.push(`doi: ${pub.doi}`);
-  return parts.join(', ') + '.';
+const FONT = 'TH SarabunPSK';
+const FONT_FALLBACK = 'Sarabun';
+const FONT_SIZE = 32; // 16pt
+const FONT_SIZE_SMALL = 28; // 14pt
+const FONT_SIZE_HEADER = 36; // 18pt
+
+function font(text: string, opts: any = {}) {
+  return new TextRun({ text, font: FONT, size: FONT_SIZE, ...opts });
 }
 
-function formatAPA(pub: PubWithRole['publications']): string {
-  // Convert authors to APA format
-  const raw = pub.authors_raw
-    .replace(/,?\s+and\s+/gi, ', ')
-    .replace(/,?\s+&\s+/gi, ', ');
-  const authorNames = raw.split(/,\s*/).filter(s => s.trim());
-  const apaNames = authorNames.map(name => {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      const initial = parts[0];
-      const surname = parts.slice(1).join(' ');
-      if (initial.endsWith('.')) return `${surname}, ${initial}`;
-      return `${surname}, ${initial.charAt(0)}.`;
-    }
-    return name;
+function fontBold(text: string, opts: any = {}) {
+  return new TextRun({ text, font: FONT, size: FONT_SIZE, bold: true, ...opts });
+}
+
+function headerParagraph(text: string) {
+  return new Paragraph({
+    children: [new TextRun({ text, font: FONT, size: FONT_SIZE_HEADER, bold: true })],
+    spacing: { before: 200, after: 100 },
   });
+}
 
-  let authorStr = '';
-  if (apaNames.length === 1) authorStr = apaNames[0];
-  else if (apaNames.length === 2) authorStr = `${apaNames[0]} & ${apaNames[1]}`;
-  else authorStr = apaNames.slice(0, -1).join(', ') + ', & ' + apaNames[apaNames.length - 1];
+function labelValue(label: string, value: string) {
+  return new Paragraph({
+    children: [
+      fontBold(label + '\t'),
+      font(value),
+    ],
+    tabStops: [{ type: TabStopType.LEFT, position: convertMillimetersToTwip(45) }],
+    spacing: { after: 40 },
+  });
+}
 
-  const parts = [authorStr, `(${pub.year}).`, `${pub.title}.`];
-  if (pub.journal_name) {
-    let src = pub.journal_name;
-    if (pub.volume) {
-      src += `, ${pub.volume}`;
-      if (pub.issue) src += `(${pub.issue})`;
-    }
-    if (pub.pages) src += `, ${pub.pages}`;
-    parts.push(src + '.');
-  }
-  if (pub.doi) parts.push(`https://doi.org/${pub.doi}`);
-  return parts.join(' ');
+function bulletItem(text: string, indent = 10) {
+  return new Paragraph({
+    children: [font(text)],
+    indent: { left: convertMillimetersToTwip(indent) },
+    spacing: { after: 20 },
+  });
+}
+
+function tableCell(text: string, bold = false, width?: number) {
+  const opts: any = {
+    children: [new Paragraph({
+      children: [new TextRun({ text, font: FONT, size: FONT_SIZE_SMALL, bold })],
+      spacing: { after: 20 },
+    })],
+    margins: { top: 40, bottom: 40, left: 80, right: 80 },
+  };
+  if (width) opts.width = { size: width, type: WidthType.DXA };
+  return new TableCell(opts);
 }
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const format = request.nextUrl.searchParams.get('format') || 'ieee';
+  const format = request.nextUrl.searchParams.get('format') || 'thai';
   const researcherId = params.id;
 
-  // Fetch researcher
-  const { data: researcher, error: rErr } = await supabase
-    .from('researchers')
-    .select('*')
-    .eq('id', researcherId)
-    .single();
+  // Fetch all data
+  const [researcherRes, pubsRes, grantsRes, patentsRes] = await Promise.all([
+    supabase.from('researchers').select('*').eq('id', researcherId).single(),
+    supabase.from('publication_authors')
+      .select('author_role, author_order, is_corresponding, publications (*)')
+      .eq('researcher_id', researcherId)
+      .order('author_order', { ascending: true }),
+    supabase.from('grant_members').select('role, grants (*)').eq('researcher_id', researcherId),
+    supabase.from('patent_inventors').select('inventor_order, patents (*)').eq('researcher_id', researcherId),
+  ]);
 
-  if (rErr || !researcher) {
+  const researcher = researcherRes.data;
+  if (!researcher) {
     return NextResponse.json({ error: 'Researcher not found' }, { status: 404 });
   }
 
-  // Fetch publications with roles
-  const { data: publications } = await supabase
-    .from('publication_authors')
-    .select(`
-      author_role, author_order, is_corresponding,
-      publications (*)
-    `)
-    .eq('researcher_id', researcherId)
-    .order('author_order', { ascending: true });
-
-  // Fetch grants
-  const { data: grants } = await supabase
-    .from('grant_members')
-    .select(`role, grants (*)`)
-    .eq('researcher_id', researcherId);
-
   const r = researcher;
   const fullNameTh = `${r.title_th}${r.first_name_th} ${r.last_name_th}`;
-  const fullNameEn = r.first_name_en ? `${r.title_en || ''} ${r.first_name_en} ${r.last_name_en || ''}`.trim() : '';
+  const fullNameEn = r.first_name_en ? `${r.title_en || ''}${r.first_name_en} ${r.last_name_en || ''}`.trim() : '';
+  const pubs = (pubsRes.data || []) as unknown as PubWithRole[];
+  const grantList = (grantsRes.data || []) as any[];
+  const patentList = (patentsRes.data || []) as any[];
 
-  const isIEEE = format === 'ieee';
-  const fontName = isIEEE ? 'Times New Roman' : 'Arial';
-
-  // Build document sections
   const children: Paragraph[] = [];
 
-  // Title
+  // ============================================================
+  // TITLE
+  // ============================================================
   children.push(new Paragraph({
-    children: [new TextRun({ text: 'Curriculum Vitae', bold: true, font: fontName, size: 32 })],
+    children: [new TextRun({ text: 'ประวัติบุคลากรในโครงการ', font: FONT, size: 40, bold: true })],
     alignment: AlignmentType.CENTER,
     spacing: { after: 200 },
   }));
 
-  // Name
+  // ============================================================
+  // 1. PERSONAL INFO
+  // ============================================================
+  children.push(labelValue('1. ชื่อ-สกุล', `${fullNameTh}    ${fullNameEn}`));
+  if (r.position_th) {
+    children.push(labelValue('2. ตำแหน่งทางวิชาการ', r.position_th));
+  }
+  children.push(labelValue('3. หน่วยงานต้นสังกัด', `สาขาวิชาวิศวกรรมไฟฟ้า คณะวิศวกรรมศาสตร์`));
   children.push(new Paragraph({
-    children: [new TextRun({ text: fullNameTh, bold: true, font: fontName, size: 28 })],
-    alignment: AlignmentType.CENTER,
+    children: [font(`\tศูนย์วิจัยระบบพลังงานสะอาด`)],
+    tabStops: [{ type: TabStopType.LEFT, position: convertMillimetersToTwip(45) }],
+    spacing: { after: 40 },
   }));
-  if (fullNameEn) {
-    children.push(new Paragraph({
-      children: [new TextRun({ text: fullNameEn, font: fontName, size: 24 })],
-      alignment: AlignmentType.CENTER,
-    }));
+  children.push(new Paragraph({
+    children: [font(`\tมหาวิทยาลัยเทคโนโลยีราชมงคลล้านนา`)],
+    tabStops: [{ type: TabStopType.LEFT, position: convertMillimetersToTwip(45) }],
+    spacing: { after: 40 },
+  }));
+
+  if (r.email) {
+    children.push(labelValue('E-mail', r.email));
+  }
+  if (r.phone) {
+    children.push(labelValue('หมายเลขโทรศัพท์', r.phone));
   }
 
-  // Position & Affiliation
-  children.push(new Paragraph({
-    children: [new TextRun({ text: `${r.department}, ${r.faculty}`, font: fontName, size: 22 })],
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 100 },
-  }));
-  children.push(new Paragraph({
-    children: [new TextRun({ text: `${r.university}, ${r.campus}`, font: fontName, size: 22 })],
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 300 },
-  }));
-
-  // Separator
-  children.push(new Paragraph({
-    border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: '999999' } },
-    spacing: { after: 200 },
-  }));
-
-  // Expertise
+  // ============================================================
+  // 4. EXPERTISE
+  // ============================================================
   if (r.expertise && r.expertise.length > 0) {
-    children.push(new Paragraph({
-      children: [new TextRun({ text: 'Research Expertise', bold: true, font: fontName, size: 24 })],
-      spacing: { before: 200, after: 100 },
-    }));
-    r.expertise.forEach((exp: string) => {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: `• ${exp}`, font: fontName, size: 22 })],
-        indent: { left: convertMillimetersToTwip(10) },
-      }));
+    children.push(headerParagraph('4. สาขาวิชาที่มีความชำนาญพิเศษ'));
+    r.expertise.forEach((exp: string, i: number) => {
+      children.push(bulletItem(`${i + 1}) ${exp}`, 15));
     });
   }
 
-  // Publications
-  const pubs = (publications || []) as unknown as PubWithRole[];
+  // ============================================================
+  // 5. PUBLICATIONS - งานวิจัย
+  // ============================================================
   if (pubs.length > 0) {
-    children.push(new Paragraph({
-      children: [new TextRun({
-        text: `Publications (${pubs.length})`,
-        bold: true, font: fontName, size: 24,
-      })],
-      spacing: { before: 300, after: 100 },
-    }));
+    children.push(headerParagraph('5. งานวิจัย'));
 
-    // Group by role
-    const roleGroups: Record<string, PubWithRole[]> = {
-      first_author: [], corresponding_author: [], co_author: [], last_author: [],
+    // Group by type
+    const journals = pubs.filter(p => p.publications?.pub_type?.includes('journal'));
+    const conferences = pubs.filter(p => p.publications?.pub_type?.includes('conference'));
+    const others = pubs.filter(p =>
+      !p.publications?.pub_type?.includes('journal') &&
+      !p.publications?.pub_type?.includes('conference')
+    );
+
+    let idx = 1;
+    const formatPub = (pa: PubWithRole) => {
+      const pub = pa.publications;
+      if (!pub) return '';
+      let citation = `${pub.authors_raw}, "${pub.title}"`;
+      if (pub.journal_name) citation += `, ${pub.journal_name}`;
+      if (pub.volume) citation += `, Vol. ${pub.volume}`;
+      if (pub.issue) citation += `(${pub.issue})`;
+      if (pub.pages) citation += `, ${pub.pages}`;
+      citation += `, ${pub.year}`;
+      const tags: string[] = [];
+      if (pub.scopus_indexed) tags.push('Scopus');
+      if (pub.wos_indexed) tags.push('WoS');
+      if (tags.length) citation += ` [${tags.join(', ')}]`;
+      return citation;
     };
-    pubs.forEach(p => {
-      const key = p.author_role || 'co_author';
-      if (!roleGroups[key]) roleGroups[key] = [];
-      roleGroups[key].push(p);
-    });
 
-    const roleLabels: Record<string, string> = {
-      first_author: 'As First Author',
-      corresponding_author: 'As Corresponding Author',
-      co_author: 'As Co-Author',
-      last_author: 'As Last/Senior Author',
-    };
-
-    let pubIdx = 1;
-    for (const [role, items] of Object.entries(roleGroups)) {
-      if (items.length === 0) continue;
+    if (journals.length > 0) {
       children.push(new Paragraph({
-        children: [new TextRun({
-          text: roleLabels[role] || role,
-          bold: true, italics: true, font: fontName, size: 22,
-        })],
-        spacing: { before: 200, after: 100 },
+        children: [fontBold('ด้าน Journal (วารสารวิชาการ)')],
+        spacing: { before: 100, after: 50 },
         indent: { left: convertMillimetersToTwip(5) },
       }));
-
-      items.forEach(pa => {
-        const pub = pa.publications;
-        if (!pub) return;
-        const citation = isIEEE ? formatIEEE(pub, pubIdx) : formatAPA(pub);
+      journals.forEach(pa => {
         children.push(new Paragraph({
-          children: [new TextRun({ text: citation, font: fontName, size: 22 })],
-          spacing: { after: 100 },
-          indent: { left: convertMillimetersToTwip(10), hanging: convertMillimetersToTwip(10) },
+          children: [font(`${idx}. ${formatPub(pa)}`)],
+          spacing: { after: 60 },
+          indent: { left: convertMillimetersToTwip(10), hanging: convertMillimetersToTwip(8) },
         }));
-        pubIdx++;
+        idx++;
+      });
+    }
+
+    if (conferences.length > 0) {
+      children.push(new Paragraph({
+        children: [fontBold('ด้าน Conference (การประชุมวิชาการ)')],
+        spacing: { before: 100, after: 50 },
+        indent: { left: convertMillimetersToTwip(5) },
+      }));
+      conferences.forEach(pa => {
+        children.push(new Paragraph({
+          children: [font(`${idx}. ${formatPub(pa)}`)],
+          spacing: { after: 60 },
+          indent: { left: convertMillimetersToTwip(10), hanging: convertMillimetersToTwip(8) },
+        }));
+        idx++;
+      });
+    }
+
+    if (others.length > 0) {
+      children.push(new Paragraph({
+        children: [fontBold('อื่นๆ')],
+        spacing: { before: 100, after: 50 },
+        indent: { left: convertMillimetersToTwip(5) },
+      }));
+      others.forEach(pa => {
+        children.push(new Paragraph({
+          children: [font(`${idx}. ${formatPub(pa)}`)],
+          spacing: { after: 60 },
+          indent: { left: convertMillimetersToTwip(10), hanging: convertMillimetersToTwip(8) },
+        }));
+        idx++;
       });
     }
   }
 
-  // Grants
-  const grantList = (grants || []) as any[];
+  // ============================================================
+  // 6. GRANTS - ทุนวิจัย (Table format)
+  // ============================================================
   if (grantList.length > 0) {
-    children.push(new Paragraph({
-      children: [new TextRun({
-        text: `Research Grants (${grantList.length})`,
-        bold: true, font: fontName, size: 24,
-      })],
-      spacing: { before: 300, after: 100 },
+    children.push(headerParagraph('6. ทุนวิจัย'));
+
+    // Table header
+    const grantRows: TableRow[] = [];
+    grantRows.push(new TableRow({
+      children: [
+        tableCell('พ.ศ.', true, 800),
+        tableCell('ชื่องานวิจัย', true, 4500),
+        tableCell('รับผิดชอบ', true, 1200),
+        tableCell('แหล่งทุน', true, 1200),
+        tableCell('งบประมาณ (บาท)', true, 1500),
+      ],
+      tableHeader: true,
     }));
 
-    grantList.forEach((gm, i) => {
+    const roleMap: Record<string, string> = {
+      pi: 'หัวหน้าโครงการ',
+      co_pi: 'ผู้ร่วมโครงการ',
+      researcher: 'นักวิจัย',
+      consultant: 'ที่ปรึกษา',
+    };
+
+    grantList.forEach((gm: any) => {
       const g = gm.grants;
       if (!g) return;
-      const roleMap: Record<string, string> = { pi: 'PI', co_pi: 'Co-PI', researcher: 'Researcher', consultant: 'Consultant' };
-      const budgetStr = g.budget ? ` (${Number(g.budget).toLocaleString()} THB)` : '';
+      grantRows.push(new TableRow({
+        children: [
+          tableCell(g.fiscal_year?.toString() || '-'),
+          tableCell(g.title_th || '-'),
+          tableCell(roleMap[gm.role] || gm.role),
+          tableCell(g.funding_agency?.replace(/\s*\(.*?\)\s*/g, '') || '-'),
+          tableCell(g.budget ? Number(g.budget).toLocaleString() : '-'),
+        ],
+      }));
+    });
+
+    children.push(new Paragraph({ spacing: { after: 50 } }));
+    // Add table as separate element
+    const grantTable = new Table({
+      rows: grantRows,
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    });
+
+    // Since we can't mix Paragraph and Table in children array directly,
+    // we need to use sections
+    // For now, render grants as list format
+    grantList.forEach((gm: any, i: number) => {
+      const g = gm.grants;
+      if (!g) return;
+      const budgetStr = g.budget ? ` งบประมาณ ${Number(g.budget).toLocaleString()} บาท` : '';
+      const yearStr = g.fiscal_year ? `(พ.ศ. ${g.fiscal_year})` : '';
       children.push(new Paragraph({
-        children: [new TextRun({
-          text: `${i + 1}. ${g.title_th}${budgetStr}`,
-          font: fontName, size: 22,
-        })],
-        spacing: { after: 50 },
+        children: [
+          fontBold(`${i + 1}. `),
+          font(`${g.title_th} ${yearStr}`),
+        ],
+        spacing: { after: 20 },
         indent: { left: convertMillimetersToTwip(5) },
       }));
       children.push(new Paragraph({
-        children: [new TextRun({
-          text: `   แหล่งทุน: ${g.funding_agency} | Role: ${roleMap[gm.role] || gm.role}`,
-          font: fontName, size: 20, color: '666666',
-        })],
+        children: [font(`   แหล่งทุน: ${g.funding_agency} | ${roleMap[gm.role] || gm.role}${budgetStr}`, { size: FONT_SIZE_SMALL, color: '444444' })],
         indent: { left: convertMillimetersToTwip(10) },
-        spacing: { after: 100 },
+        spacing: { after: 80 },
       }));
     });
   }
 
-  // Disclaimer
+  // ============================================================
+  // 7. PATENTS - สิทธิบัตร/อนุสิทธิบัตร
+  // ============================================================
+  if (patentList.length > 0) {
+    children.push(headerParagraph('7. สิทธิบัตร / อนุสิทธิบัตร'));
+
+    patentList.forEach((pi: any, i: number) => {
+      const p = pi.patents;
+      if (!p) return;
+      const typeLabel = p.patent_type === 'patent' ? 'สิทธิบัตร' :
+        p.patent_type === 'petty_patent' ? 'อนุสิทธิบัตร' :
+          p.patent_type === 'copyright' ? 'ลิขสิทธิ์' : 'ความลับทางการค้า';
+      const statusLabel = p.status === 'granted' ? 'ได้รับแล้ว' :
+        p.status === 'pending' ? 'อยู่ในระหว่างการดำเนินการ' :
+          p.status === 'filed' ? 'ยื่นคำขอแล้ว' : p.status;
+      const appNo = p.application_no ? ` (${p.application_no})` : '';
+
+      children.push(new Paragraph({
+        children: [
+          fontBold(`${i + 1}. `),
+          font(p.title_th),
+        ],
+        spacing: { after: 20 },
+        indent: { left: convertMillimetersToTwip(5) },
+      }));
+      children.push(new Paragraph({
+        children: [font(`   ประเภท: ${typeLabel} | สถานะ: ${statusLabel}${appNo}`, { size: FONT_SIZE_SMALL, color: '444444' })],
+        indent: { left: convertMillimetersToTwip(10) },
+        spacing: { after: 80 },
+      }));
+    });
+  }
+
+  // ============================================================
+  // FOOTER
+  // ============================================================
   children.push(new Paragraph({
     border: { top: { style: BorderStyle.SINGLE, size: 1, color: '999999' } },
     spacing: { before: 400, after: 100 },
   }));
   children.push(new Paragraph({
-    children: [new TextRun({
-      text: 'หมายเหตุ: แสดงเฉพาะผลงานที่ผ่านการยืนยันจากฐานข้อมูลวิชาการ (Scopus, Web of Science, DOI)',
-      font: fontName, size: 18, italics: true, color: '888888',
-    })],
-  }));
-  children.push(new Paragraph({
-    children: [new TextRun({
-      text: `Generated: ${new Date().toISOString().split('T')[0]} | Format: ${format.toUpperCase()} | CESRU - RMUTL`,
-      font: fontName, size: 18, color: '888888',
-    })],
+    children: [font(
+      `สร้างจากระบบฐานข้อมูลนักวิจัย CESRU | วันที่ ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+      { size: FONT_SIZE_SMALL, italics: true, color: '888888' }
+    )],
   }));
 
   // Create document
   const doc = new Document({
-    sections: [{ children }],
+    sections: [{
+      properties: {
+        page: {
+          margin: {
+            top: convertMillimetersToTwip(25),
+            bottom: convertMillimetersToTwip(25),
+            left: convertMillimetersToTwip(25),
+            right: convertMillimetersToTwip(25),
+          },
+        },
+      },
+      children,
+    }],
   });
 
   const buffer = await Packer.toBuffer(doc);
   const uint8 = new Uint8Array(buffer);
   const safeName = (r.last_name_en || r.last_name_th).replace(/\s+/g, '_');
-  const filename = `CV_${safeName}_${format.toUpperCase()}.docx`;
+  const filename = `CV_${safeName}_CESRU.docx`;
 
   return new NextResponse(uint8, {
     headers: {
