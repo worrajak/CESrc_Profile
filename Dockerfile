@@ -12,7 +12,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Environment variables for build (will be overridden at runtime)
+# Ensure public dir exists (even if empty)
+RUN mkdir -p /app/public
+
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
@@ -27,8 +29,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy public folder (create if not exists)
-RUN mkdir -p ./public
+# Copy public from builder (now guaranteed to exist)
 COPY --from=builder /app/public ./public
 
 # Standalone output
