@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export const metadata = {
   title: 'นักวิจัย | CESRU - RMUTL',

@@ -3,6 +3,7 @@ import ResearcherCard from '@/components/ResearcherCard';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
   const [researchersRes, pubCountRes, grantCountRes, areasRes] = await Promise.all([

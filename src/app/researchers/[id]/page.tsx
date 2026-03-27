@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 const roleLabel: Record<string, string> = {
   first_author: 'First Author',

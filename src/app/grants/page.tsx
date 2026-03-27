@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export const metadata = {
   title: 'ทุนวิจัย | CESRU - RMUTL',
