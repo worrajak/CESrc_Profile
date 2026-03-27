@@ -443,4 +443,11 @@ INSERT INTO patent_inventors (patent_id, researcher_id, inventor_order) VALUES
 ('d0000001-0000-0000-0000-000000000007', 'a0000001-0000-0000-0000-000000000009', 1);
 
 -- Add RLS policies for patents if not exists
-CREATE POLICY IF NOT EXISTS "Public read patent_inventors" ON patent_inventors FOR SELECT USING (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'patent_inventors' AND policyname = 'Public read patent_inventors'
+  ) THEN
+    CREATE POLICY "Public read patent_inventors" ON patent_inventors FOR SELECT USING (true);
+  END IF;
+END $$;
