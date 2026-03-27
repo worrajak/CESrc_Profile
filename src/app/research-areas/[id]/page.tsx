@@ -15,24 +15,25 @@ async function getAreaData(id: string) {
 
   if (!area) return null;
 
-  // Search publications by keywords matching area name
-  const searchTerms = area.name_en.toLowerCase().split(/[&,]/).map((s: string) => s.trim()).filter(Boolean);
+  // Build search terms: use search_terms column if available, fallback to name_en
+  const searchTerms: string[] = (area.search_terms && area.search_terms.length > 0)
+    ? area.search_terms.map((s: string) => s.toLowerCase())
+    : area.name_en.toLowerCase().split(/[&,]/).map((s: string) => s.trim()).filter(Boolean);
 
   const { data: publications } = await supabase
     .from('publications')
     .select('*')
     .order('year', { ascending: false });
 
-  // Filter publications that match research area keywords
+  // Filter publications that match research area search terms
   const matchedPubs = (publications || []).filter((pub: any) => {
     const pubKeywords = (pub.keywords || []).map((k: string) => k.toLowerCase()).join(' ');
     const pubTitle = pub.title.toLowerCase();
     const pubJournal = (pub.journal_name || '').toLowerCase();
-    const combined = `${pubKeywords} ${pubTitle} ${pubJournal}`;
+    const pubAbstract = (pub.abstract || '').toLowerCase();
+    const combined = `${pubKeywords} ${pubTitle} ${pubJournal} ${pubAbstract}`;
 
-    return searchTerms.some((term: string) =>
-      combined.includes(term.toLowerCase())
-    );
+    return searchTerms.some((term: string) => combined.includes(term));
   });
 
   // Get researchers with matching expertise
@@ -43,9 +44,7 @@ async function getAreaData(id: string) {
 
   const matchedResearchers = (researchers || []).filter((r: any) => {
     const expertise = (r.expertise || []).map((e: string) => e.toLowerCase()).join(' ');
-    return searchTerms.some((term: string) =>
-      expertise.includes(term.toLowerCase())
-    );
+    return searchTerms.some((term: string) => expertise.includes(term));
   });
 
   return { area, publications: matchedPubs, researchers: matchedResearchers };
@@ -64,8 +63,18 @@ export default async function ResearchAreaPage({ params }: { params: { id: strin
         <Link href="/" className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block">
           ← กลับหน้าแรก
         </Link>
-        <h1 className="text-3xl font-bold text-gray-800">{area.name_th}</h1>
+        <div className="flex items-center gap-3">
+          {area.icon && <span className="text-4xl">{area.icon}</span>}
+          <h1 className="text-3xl font-bold text-gray-800">{area.name_th}</h1>
+        </div>
         <p className="text-lg text-gray-500 mt-1">{area.name_en}</p>
+        {area.sdg_goals && area.sdg_goals.length > 0 && (
+          <div className="flex gap-2 mt-2">
+            {area.sdg_goals.map((sdg: string) => (
+              <span key={sdg} className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded">{sdg}</span>
+            ))}
+          </div>
+        )}
         {area.description_th && <p className="text-gray-600 mt-3">{area.description_th}</p>}
       </div>
 
