@@ -66,10 +66,18 @@ export default async function HomePage() {
       <section className="max-w-7xl mx-auto px-4 py-12">
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">สาขาวิจัย</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {areas.map((area: { id: string; name_th: string; name_en: string }) => (
+          {areas.map((area: { id: string; name_th: string; name_en: string; icon: string | null; sdg_goals: string[] | null }) => (
             <Link key={area.id} href={`/research-areas/${area.id}`} className="bg-white rounded-lg p-4 shadow-sm border text-center hover:shadow-md hover:border-blue-300 transition block">
+              {area.icon && <div className="text-2xl mb-1">{area.icon}</div>}
               <p className="font-medium text-gray-800 text-sm">{area.name_th}</p>
               <p className="text-xs text-gray-500 mt-1">{area.name_en}</p>
+              {area.sdg_goals && area.sdg_goals.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1 mt-2">
+                  {area.sdg_goals.map((sdg: string) => (
+                    <span key={sdg} className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded">{sdg}</span>
+                  ))}
+                </div>
+              )}
             </Link>
           ))}
         </div>
