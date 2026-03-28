@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
-  const [researchersRes, pubCountRes, grantCountRes, areasRes, newsRes] = await Promise.all([
+  const [researchersRes, pubCountRes, grantCountRes, newsRes] = await Promise.all([
     supabase
       .from('researchers')
       .select('*')
@@ -15,7 +15,6 @@ async function getHomeData() {
       .order('unit_role', { ascending: true }),
     supabase.from('publications').select('id', { count: 'exact', head: true }),
     supabase.from('grants').select('id', { count: 'exact', head: true }),
-    supabase.from('research_areas').select('*').order('sort_order'),
     supabase
       .from('news')
       .select(`
@@ -32,13 +31,12 @@ async function getHomeData() {
     researchers: researchersRes.data || [],
     pubCount: pubCountRes.count || 0,
     grantCount: grantCountRes.count || 0,
-    areas: areasRes.data || [],
     news: newsRes.data || [],
   };
 }
 
 export default async function HomePage() {
-  const { researchers, pubCount, grantCount, areas, news } = await getHomeData();
+  const { researchers, pubCount, grantCount, news } = await getHomeData();
 
   return (
     <div>
@@ -71,11 +69,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* News + Research Areas (side by side) */}
+      {/* News & IEEE Spectrum */}
       <section className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Left: News */}
+          {/* Left: CESrc News */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -119,44 +117,16 @@ export default async function HomePage() {
                 <p className="text-gray-400 text-sm">ยังไม่มีข่าวสาร</p>
               </div>
             )}
-
-            {/* Scholar News */}
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <span className="w-1 h-4 bg-green-600 rounded-full"></span>
-                IEEE Spectrum News
-              </h3>
-              <div className="bg-gradient-to-b from-green-50 to-white rounded-lg p-4 border border-green-100">
-                <ScholarNews />
-              </div>
-            </div>
           </div>
 
-          {/* Right: Research Areas */}
+          {/* Right: IEEE Spectrum News */}
           <div>
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="w-1 h-5 bg-indigo-600 rounded-full"></span>
-              สาขาวิจัย
+              <span className="w-1 h-5 bg-green-600 rounded-full"></span>
+              IEEE Spectrum News
             </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {areas.map((area: { id: string; name_th: string; name_en: string; icon: string | null; sdg_goals: string[] | null }) => (
-                <Link
-                  key={area.id}
-                  href={`/research-areas/${area.id}`}
-                  className="bg-white rounded-lg p-3 shadow-sm border text-center hover:shadow-md hover:border-blue-300 transition block"
-                >
-                  {area.icon && <div className="text-xl mb-0.5">{area.icon}</div>}
-                  <p className="font-medium text-gray-800 text-xs leading-tight">{area.name_th}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{area.name_en}</p>
-                  {area.sdg_goals && area.sdg_goals.length > 0 && (
-                    <div className="flex flex-wrap justify-center gap-0.5 mt-1">
-                      {area.sdg_goals.map((sdg: string) => (
-                        <span key={sdg} className="text-[8px] bg-green-50 text-green-700 px-1 py-0.5 rounded">{sdg}</span>
-                      ))}
-                    </div>
-                  )}
-                </Link>
-              ))}
+            <div className="bg-gradient-to-b from-green-50 to-white rounded-xl p-4 border border-green-100">
+              <ScholarNews />
             </div>
           </div>
 
