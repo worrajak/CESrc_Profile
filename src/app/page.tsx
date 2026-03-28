@@ -1,6 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import ResearcherCard from '@/components/ResearcherCard';
-import NewsCard from '@/components/NewsCard';
 import ScholarNews from '@/components/ScholarNews';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -41,10 +39,6 @@ async function getHomeData() {
 
 export default async function HomePage() {
   const { researchers, pubCount, grantCount, areas, news } = await getHomeData();
-
-  const advisor = researchers.filter((r: { unit_role: string }) => r.unit_role === 'advisor');
-  const head = researchers.filter((r: { unit_role: string }) => r.unit_role === 'head');
-  const members = researchers.filter((r: { unit_role: string }) => r.unit_role === 'member');
 
   return (
     <div>
@@ -169,42 +163,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Researchers */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">ทีมนักวิจัย</h2>
-          <Link href="/researchers" className="text-blue-600 hover:text-blue-800 text-sm">
-            ดูทั้งหมด →
-          </Link>
-        </div>
-
-        {advisor.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-purple-700 mb-3">ที่ปรึกษา</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {advisor.map((r: any) => <ResearcherCard key={r.id} researcher={r} />)}
-            </div>
-          </div>
-        )}
-
-        {head.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-700 mb-3">หัวหน้าหน่วยวิจัย</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {head.map((r: any) => <ResearcherCard key={r.id} researcher={r} />)}
-            </div>
-          </div>
-        )}
-
-        {members.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-blue-700 mb-3">สมาชิก</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.map((r: any) => <ResearcherCard key={r.id} researcher={r} />)}
-            </div>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
