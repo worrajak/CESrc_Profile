@@ -20,5 +20,5 @@ WHERE id = 'a0000001-0000-0000-0000-000000000014';
 
 -- 4. เพิ่มรูป avatar ของ Worrajak (ไฟล์อยู่ที่ public/researchers/worrajak.jpg)
 UPDATE researchers
-SET avatar_url = '/avatars/worrajak.jpg'
+SET avatar_url = '/worrajak.jpg'
 WHERE id = 'a0000001-0000-0000-0000-000000000009';
