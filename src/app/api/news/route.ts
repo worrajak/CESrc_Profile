@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 // POST - create news (requires admin password)
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { password, title, content, category, cover_image_url, images } = body;
+  const { password, title, content, category, cover_image_url, images, tags, sdg_goals } = body;
 
   // Verify admin
   if (password !== process.env.ADMIN_PASSWORD) {
@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
       content,
       category: category || 'team_activity',
       cover_image_url: cover_image_url || null,
+      tags: tags || [],
+      sdg_goals: sdg_goals || [],
       is_published: true,
       published_at: new Date().toISOString(),
     })

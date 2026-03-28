@@ -7,6 +7,8 @@ interface NewsItem {
   category: string;
   cover_image_url: string | null;
   published_at: string;
+  tags?: string[] | null;
+  sdg_goals?: string[] | null;
   researchers?: {
     title_th: string;
     first_name_th: string;
@@ -54,10 +56,15 @@ export default function NewsCard({ news }: { news: NewsItem }) {
           <p className="text-sm text-gray-500 mt-1 line-clamp-2">
             {news.content.replace(/[#*_`]/g, '').substring(0, 120)}...
           </p>
-          {news.researchers && (
-            <p className="text-xs text-gray-400 mt-2">
-              โดย {news.researchers.title_th}{news.researchers.first_name_th} {news.researchers.last_name_th}
-            </p>
+          {news.tags && news.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {news.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{tag}</span>
+              ))}
+              {news.sdg_goals && news.sdg_goals.slice(0, 2).map((sdg) => (
+                <span key={sdg} className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded">{sdg}</span>
+              ))}
+            </div>
           )}
         </div>
       </div>
