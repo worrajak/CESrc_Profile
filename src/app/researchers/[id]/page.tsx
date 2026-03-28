@@ -81,9 +81,13 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
       {/* Profile Header */}
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
         <div className="flex flex-col md:flex-row items-start gap-6">
-          <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
-            {r.first_name_th.charAt(0)}
-          </div>
+          {r.avatar_url ? (
+            <img src={r.avatar_url} alt={fullNameTh} className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
+              {r.first_name_th.charAt(0)}
+            </div>
+          )}
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900">{fullNameTh}</h1>
             {fullNameEn && <p className="text-lg text-gray-500 mt-1">{fullNameEn.trim()}</p>}
@@ -142,54 +146,76 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
         )}
       </div>
 
-      {/* Publications */}
-      {publications.length > 0 && (
-        <section className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">
-            ผลงานตีพิมพ์ ({publications.length})
-          </h2>
-          <div className="space-y-6">
-            {publications.map((pa: any, idx: number) => {
-              const pub = pa.publications;
-              if (!pub) return null;
-              const role = pa.author_role;
-              const roleColors: Record<string, string> = {
-                first_author: 'bg-green-100 text-green-800',
-                corresponding_author: 'bg-yellow-100 text-yellow-800',
-                last_author: 'bg-purple-100 text-purple-800',
-                co_author: 'bg-gray-100 text-gray-700',
-              };
-              return (
-                <div key={pub.id} className="border-l-4 border-blue-400 pl-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900">{pub.title}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${roleColors[role] || roleColors.co_author}`}>
-                      {roleLabelTh[role] || role}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{pub.authors_raw}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {pub.journal_name && <span className="italic">{pub.journal_name}</span>}
-                    {pub.volume && <span>, vol. {pub.volume}</span>}
-                    {pub.issue && <span>, no. {pub.issue}</span>}
-                    {pub.pages && <span>, {pub.pages}</span>}
-                    <span>, {pub.year}</span>
-                  </p>
-                  {pub.doi && (
-                    <a href={`https://doi.org/${pub.doi}`} target="_blank" className="text-sm text-blue-600 hover:underline">
-                      DOI: {pub.doi}
-                    </a>
-                  )}
-                  <div className="flex gap-2 mt-1">
-                    {pub.scopus_indexed && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Scopus</span>}
-                    {pub.wos_indexed && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">WoS</span>}
+      {/* Publications - grouped by year, latest first */}
+      {publications.length > 0 && (() => {
+        const roleColors: Record<string, string> = {
+          first_author: 'bg-green-100 text-green-800',
+          corresponding_author: 'bg-yellow-100 text-yellow-800',
+          last_author: 'bg-purple-100 text-purple-800',
+          co_author: 'bg-gray-100 text-gray-700',
+        };
+        // Group by year, sort descending
+        const byYear: Record<number, any[]> = {};
+        publications.forEach((pa: any) => {
+          const pub = pa.publications;
+          if (!pub) return;
+          const y = pub.year || 0;
+          if (!byYear[y]) byYear[y] = [];
+          byYear[y].push(pa);
+        });
+        const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+        return (
+          <section className="bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">
+              ผลงานตีพิมพ์ ({publications.length})
+            </h2>
+            <div className="space-y-8">
+              {years.map((year) => (
+                <div key={year}>
+                  <h3 className="text-lg font-bold text-blue-700 mb-3 flex items-center gap-2">
+                    <span className="w-1.5 h-5 bg-blue-600 rounded-full"></span>
+                    {year}
+                    <span className="text-sm font-normal text-gray-400">({byYear[year].length} เรื่อง)</span>
+                  </h3>
+                  <div className="space-y-4 ml-4">
+                    {byYear[year].map((pa: any) => {
+                      const pub = pa.publications;
+                      const role = pa.author_role;
+                      return (
+                        <div key={pub.id} className="border-l-4 border-blue-400 pl-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-semibold text-gray-900">{pub.title}</h4>
+                            <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${roleColors[role] || roleColors.co_author}`}>
+                              {roleLabelTh[role] || role}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{pub.authors_raw}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {pub.journal_name && <span className="italic">{pub.journal_name}</span>}
+                            {pub.volume && <span>, vol. {pub.volume}</span>}
+                            {pub.issue && <span>, no. {pub.issue}</span>}
+                            {pub.pages && <span>, {pub.pages}</span>}
+                          </p>
+                          {pub.doi && (
+                            <a href={`https://doi.org/${pub.doi}`} target="_blank" className="text-sm text-blue-600 hover:underline">
+                              DOI: {pub.doi}
+                            </a>
+                          )}
+                          <div className="flex gap-2 mt-1">
+                            {pub.scopus_indexed && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Scopus</span>}
+                            {pub.wos_indexed && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">WoS</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Grants */}
       {grants.length > 0 && (
