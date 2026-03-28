@@ -146,7 +146,7 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
         )}
       </div>
 
-      {/* Publications - grouped by year, latest first */}
+      {/* Publications - grouped by type then year */}
       {publications.length > 0 && (() => {
         const roleColors: Record<string, string> = {
           first_author: 'bg-green-100 text-green-800',
@@ -154,16 +154,46 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
           last_author: 'bg-purple-100 text-purple-800',
           co_author: 'bg-gray-100 text-gray-700',
         };
-        // Group by year, sort descending
-        const byYear: Record<number, any[]> = {};
-        publications.forEach((pa: any) => {
+
+        const pubTypeGroups = [
+          { types: ['journal_international'], label: 'วารสารนานาชาติ (International Journal)', color: 'border-blue-500', icon: 'bg-blue-600' },
+          { types: ['journal_national'], label: 'วารสารในประเทศ (National Journal)', color: 'border-green-500', icon: 'bg-green-600' },
+          { types: ['conference_international'], label: 'การประชุมนานาชาติ (International Conference)', color: 'border-purple-500', icon: 'bg-purple-600' },
+          { types: ['conference_national'], label: 'การประชุมในประเทศ (National Conference)', color: 'border-orange-500', icon: 'bg-orange-600' },
+          { types: ['book_chapter', 'book', 'technical_report', 'thesis', 'patent', 'petty_patent'], label: 'อื่นๆ (Others)', color: 'border-gray-500', icon: 'bg-gray-600' },
+        ];
+
+        const renderPub = (pa: any) => {
           const pub = pa.publications;
-          if (!pub) return;
-          const y = pub.year || 0;
-          if (!byYear[y]) byYear[y] = [];
-          byYear[y].push(pa);
-        });
-        const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+          const role = pa.author_role;
+          return (
+            <div key={pub.id} className="border-l-4 border-blue-300 pl-4">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="font-semibold text-gray-900 text-sm">{pub.title}</h4>
+                <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${roleColors[role] || roleColors.co_author}`}>
+                  {roleLabelTh[role] || role}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">{pub.authors_raw}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {pub.journal_name && <span className="italic">{pub.journal_name}</span>}
+                {pub.volume && <span>, vol. {pub.volume}</span>}
+                {pub.issue && <span>, no. {pub.issue}</span>}
+                {pub.pages && <span>, {pub.pages}</span>}
+                <span>, {pub.year}</span>
+              </p>
+              {pub.doi && (
+                <a href={`https://doi.org/${pub.doi}`} target="_blank" className="text-xs text-blue-600 hover:underline">
+                  DOI: {pub.doi}
+                </a>
+              )}
+              <div className="flex gap-2 mt-1">
+                {pub.scopus_indexed && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">Scopus</span>}
+                {pub.wos_indexed && <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">WoS</span>}
+              </div>
+            </div>
+          );
+        };
 
         return (
           <section className="bg-white rounded-xl shadow-lg p-8 mb-8">
@@ -171,47 +201,41 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
               ผลงานตีพิมพ์ ({publications.length})
             </h2>
             <div className="space-y-8">
-              {years.map((year) => (
-                <div key={year}>
-                  <h3 className="text-lg font-bold text-blue-700 mb-3 flex items-center gap-2">
-                    <span className="w-1.5 h-5 bg-blue-600 rounded-full"></span>
-                    {year}
-                    <span className="text-sm font-normal text-gray-400">({byYear[year].length} เรื่อง)</span>
-                  </h3>
-                  <div className="space-y-4 ml-4">
-                    {byYear[year].map((pa: any) => {
-                      const pub = pa.publications;
-                      const role = pa.author_role;
-                      return (
-                        <div key={pub.id} className="border-l-4 border-blue-400 pl-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-gray-900">{pub.title}</h4>
-                            <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${roleColors[role] || roleColors.co_author}`}>
-                              {roleLabelTh[role] || role}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{pub.authors_raw}</p>
-                          <p className="text-sm text-gray-500 mt-1">
-                            {pub.journal_name && <span className="italic">{pub.journal_name}</span>}
-                            {pub.volume && <span>, vol. {pub.volume}</span>}
-                            {pub.issue && <span>, no. {pub.issue}</span>}
-                            {pub.pages && <span>, {pub.pages}</span>}
-                          </p>
-                          {pub.doi && (
-                            <a href={`https://doi.org/${pub.doi}`} target="_blank" className="text-sm text-blue-600 hover:underline">
-                              DOI: {pub.doi}
-                            </a>
-                          )}
-                          <div className="flex gap-2 mt-1">
-                            {pub.scopus_indexed && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Scopus</span>}
-                            {pub.wos_indexed && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">WoS</span>}
+              {pubTypeGroups.map((group) => {
+                const items = publications
+                  .filter((pa: any) => pa.publications && group.types.includes(pa.publications.pub_type))
+                  .sort((a: any, b: any) => (b.publications?.year || 0) - (a.publications?.year || 0));
+                if (items.length === 0) return null;
+
+                // Group by year within each type
+                const byYear: Record<number, any[]> = {};
+                items.forEach((pa: any) => {
+                  const y = pa.publications.year || 0;
+                  if (!byYear[y]) byYear[y] = [];
+                  byYear[y].push(pa);
+                });
+                const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+
+                return (
+                  <div key={group.label}>
+                    <h3 className={`text-base font-bold text-gray-700 mb-3 pb-2 border-b-2 ${group.color} flex items-center gap-2`}>
+                      <span className={`w-2 h-2 rounded-full ${group.icon}`}></span>
+                      {group.label}
+                      <span className="text-sm font-normal text-gray-400">({items.length})</span>
+                    </h3>
+                    <div className="space-y-5 ml-2">
+                      {years.map((year) => (
+                        <div key={year}>
+                          <p className="text-sm font-semibold text-gray-500 mb-2">{year}</p>
+                          <div className="space-y-3 ml-2">
+                            {byYear[year].map(renderPub)}
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         );
