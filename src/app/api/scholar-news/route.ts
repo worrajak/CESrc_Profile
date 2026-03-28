@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-interface ScholarArticle {
+interface NewsArticle {
   title: string;
   link: string;
   snippet: string;
@@ -10,105 +10,115 @@ interface ScholarArticle {
   thumbnail: string | null;
 }
 
-// Cache to avoid hitting Google too often
-let cachedArticles: ScholarArticle[] = [];
+// Cache
+let cachedArticles: NewsArticle[] = [];
 let lastFetchTime = 0;
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
-async function fetchGoogleScholarNews(): Promise<ScholarArticle[]> {
-  const queries = [
-    'solar energy renewable Thailand',
-    'clean energy microgrid battery storage',
-    'electric vehicle charging power system',
-  ];
-
-  const allArticles: ScholarArticle[] = [];
-
-  for (const query of queries) {
-    try {
-      const url = `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}&hl=en&as_sdt=0,5&as_ylo=2024&num=5`;
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-        next: { revalidate: 1800 }, // 30 min cache
-      });
-
-      if (!res.ok) continue;
-
-      const html = await res.text();
-      const articles = parseScholarHTML(html);
-      allArticles.push(...articles);
-    } catch {
-      // Skip this query on error
-    }
-  }
-
-  // Deduplicate by title and limit to 5
-  const seen = new Set<string>();
-  const unique = allArticles.filter((a) => {
-    const key = a.title.toLowerCase().substring(0, 50);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+async function fetchIEEESpectrumNews(): Promise<NewsArticle[]> {
+  const url = 'https://spectrum.ieee.org/type/news/';
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    next: { revalidate: 1800 },
   });
 
-  return unique.slice(0, 5);
+  if (!res.ok) return [];
+
+  const html = await res.text();
+  return parseIEEESpectrumHTML(html);
 }
 
-function parseScholarHTML(html: string): ScholarArticle[] {
-  const articles: ScholarArticle[] = [];
-  // Match each result block
-  const resultBlocks = html.split(/class="gs_r gs_or gs_scl"/);
+function parseIEEESpectrumHTML(html: string): NewsArticle[] {
+  const articles: NewsArticle[] = [];
 
-  for (let i = 1; i < resultBlocks.length && articles.length < 5; i++) {
-    const block = resultBlocks[i];
+  // IEEE Spectrum uses article cards with <h2> titles inside links
+  // Pattern: find article blocks with titles and links
+  const articleBlocks = html.split(/<article/);
 
-    // Title and link
-    const titleMatch = block.match(/<h3[^>]*class="gs_rt"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/);
-    if (!titleMatch) continue;
+  for (let i = 1; i < articleBlocks.length && articles.length < 5; i++) {
+    const block = articleBlocks[i];
 
-    const link = titleMatch[1];
+    // Find title link - typically <a href="..."><h2>Title</h2></a> or <h2><a>...
+    const titleMatch = block.match(/href="(\/[^"]*)"[^>]*>[\s\S]*?<(?:h2|h3)[^>]*>([\s\S]*?)<\/(?:h2|h3)>/);
+    if (!titleMatch) {
+      // Try alternative: <h2><a href="...">Title</a></h2>
+      const altMatch = block.match(/<(?:h2|h3)[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/);
+      if (!altMatch) continue;
+
+      const link = altMatch[1].startsWith('http') ? altMatch[1] : `https://spectrum.ieee.org${altMatch[1]}`;
+      const title = altMatch[2].replace(/<[^>]+>/g, '').trim();
+      if (!title || title.length < 10) continue;
+
+      const snippet = extractSnippet(block);
+      const thumbnail = extractThumbnail(block);
+
+      articles.push({
+        title,
+        link,
+        snippet,
+        authors: '',
+        source: 'IEEE Spectrum',
+        year: '',
+        thumbnail,
+      });
+      continue;
+    }
+
+    const link = titleMatch[1].startsWith('http') ? titleMatch[1] : `https://spectrum.ieee.org${titleMatch[1]}`;
     const title = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+    if (!title || title.length < 10) continue;
 
-    // Snippet
-    const snippetMatch = block.match(/class="gs_rs"[^>]*>([\s\S]*?)<\/div>/);
-    const snippet = snippetMatch
-      ? snippetMatch[1].replace(/<[^>]+>/g, '').trim().substring(0, 200)
-      : '';
+    const snippet = extractSnippet(block);
+    const thumbnail = extractThumbnail(block);
 
-    // Authors and source
-    const authorMatch = block.match(/class="gs_a"[^>]*>([\s\S]*?)<\/div>/);
-    const authorLine = authorMatch
-      ? authorMatch[1].replace(/<[^>]+>/g, '').trim()
-      : '';
-    const authorParts = authorLine.split(' - ');
-    const authors = authorParts[0]?.trim() || '';
-    const source = authorParts[1]?.trim() || '';
-    const year = authorParts[2]?.trim() || '';
-
-    // Thumbnail
-    const thumbMatch = block.match(/class="gs_or_ggsm"[\s\S]*?href="([^"]*)"/);
-    const thumbnail = thumbMatch ? thumbMatch[1] : null;
-
-    articles.push({ title, link, snippet, authors, source, year, thumbnail });
+    articles.push({
+      title,
+      link,
+      snippet,
+      authors: '',
+      source: 'IEEE Spectrum',
+      year: '',
+      thumbnail,
+    });
   }
 
   return articles;
 }
 
+function extractSnippet(block: string): string {
+  // Look for paragraph or description text
+  const pMatch = block.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+  if (pMatch) {
+    const text = pMatch[1].replace(/<[^>]+>/g, '').trim();
+    if (text.length > 20) return text.substring(0, 150);
+  }
+  return '';
+}
+
+function extractThumbnail(block: string): string | null {
+  // Look for img src
+  const imgMatch = block.match(/<img[^>]*src="([^"]*(?:\.jpg|\.jpeg|\.png|\.webp)[^"]*)"/);
+  if (imgMatch) return imgMatch[1];
+
+  // Try srcset
+  const srcsetMatch = block.match(/srcset="([^"]*(?:\.jpg|\.jpeg|\.png|\.webp)[^\s,]*)/) ;
+  if (srcsetMatch) return srcsetMatch[1];
+
+  return null;
+}
+
 export async function GET() {
   const now = Date.now();
 
-  // Return cached if still fresh
   if (cachedArticles.length > 0 && now - lastFetchTime < CACHE_DURATION) {
     return NextResponse.json({ articles: cachedArticles, cached: true });
   }
 
   try {
-    const articles = await fetchGoogleScholarNews();
+    const articles = await fetchIEEESpectrumNews();
 
     if (articles.length > 0) {
       cachedArticles = articles;
@@ -117,7 +127,6 @@ export async function GET() {
 
     return NextResponse.json({ articles, cached: false });
   } catch {
-    // Return cached even if expired, or empty
     return NextResponse.json({ articles: cachedArticles, cached: true, error: 'fetch failed' });
   }
 }

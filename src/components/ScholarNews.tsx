@@ -66,23 +66,18 @@ export default function ScholarNews() {
               <h4 className="text-sm font-medium text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2">
                 {article.title}
               </h4>
-              <p className="text-xs text-gray-500 mt-1 line-clamp-1">
-                {article.authors}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-gray-400">{article.source}</span>
-                {article.year && (
-                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 rounded">
-                    {article.year}
-                  </span>
-                )}
-              </div>
+              {article.snippet && (
+                <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                  {article.snippet}
+                </p>
+              )}
+              <span className="text-[10px] text-gray-400 mt-1 block">{article.source}</span>
             </div>
           </div>
         </a>
       ))}
       <p className="text-[10px] text-gray-400 text-right">
-        Powered by Google Scholar
+        Powered by IEEE Spectrum
       </p>
     </div>
   );

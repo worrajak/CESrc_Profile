@@ -124,7 +124,7 @@ export default async function HomePage() {
             <div className="mt-4">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <span className="w-1 h-4 bg-green-600 rounded-full"></span>
-                บทความวิชาการล่าสุด
+                IEEE Spectrum News
               </h3>
               <div className="bg-gradient-to-b from-green-50 to-white rounded-lg p-4 border border-green-100">
                 <ScholarNews />

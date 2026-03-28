@@ -62,11 +62,11 @@ export default async function NewsPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">
             <span className="w-1 h-6 bg-green-600 rounded-full"></span>
-            บทความวิชาการล่าสุด
+            IEEE Spectrum News
           </h2>
           <div className="bg-gradient-to-b from-green-50 to-white rounded-xl p-4 border border-green-100">
             <p className="text-xs text-gray-500 mb-3">
-              จาก Google Scholar - พลังงานสะอาด, Solar, EV, Battery
+              จาก IEEE Spectrum - Technology, Engineering & Science News
             </p>
             <ScholarNews />
           </div>
