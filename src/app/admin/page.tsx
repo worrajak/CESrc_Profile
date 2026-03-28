@@ -105,11 +105,11 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">เขียนข่าว, เพิ่มรูป, ลบข่าว</p>
         </Link>
         <Link
-          href="/news"
+          href="/admin/publications"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
         >
-          <h3 className="font-semibold text-gray-800 mb-1">ดูหน้าข่าวสาร</h3>
-          <p className="text-sm text-gray-500">ดูข่าวสารที่เผยแพร่แล้ว</p>
+          <h3 className="font-semibold text-gray-800 mb-1">นำเข้าผลงานตีพิมพ์</h3>
+          <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัยอัตโนมัติ</p>
         </Link>
         <a
           href="https://supabase.com/dashboard"
