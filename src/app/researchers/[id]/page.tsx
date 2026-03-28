@@ -41,10 +41,10 @@ async function getResearcher(id: string) {
       author_role,
       author_order,
       is_corresponding,
-      publications (*)
+      publications!inner (*)
     `)
     .eq('researcher_id', id)
-    .order('author_order', { ascending: true });
+    .order('year', { referencedTable: 'publications', ascending: false });
 
   const { data: grants } = await supabase
     .from('grant_members')
