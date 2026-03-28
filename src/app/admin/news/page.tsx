@@ -127,10 +127,10 @@ export default function AdminNewsPage() {
       });
       const data = await res.json();
       if (data.tags) {
-        setTags((prev) => [...new Set([...prev, ...data.tags])]);
+        setTags((prev) => Array.from(new Set([...prev, ...data.tags])));
       }
       if (data.sdg_goals) {
-        setSdgGoals((prev) => [...new Set([...prev, ...data.sdg_goals])]);
+        setSdgGoals((prev) => Array.from(new Set([...prev, ...data.sdg_goals])));
       }
     } catch { /* ignore */ }
     finally { setSuggesting(false); }
