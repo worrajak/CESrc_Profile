@@ -70,9 +70,10 @@ export default function AdminNewsPage() {
   };
 
   useEffect(() => {
-    if (sessionStorage.getItem('admin_auth') === 'true') {
+    const storedPwd = sessionStorage.getItem('admin_pwd');
+    if (sessionStorage.getItem('admin_auth') === 'true' && storedPwd) {
       setAuthenticated(true);
-      setPassword(sessionStorage.getItem('admin_pwd') || '');
+      setPassword(storedPwd);
       fetchNews();
     }
   }, []);

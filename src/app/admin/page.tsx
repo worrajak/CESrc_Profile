@@ -26,6 +26,7 @@ export default function AdminPage() {
       if (res.ok) {
         setAuthenticated(true);
         sessionStorage.setItem('admin_auth', 'true');
+        sessionStorage.setItem('admin_pwd', password);
       } else {
         setError('รหัสผ่านไม่ถูกต้อง');
       }
