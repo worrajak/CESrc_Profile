@@ -33,27 +33,36 @@ export default function NewsCard({ news }: { news: NewsItem }) {
 
   return (
     <Link href={`/news/${news.id}`} className="block group">
-      <div className="bg-white rounded-xl shadow-sm border hover:shadow-md transition overflow-hidden">
-        {news.cover_image_url && (
-          <div className="aspect-video bg-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border hover:shadow-md transition overflow-hidden flex">
+        {/* Thumbnail */}
+        {news.cover_image_url ? (
+          <div className="w-32 md:w-40 flex-shrink-0 bg-gray-100 overflow-hidden">
             <img
               src={news.cover_image_url}
               alt={news.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           </div>
+        ) : (
+          <div className="w-32 md:w-40 flex-shrink-0 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+            <span className="text-3xl opacity-50">
+              {news.category === 'energy_news' ? '⚡' : news.category === 'academic' ? '📄' : '📰'}
+            </span>
+          </div>
         )}
-        <div className="p-4">
-          <div className="flex items-center gap-2 mb-2">
+
+        {/* Content */}
+        <div className="p-4 flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1.5">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cat.color}`}>
               {cat.label}
             </span>
             <span className="text-xs text-gray-400">{date}</span>
           </div>
-          <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2">
+          <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2 text-sm md:text-base">
             {news.title}
           </h3>
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+          <p className="text-xs md:text-sm text-gray-500 mt-1 line-clamp-2">
             {news.content.replace(/[#*_`]/g, '').substring(0, 120)}...
           </p>
           {news.tags && news.tags.length > 0 && (

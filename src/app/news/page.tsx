@@ -43,7 +43,7 @@ export default async function NewsPage() {
           </h2>
 
           {news.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               {news.map((item: any) => (
                 <NewsCard key={item.id} news={item} />
               ))}
