@@ -11,7 +11,7 @@ INSERT INTO researchers (
 )
 VALUES (
   'a0000001-0000-0000-0000-000000000012',
-  'อาจารย์', 'ณัฐวัฒน์', 'พันละวัน',
+  'อาจารย์', 'ณัฐวัฒน์', 'พัลวัล',
   'Lect.', 'Nattawat', 'Panlawan',
   'member',
   'Division of Electrical Engineering', 'Faculty of Engineering',
@@ -31,7 +31,7 @@ INSERT INTO researchers (
 )
 VALUES (
   'a0000001-0000-0000-0000-000000000013',
-  'อาจารย์', 'กันต์', 'นาคาเอี่ยม',
+  'อาจารย์', 'กัญจน์', 'นาคเอี่ยม',
   'Lect.', 'Kan', 'Nakaiam',
   'member',
   'Division of Electrical Engineering', 'Faculty of Engineering',
@@ -50,7 +50,7 @@ INSERT INTO researchers (
 )
 VALUES (
   'a0000001-0000-0000-0000-000000000014',
-  'อาจารย์', 'นริศ', 'คำแปงแก้ว',
+  'อาจารย์', 'นริศ', 'กำแพงแก้ว',
   'Lect.', 'Naris', 'Khampangkaew',
   'member',
   'Division of Electrical Engineering', 'Faculty of Engineering',
