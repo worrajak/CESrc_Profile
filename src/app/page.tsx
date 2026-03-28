@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
+import NewsCard from '@/components/NewsCard';
+import ScholarNews from '@/components/ScholarNews';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -7,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
-  const [researchersRes, pubCountRes, grantCountRes, areasRes] = await Promise.all([
+  const [researchersRes, pubCountRes, grantCountRes, areasRes, newsRes] = await Promise.all([
     supabase
       .from('researchers')
       .select('*')
@@ -16,6 +18,16 @@ async function getHomeData() {
     supabase.from('publications').select('id', { count: 'exact', head: true }),
     supabase.from('grants').select('id', { count: 'exact', head: true }),
     supabase.from('research_areas').select('*').order('sort_order'),
+    supabase
+      .from('news')
+      .select(`
+        *,
+        news_images (id, image_url, caption, sort_order),
+        researchers:author_id (title_th, first_name_th, last_name_th)
+      `)
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .limit(5),
   ]);
 
   return {
@@ -23,11 +35,12 @@ async function getHomeData() {
     pubCount: pubCountRes.count || 0,
     grantCount: grantCountRes.count || 0,
     areas: areasRes.data || [],
+    news: newsRes.data || [],
   };
 }
 
 export default async function HomePage() {
-  const { researchers, pubCount, grantCount, areas } = await getHomeData();
+  const { researchers, pubCount, grantCount, areas, news } = await getHomeData();
 
   const advisor = researchers.filter((r: { unit_role: string }) => r.unit_role === 'advisor');
   const head = researchers.filter((r: { unit_role: string }) => r.unit_role === 'head');
@@ -59,6 +72,41 @@ export default async function HomePage() {
             <div className="text-center">
               <div className="text-3xl font-bold text-yellow-300">{grantCount}</div>
               <div className="text-sm text-blue-200">ทุนวิจัย</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* News & Scholar Section */}
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">ข่าวสารและกิจกรรม</h2>
+          <Link href="/news" className="text-blue-600 hover:text-blue-800 text-sm">
+            ดูทั้งหมด →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* CESrc News */}
+          <div className="lg:col-span-2">
+            {news.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {news.map((item: any) => (
+                  <NewsCard key={item.id} news={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl p-8 text-center border">
+                <p className="text-gray-400">ยังไม่มีข่าวสาร</p>
+              </div>
+            )}
+          </div>
+          {/* Scholar News */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              บทความวิชาการล่าสุด
+            </h3>
+            <div className="bg-gradient-to-b from-green-50 to-white rounded-xl p-4 border border-green-100">
+              <ScholarNews />
             </div>
           </div>
         </div>

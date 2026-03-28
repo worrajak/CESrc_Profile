@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -91,6 +92,33 @@ export default function AdminPage() {
         >
           ออกจากระบบ
         </button>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Link
+          href="/admin/news"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการข่าวสาร</h3>
+          <p className="text-sm text-gray-500">เขียนข่าว, เพิ่มรูป, ลบข่าว</p>
+        </Link>
+        <Link
+          href="/news"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">ดูหน้าข่าวสาร</h3>
+          <p className="text-sm text-gray-500">ดูข่าวสารที่เผยแพร่แล้ว</p>
+        </Link>
+        <a
+          href="https://supabase.com/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-purple-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">Supabase Dashboard</h3>
+          <p className="text-sm text-gray-500">จัดการฐานข้อมูลและ Storage</p>
+        </a>
       </div>
 
       {/* GA Embed Dashboard */}

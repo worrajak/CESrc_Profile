@@ -27,6 +27,7 @@ export default function Navbar() {
             <Link href="/grants" className="hover:text-yellow-300 transition">ทุนวิจัย</Link>
             <Link href="/patents" className="hover:text-yellow-300 transition">สิทธิบัตร</Link>
             <Link href="/services" className="hover:text-yellow-300 transition">บริการวิชาการ</Link>
+            <Link href="/news" className="hover:text-yellow-300 transition">ข่าวสาร</Link>
           </div>
 
           {/* Mobile toggle */}
@@ -51,6 +52,7 @@ export default function Navbar() {
           <Link href="/grants" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ทุนวิจัย</Link>
           <Link href="/patents" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>สิทธิบัตร</Link>
           <Link href="/services" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>บริการวิชาการ</Link>
+          <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ข่าวสาร</Link>
         </div>
       )}
     </nav>
