@@ -31,10 +31,13 @@ export default function AdminPublicationsPage() {
   const [loginError, setLoginError] = useState('');
 
   // Import state
+  const [importMode, setImportMode] = useState<'doi' | 'citation'>('doi');
   const [doiInput, setDoiInput] = useState('');
+  const [citationInput, setCitationInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [parseSource, setParseSource] = useState('');
 
   // Publication form
   const [title, setTitle] = useState('');
@@ -88,7 +91,23 @@ export default function AdminPublicationsPage() {
     setYear(''); setDoi(''); setPubType('journal_international');
     setScopusIndexed(false); setWosIndexed(false); setKeywordsStr('');
     setParsedAuthors([]); setMatches([]);
-    setError(''); setSuccess('');
+    setError(''); setSuccess(''); setParseSource('');
+  };
+
+  // Fill form from API response
+  const fillForm = (data: any) => {
+    setTitle(data.title || '');
+    setAuthorsRaw(data.authors_raw || '');
+    setJournalName(data.journal_name || '');
+    setVolume(data.volume || '');
+    setIssue(data.issue || '');
+    setPages(data.pages || '');
+    setYear(data.year?.toString() || '');
+    setDoi(data.doi || '');
+    setPubType(data.pub_type || 'journal_international');
+    setKeywordsStr((data.keywords || []).join(', '));
+    setParsedAuthors(data.authors || []);
+    setParseSource(data.source || '');
   };
 
   // Fetch DOI
@@ -112,18 +131,7 @@ export default function AdminPublicationsPage() {
         return;
       }
 
-      // Fill form
-      setTitle(data.title || '');
-      setAuthorsRaw(data.authors_raw || '');
-      setJournalName(data.journal_name || '');
-      setVolume(data.volume || '');
-      setIssue(data.issue || '');
-      setPages(data.pages || '');
-      setYear(data.year?.toString() || '');
-      setDoi(data.doi || '');
-      setPubType(data.pub_type || 'journal_international');
-      setKeywordsStr((data.keywords || []).join(', '));
-      setParsedAuthors(data.authors || []);
+      fillForm(data);
       setSuccess('Fetched from CrossRef successfully');
     } catch {
       setError('Network error');
@@ -131,6 +139,37 @@ export default function AdminPublicationsPage() {
       setLoading(false);
     }
   }, [doiInput, password]);
+
+  // Parse Citation
+  const parseCitation = useCallback(async () => {
+    if (!citationInput.trim()) return;
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setMatches([]);
+
+    try {
+      const res = await fetch('/api/publications/parse-citation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, citation: citationInput.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to parse citation');
+        return;
+      }
+
+      fillForm(data);
+      const src = data.source === 'crossref' ? 'DOI found — fetched from CrossRef' : 'Parsed from citation text (please verify)';
+      setSuccess(src);
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  }, [citationInput, password]);
 
   // Match authors
   const matchAuthors = useCallback(async () => {
@@ -233,31 +272,77 @@ export default function AdminPublicationsPage() {
         <a href="/admin" className="text-sm text-blue-600 hover:underline">← กลับ Admin</a>
       </div>
 
-      {/* DOI Import */}
+      {/* Import Tabs */}
       <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-700 mb-3">Import จาก DOI</h2>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={doiInput}
-            onChange={e => setDoiInput(e.target.value)}
-            placeholder="เช่น 10.3390/en18071628 หรือ https://doi.org/..."
-            className="flex-1 px-4 py-2 border rounded-lg text-sm"
-            onKeyDown={e => e.key === 'Enter' && fetchDoi()}
-          />
+        <div className="flex gap-2 mb-4">
           <button
-            onClick={fetchDoi}
-            disabled={loading || !doiInput.trim()}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm whitespace-nowrap"
+            onClick={() => setImportMode('doi')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              importMode === 'doi' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
-            {loading ? 'กำลังดึง...' : 'Fetch DOI'}
+            Import จาก DOI
+          </button>
+          <button
+            onClick={() => setImportMode('citation')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              importMode === 'citation' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Import จาก Citation
           </button>
         </div>
+
+        {importMode === 'doi' ? (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={doiInput}
+              onChange={e => setDoiInput(e.target.value)}
+              placeholder="เช่น 10.3390/en18071628 หรือ https://doi.org/..."
+              className="flex-1 px-4 py-2 border rounded-lg text-sm"
+              onKeyDown={e => e.key === 'Enter' && fetchDoi()}
+            />
+            <button
+              onClick={fetchDoi}
+              disabled={loading || !doiInput.trim()}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm whitespace-nowrap"
+            >
+              {loading ? 'กำลังดึง...' : 'Fetch DOI'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <textarea
+              value={citationInput}
+              onChange={e => setCitationInput(e.target.value)}
+              placeholder={'วาง citation จาก Google Scholar, สำนักพิมพ์ หรือ reference list เช่น:\n\nM. Ngao-det, J. Thongpron, A. Namin, ... "Title," Journal, vol. 18, no. 7, pp. 1628, 2025.\n\nถ้ามี DOI ใน citation จะดึงจาก CrossRef อัตโนมัติ'}
+              className="w-full px-4 py-3 border rounded-lg text-sm h-28 resize-y"
+            />
+            <button
+              onClick={parseCitation}
+              disabled={loading || !citationInput.trim()}
+              className="mt-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+            >
+              {loading ? 'กำลังแยกข้อมูล...' : 'Parse Citation'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Status messages */}
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">{success}</div>}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm flex items-center gap-2">
+          {success}
+          {parseSource === 'parsed' && (
+            <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs">Regex parsed — กรุณาตรวจสอบข้อมูล</span>
+          )}
+          {parseSource === 'crossref' && (
+            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">CrossRef verified</span>
+          )}
+        </div>
+      )}
 
       {/* Publication Form */}
       {title && (
