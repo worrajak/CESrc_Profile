@@ -40,9 +40,11 @@ interface StudentForm {
   status: string;
   email: string;
   phone: string;
-  // Advisor info
+  // Advisor & committee info
   advisor_id: string;
-  co_advisor_id: string;
+  co_advisor_ids: string[];       // สูงสุด 3 ท่าน
+  committee_chair_id: string;     // ประธานกรรมการสอบ (นักวิจัยภายใน)
+  committee_chair_external: string; // ประธานกรรมการสอบภายนอก (ชื่อ+สังกัด)
   thesis_title_th: string;
   thesis_title_en: string;
 }
@@ -53,7 +55,8 @@ const emptyForm: StudentForm = {
   degree_level: 'bachelor', program_th: 'วิศวกรรมไฟฟ้า', program_en: 'Electrical Engineering',
   enrollment_year: '', graduation_year: '', status: 'active',
   email: '', phone: '',
-  advisor_id: '', co_advisor_id: '', thesis_title_th: '', thesis_title_en: '',
+  advisor_id: '', co_advisor_ids: [''], committee_chair_id: '', committee_chair_external: '',
+  thesis_title_th: '', thesis_title_en: '',
 };
 
 export default function AdminStudentsPage() {
@@ -115,6 +118,44 @@ export default function AdminStudentsPage() {
     if (authenticated) fetchData();
   }, [authenticated, fetchData]);
 
+  // Helper: insert all committee members for a thesis
+  const insertCommittee = async (supabase: any, thesisId: string) => {
+    let order = 1;
+    // 1. อาจารย์ที่ปรึกษาหลัก
+    await supabase.from('thesis_committee').insert({
+      thesis_id: thesisId, researcher_id: form.advisor_id,
+      committee_role: 'main_advisor', sort_order: order++,
+    });
+    // 2. อาจารย์ที่ปรึกษาร่วม (สูงสุด 3 ท่าน)
+    for (const coId of form.co_advisor_ids.filter(id => id)) {
+      await supabase.from('thesis_committee').insert({
+        thesis_id: thesisId, researcher_id: coId,
+        committee_role: 'co_advisor', sort_order: order++,
+      });
+    }
+    // 3. ประธานกรรมการสอบ (ภายใน)
+    if (form.committee_chair_id) {
+      await supabase.from('thesis_committee').insert({
+        thesis_id: thesisId, researcher_id: form.committee_chair_id,
+        committee_role: 'committee_chair', sort_order: order++,
+      });
+    }
+    // 4. ประธานกรรมการสอบ (ภายนอก) — สร้าง external_persons แล้วเชื่อม
+    if (form.committee_chair_external.trim()) {
+      const parts = form.committee_chair_external.trim();
+      const { data: ext } = await supabase.from('external_persons').insert({
+        title_th: '', first_name_th: parts, last_name_th: '',
+        position: 'ประธานกรรมการสอบ',
+      }).select().single();
+      if (ext) {
+        await supabase.from('thesis_committee').insert({
+          thesis_id: thesisId, external_person_id: ext.id,
+          committee_role: 'committee_chair', sort_order: order++,
+        });
+      }
+    }
+  };
+
   const handleSave = async () => {
     if (!form.first_name_th || !form.last_name_th) {
       setMessage('กรุณากรอกชื่อ-นามสกุล');
@@ -165,20 +206,7 @@ export default function AdminStudentsPage() {
 
           // Replace committee: delete old, insert new
           await supabase.from('thesis_committee').delete().eq('thesis_id', existingThesis.id);
-          await supabase.from('thesis_committee').insert({
-            thesis_id: existingThesis.id,
-            researcher_id: form.advisor_id,
-            committee_role: 'main_advisor',
-            sort_order: 1,
-          });
-          if (form.co_advisor_id) {
-            await supabase.from('thesis_committee').insert({
-              thesis_id: existingThesis.id,
-              researcher_id: form.co_advisor_id,
-              committee_role: 'co_advisor',
-              sort_order: 2,
-            });
-          }
+          await insertCommittee(supabase, existingThesis.id);
         } else {
           // Create new thesis + committee
           const { data: thesis } = await supabase.from('theses').insert({
@@ -191,22 +219,7 @@ export default function AdminStudentsPage() {
             academic_year: form.enrollment_year ? parseInt(form.enrollment_year) : null,
             status: 'proposal',
           }).select().single();
-          if (thesis) {
-            await supabase.from('thesis_committee').insert({
-              thesis_id: thesis.id,
-              researcher_id: form.advisor_id,
-              committee_role: 'main_advisor',
-              sort_order: 1,
-            });
-            if (form.co_advisor_id) {
-              await supabase.from('thesis_committee').insert({
-                thesis_id: thesis.id,
-                researcher_id: form.co_advisor_id,
-                committee_role: 'co_advisor',
-                sort_order: 2,
-              });
-            }
-          }
+          if (thesis) await insertCommittee(supabase, thesis.id);
         }
       }
     } else {
@@ -216,7 +229,7 @@ export default function AdminStudentsPage() {
 
       // สร้าง thesis + thesis_committee สำหรับ ป.โท/เอก ที่ระบุอาจารย์
       if (!error && inserted && form.advisor_id && ['master', 'doctoral'].includes(form.degree_level)) {
-        const { data: thesis, error: thesisErr } = await supabase.from('theses').insert({
+        const { data: thesis } = await supabase.from('theses').insert({
           student_id: inserted.id,
           title_th: form.thesis_title_th || `วิทยานิพนธ์ - ${form.first_name_th} ${form.last_name_th}`,
           title_en: form.thesis_title_en || null,
@@ -226,25 +239,7 @@ export default function AdminStudentsPage() {
           academic_year: form.enrollment_year ? parseInt(form.enrollment_year) : null,
           status: 'proposal',
         }).select().single();
-
-        if (thesis && !thesisErr) {
-          // อาจารย์ที่ปรึกษาหลัก
-          await supabase.from('thesis_committee').insert({
-            thesis_id: thesis.id,
-            researcher_id: form.advisor_id,
-            committee_role: 'main_advisor',
-            sort_order: 1,
-          });
-          // อาจารย์ที่ปรึกษาร่วม (ถ้ามี)
-          if (form.co_advisor_id) {
-            await supabase.from('thesis_committee').insert({
-              thesis_id: thesis.id,
-              researcher_id: form.co_advisor_id,
-              committee_role: 'co_advisor',
-              sort_order: 2,
-            });
-          }
-        }
+        if (thesis) await insertCommittee(supabase, thesis.id);
       }
     }
 
@@ -272,8 +267,27 @@ export default function AdminStudentsPage() {
       .eq('student_id', s.id)
       .maybeSingle();
 
-    const mainAdvisor = thesis?.thesis_committee?.find((tc: any) => tc.committee_role === 'main_advisor');
-    const coAdvisor = thesis?.thesis_committee?.find((tc: any) => tc.committee_role === 'co_advisor');
+    const committee = thesis?.thesis_committee || [];
+    const mainAdvisor = committee.find((tc: any) => tc.committee_role === 'main_advisor');
+    const coAdvisors = committee
+      .filter((tc: any) => tc.committee_role === 'co_advisor')
+      .map((tc: any) => tc.researcher_id);
+    const chairInternal = committee.find((tc: any) => tc.committee_role === 'committee_chair');
+
+    // Load external chair if exists
+    let chairExternalName = '';
+    if (thesis) {
+      const { data: extChairs } = await supabase
+        .from('thesis_committee')
+        .select('external_person_id, external_persons (title_th, first_name_th, last_name_th, university)')
+        .eq('thesis_id', thesis.id)
+        .eq('committee_role', 'committee_chair')
+        .not('external_person_id', 'is', null);
+      if (extChairs && extChairs.length > 0) {
+        const ep = (extChairs[0] as any).external_persons;
+        if (ep) chairExternalName = `${ep.title_th || ''}${ep.first_name_th || ''} ${ep.last_name_th || ''} (${ep.university || ''})`;
+      }
+    }
 
     setForm({
       student_code: s.student_code || '',
@@ -283,7 +297,9 @@ export default function AdminStudentsPage() {
       enrollment_year: s.enrollment_year?.toString() || '', graduation_year: s.graduation_year?.toString() || '',
       status: s.status, email: s.email || '', phone: s.phone || '',
       advisor_id: mainAdvisor?.researcher_id || '',
-      co_advisor_id: coAdvisor?.researcher_id || '',
+      co_advisor_ids: coAdvisors.length > 0 ? coAdvisors : [''],
+      committee_chair_id: chairInternal?.researcher_id || '',
+      committee_chair_external: chairExternalName,
       thesis_title_th: thesis?.title_th || '',
       thesis_title_en: thesis?.title_en || '',
     });
@@ -441,15 +457,16 @@ export default function AdminStudentsPage() {
             </div>
           </div>
 
-          {/* Advisor Section */}
+          {/* Advisor & Committee Section */}
           <div className="mt-6 pt-6 border-t">
             <h3 className="font-semibold text-gray-800 mb-3">
-              อาจารย์ที่ปรึกษา
+              อาจารย์ที่ปรึกษาและกรรมการสอบ
               {form.degree_level === 'bachelor' && (
                 <span className="text-xs text-gray-400 font-normal ml-2">(ป.ตรี จัดการที่หน้าหัวข้อโครงงาน)</span>
               )}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* ที่ปรึกษาหลัก */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">อาจารย์ที่ปรึกษาหลัก</label>
                 <select value={form.advisor_id} onChange={e => setForm({ ...form, advisor_id: e.target.value })}
@@ -462,18 +479,75 @@ export default function AdminStudentsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* ที่ปรึกษาร่วม (สูงสุด 3 ท่าน) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">อาจารย์ที่ปรึกษาร่วม</label>
-                <select value={form.co_advisor_id} onChange={e => setForm({ ...form, co_advisor_id: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2">
-                  <option value="">-- ไม่มี --</option>
-                  {researchers.map((r: any) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title_th}{r.first_name_th} {r.last_name_th}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  อาจารย์ที่ปรึกษาร่วม
+                  <span className="text-xs text-gray-400 ml-1">(สูงสุด 3 ท่าน)</span>
+                </label>
+                {form.co_advisor_ids.map((coId, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <select value={coId}
+                      onChange={e => {
+                        const updated = [...form.co_advisor_ids];
+                        updated[idx] = e.target.value;
+                        setForm({ ...form, co_advisor_ids: updated });
+                      }}
+                      className="flex-1 border rounded-lg px-3 py-2">
+                      <option value="">-- ไม่มี --</option>
+                      {researchers.map((r: any) => (
+                        <option key={r.id} value={r.id}>
+                          {r.title_th}{r.first_name_th} {r.last_name_th}
+                        </option>
+                      ))}
+                    </select>
+                    {form.co_advisor_ids.length > 1 && (
+                      <button type="button" onClick={() => {
+                        const updated = form.co_advisor_ids.filter((_, i) => i !== idx);
+                        setForm({ ...form, co_advisor_ids: updated });
+                      }} className="text-red-500 hover:text-red-700 text-sm px-2">ลบ</button>
+                    )}
+                  </div>
+                ))}
+                {form.co_advisor_ids.length < 3 && (
+                  <button type="button" onClick={() => setForm({ ...form, co_advisor_ids: [...form.co_advisor_ids, ''] })}
+                    className="text-blue-600 hover:text-blue-800 text-xs mt-1">
+                    + เพิ่มที่ปรึกษาร่วม
+                  </button>
+                )}
               </div>
+
+              {/* กรรมการสอบ — สำหรับ ป.โท/เอก */}
+              {['master', 'doctoral'].includes(form.degree_level) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ประธานกรรมการสอบ (ภายใน)</label>
+                    <select value={form.committee_chair_id} onChange={e => setForm({ ...form, committee_chair_id: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2">
+                      <option value="">-- ไม่ระบุ --</option>
+                      {researchers.map((r: any) => (
+                        <option key={r.id} value={r.id}>
+                          {r.title_th}{r.first_name_th} {r.last_name_th}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ประธานกรรมการสอบ (ภายนอก)
+                      <span className="text-xs text-gray-400 ml-1">ถ้ามี</span>
+                    </label>
+                    <input value={form.committee_chair_external}
+                      onChange={e => setForm({ ...form, committee_chair_external: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2"
+                      placeholder="ชื่อ-สกุล (มหาวิทยาลัย)" />
+                    <p className="text-[11px] text-gray-400 mt-1">เช่น รศ.ดร.สมชาย ใจดี (มหาวิทยาลัยเชียงใหม่)</p>
+                  </div>
+                </>
+              )}
+
+              {/* ชื่อวิทยานิพนธ์ — สำหรับ ป.โท/เอก */}
               {['master', 'doctoral'].includes(form.degree_level) && (
                 <>
                   <div>
