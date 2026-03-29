@@ -40,6 +40,11 @@ interface StudentForm {
   status: string;
   email: string;
   phone: string;
+  // Advisor info
+  advisor_id: string;
+  co_advisor_id: string;
+  thesis_title_th: string;
+  thesis_title_en: string;
 }
 
 const emptyForm: StudentForm = {
@@ -48,6 +53,7 @@ const emptyForm: StudentForm = {
   degree_level: 'bachelor', program_th: 'วิศวกรรมไฟฟ้า', program_en: 'Electrical Engineering',
   enrollment_year: '', graduation_year: '', status: 'active',
   email: '', phone: '',
+  advisor_id: '', co_advisor_id: '', thesis_title_th: '', thesis_title_en: '',
 };
 
 export default function AdminStudentsPage() {
@@ -62,6 +68,7 @@ export default function AdminStudentsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [filterDegree, setFilterDegree] = useState('all');
+  const [thesisMap, setThesisMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -93,12 +100,29 @@ export default function AdminStudentsPage() {
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
-    const [studentsRes, researchersRes] = await Promise.all([
+    const [studentsRes, researchersRes, thesesRes] = await Promise.all([
       supabase.from('students').select('*').order('created_at', { ascending: false }),
       supabase.from('researchers').select('id, title_th, first_name_th, last_name_th').eq('is_active', true),
+      supabase.from('theses').select(`
+        id, student_id, title_th, title_en,
+        thesis_committee (researcher_id, committee_role)
+      `),
     ]);
     setStudents(studentsRes.data || []);
     setResearchers(researchersRes.data || []);
+    // Build thesis lookup by student_id
+    const tMap: Record<string, any> = {};
+    (thesesRes.data || []).forEach((t: any) => {
+      const mainAdvisor = t.thesis_committee?.find((tc: any) => tc.committee_role === 'main_advisor');
+      const coAdvisor = t.thesis_committee?.find((tc: any) => tc.committee_role === 'co_advisor');
+      tMap[t.student_id] = {
+        thesis_title_th: t.title_th || '',
+        thesis_title_en: t.title_en || '',
+        advisor_id: mainAdvisor?.researcher_id || '',
+        co_advisor_id: coAdvisor?.researcher_id || '',
+      };
+    });
+    setThesisMap(tMap);
   }, []);
 
   useEffect(() => {
@@ -141,7 +165,42 @@ export default function AdminStudentsPage() {
     if (editingId) {
       ({ error } = await supabase.from('students').update(payload).eq('id', editingId));
     } else {
-      ({ error } = await supabase.from('students').insert(payload));
+      const { data: inserted, error: insertErr } = await supabase
+        .from('students').insert(payload).select().single();
+      error = insertErr;
+
+      // สร้าง thesis + thesis_committee สำหรับ ป.โท/เอก ที่ระบุอาจารย์
+      if (!error && inserted && form.advisor_id && ['master', 'doctoral'].includes(form.degree_level)) {
+        const { data: thesis, error: thesisErr } = await supabase.from('theses').insert({
+          student_id: inserted.id,
+          title_th: form.thesis_title_th || `วิทยานิพนธ์ - ${form.first_name_th} ${form.last_name_th}`,
+          title_en: form.thesis_title_en || null,
+          degree_level: form.degree_level,
+          program_th: form.program_th || null,
+          program_en: form.program_en || null,
+          academic_year: form.enrollment_year ? parseInt(form.enrollment_year) : null,
+          status: 'proposal',
+        }).select().single();
+
+        if (thesis && !thesisErr) {
+          // อาจารย์ที่ปรึกษาหลัก
+          await supabase.from('thesis_committee').insert({
+            thesis_id: thesis.id,
+            researcher_id: form.advisor_id,
+            committee_role: 'main_advisor',
+            sort_order: 1,
+          });
+          // อาจารย์ที่ปรึกษาร่วม (ถ้ามี)
+          if (form.co_advisor_id) {
+            await supabase.from('thesis_committee').insert({
+              thesis_id: thesis.id,
+              researcher_id: form.co_advisor_id,
+              committee_role: 'co_advisor',
+              sort_order: 2,
+            });
+          }
+        }
+      }
     }
 
     if (error) {
@@ -164,6 +223,10 @@ export default function AdminStudentsPage() {
       degree_level: s.degree_level, program_th: s.program_th || '', program_en: s.program_en || '',
       enrollment_year: s.enrollment_year?.toString() || '', graduation_year: s.graduation_year?.toString() || '',
       status: s.status, email: s.email || '', phone: s.phone || '',
+      advisor_id: thesisMap[s.id]?.advisor_id || '',
+      co_advisor_id: thesisMap[s.id]?.co_advisor_id || '',
+      thesis_title_th: thesisMap[s.id]?.thesis_title_th || '',
+      thesis_title_en: thesisMap[s.id]?.thesis_title_en || '',
     });
     setEditingId(s.id);
     setShowForm(true);
@@ -320,6 +383,56 @@ export default function AdminStudentsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">โทรศัพท์</label>
               <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
                 className="w-full border rounded-lg px-3 py-2" placeholder="08X-XXX-XXXX" />
+            </div>
+          </div>
+
+          {/* Advisor Section */}
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="font-semibold text-gray-800 mb-3">
+              อาจารย์ที่ปรึกษา
+              {form.degree_level === 'bachelor' && (
+                <span className="text-xs text-gray-400 font-normal ml-2">(ป.ตรี จัดการที่หน้าหัวข้อโครงงาน)</span>
+              )}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">อาจารย์ที่ปรึกษาหลัก</label>
+                <select value={form.advisor_id} onChange={e => setForm({ ...form, advisor_id: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2">
+                  <option value="">-- เลือกอาจารย์ --</option>
+                  {researchers.map((r: any) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title_th}{r.first_name_th} {r.last_name_th}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">อาจารย์ที่ปรึกษาร่วม</label>
+                <select value={form.co_advisor_id} onChange={e => setForm({ ...form, co_advisor_id: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2">
+                  <option value="">-- ไม่มี --</option>
+                  {researchers.map((r: any) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title_th}{r.first_name_th} {r.last_name_th}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {['master', 'doctoral'].includes(form.degree_level) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อวิทยานิพนธ์ (ไทย)</label>
+                    <input value={form.thesis_title_th} onChange={e => setForm({ ...form, thesis_title_th: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2" placeholder="ชื่อเรื่องวิทยานิพนธ์" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Thesis Title (EN)</label>
+                    <input value={form.thesis_title_en} onChange={e => setForm({ ...form, thesis_title_en: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2" placeholder="Thesis title in English" />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
