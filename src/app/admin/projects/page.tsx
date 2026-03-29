@@ -45,6 +45,8 @@ interface TopicForm {
   max_semesters: string;
   required_skills: string;
   status: string;
+  // นศ. ที่ทำหัวข้อนี้
+  student_ids: string[];  // ป.ตรี สูงสุด 3, ป.โท/เอก 1
 }
 
 const emptyForm: TopicForm = {
@@ -53,6 +55,7 @@ const emptyForm: TopicForm = {
   advisor_id: '', co_advisor_id: '', research_area_id: '',
   academic_year: new Date().getFullYear() + 543 + '', semester: '1', max_semesters: '2',
   required_skills: '', status: 'open',
+  student_ids: [''],
 };
 
 export default function AdminProjectsPage() {
@@ -162,10 +165,76 @@ export default function AdminProjectsPage() {
     };
 
     let error;
+    const selectedStudents = form.student_ids.filter(id => id);
+
     if (editingId) {
       ({ error } = await supabase.from('project_topics').update(payload).eq('id', editingId));
+
+      // Update students: delete old groups/members, recreate
+      if (!error && selectedStudents.length > 0) {
+        // Delete existing groups for this topic
+        await supabase.from('project_groups').delete().eq('topic_id', editingId);
+
+        if (form.topic_level === 'bachelor') {
+          // ป.ตรี: สร้าง group + members
+          const { data: group } = await supabase.from('project_groups').insert({
+            topic_id: editingId,
+            project_name_th: form.title_th,
+            status: form.status === 'open' ? 'forming' : form.status === 'in_progress' ? 'in_progress' : form.status === 'completed' ? 'completed' : 'approved',
+            start_year: parseInt(form.academic_year) || null,
+            start_semester: parseInt(form.semester) || null,
+          }).select().single();
+          if (group) {
+            const members = selectedStudents.map((sid, i) => ({
+              group_id: group.id, student_id: sid,
+              role: i === 0 ? 'leader' : 'member',
+            }));
+            await supabase.from('project_members').insert(members);
+          }
+        }
+      }
     } else {
-      ({ error } = await supabase.from('project_topics').insert(payload));
+      const { data: inserted, error: insertErr } = await supabase
+        .from('project_topics').insert(payload).select().single();
+      error = insertErr;
+
+      // สร้าง group + members สำหรับ นศ. ที่เลือก
+      if (!error && inserted && selectedStudents.length > 0) {
+        if (form.topic_level === 'bachelor') {
+          // ป.ตรี: สร้าง group + members
+          const { data: group } = await supabase.from('project_groups').insert({
+            topic_id: inserted.id,
+            project_name_th: form.title_th,
+            status: 'forming',
+            start_year: parseInt(form.academic_year) || null,
+            start_semester: parseInt(form.semester) || null,
+          }).select().single();
+          if (group) {
+            const members = selectedStudents.map((sid, i) => ({
+              group_id: group.id, student_id: sid,
+              role: i === 0 ? 'leader' : 'member',
+            }));
+            await supabase.from('project_members').insert(members);
+          }
+        } else {
+          // ป.โท/เอก: เชื่อม thesis ที่มีอยู่ กับ topic ผ่าน project_groups
+          const studentId = selectedStudents[0];
+          const { data: thesis } = await supabase
+            .from('theses').select('id').eq('student_id', studentId).maybeSingle();
+          const { data: group } = await supabase.from('project_groups').insert({
+            topic_id: inserted.id,
+            project_name_th: form.title_th,
+            status: 'approved',
+            thesis_id: thesis?.id || null,
+            start_year: parseInt(form.academic_year) || null,
+          }).select().single();
+          if (group) {
+            await supabase.from('project_members').insert({
+              group_id: group.id, student_id: studentId, role: 'leader',
+            });
+          }
+        }
+      }
     }
 
     if (error) {
@@ -181,6 +250,14 @@ export default function AdminProjectsPage() {
   };
 
   const handleEditTopic = (t: any) => {
+    // Extract existing student ids from groups
+    const existingStudentIds: string[] = [];
+    t.project_groups?.forEach((pg: any) => {
+      pg.project_members?.forEach((pm: any) => {
+        if (pm.student_id) existingStudentIds.push(pm.student_id);
+      });
+    });
+
     setForm({
       title_th: t.title_th, title_en: t.title_en || '', description_th: t.description_th || '',
       topic_level: t.topic_level, max_students: t.max_students?.toString() || '2',
@@ -189,6 +266,7 @@ export default function AdminProjectsPage() {
       academic_year: t.academic_year?.toString() || '', semester: t.semester?.toString() || '1',
       max_semesters: t.max_semesters?.toString() || '2',
       required_skills: t.required_skills?.join(', ') || '', status: t.status,
+      student_ids: existingStudentIds.length > 0 ? existingStudentIds : [''],
     });
     setEditingId(t.id);
     setShowForm(true);
@@ -379,6 +457,57 @@ export default function AdminProjectsPage() {
                     className="w-full border rounded-lg px-3 py-2" placeholder="Python, MATLAB, PVsyst" />
                 </div>
               </div>
+
+              {/* นักศึกษาที่ทำหัวข้อนี้ */}
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="font-semibold text-gray-800 mb-1">
+                  นักศึกษาที่ทำหัวข้อนี้
+                </h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  {form.topic_level === 'bachelor'
+                    ? 'ป.ตรี: เลือกได้สูงสุด 3 คน'
+                    : 'ป.โท/เอก: เลือกได้ 1 คน'}
+                </p>
+                {form.student_ids.map((sid, idx) => {
+                  const maxCount = form.topic_level === 'bachelor' ? 3 : 1;
+                  const filteredStudents = students.filter((s: any) => {
+                    if (form.topic_level === 'bachelor') return s.degree_level === 'bachelor';
+                    return ['master', 'doctoral'].includes(s.degree_level);
+                  });
+                  return (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <select value={sid}
+                        onChange={e => {
+                          const updated = [...form.student_ids];
+                          updated[idx] = e.target.value;
+                          setForm({ ...form, student_ids: updated });
+                        }}
+                        className="flex-1 border rounded-lg px-3 py-2">
+                        <option value="">-- เลือกนักศึกษา --</option>
+                        {filteredStudents.map((s: any) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title_th}{s.first_name_th} {s.last_name_th}
+                            {s.student_code ? ` (${s.student_code})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {form.student_ids.length > 1 && (
+                        <button type="button" onClick={() => {
+                          const updated = form.student_ids.filter((_, i) => i !== idx);
+                          setForm({ ...form, student_ids: updated });
+                        }} className="text-red-500 hover:text-red-700 text-sm px-2">ลบ</button>
+                      )}
+                    </div>
+                  );
+                })}
+                {form.student_ids.length < (form.topic_level === 'bachelor' ? 3 : 1) && (
+                  <button type="button" onClick={() => setForm({ ...form, student_ids: [...form.student_ids, ''] })}
+                    className="text-blue-600 hover:text-blue-800 text-xs mt-1">
+                    + เพิ่มนักศึกษา
+                  </button>
+                )}
+              </div>
+
               <div className="flex gap-3 mt-6">
                 <button onClick={handleSaveTopic} disabled={saving}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50">
