@@ -91,7 +91,7 @@ function parseCitation(citation: string) {
   }
 
   // Pattern 2: IEEE-like — "Authors, "Title," Journal, vol. X, no. Y, pp. Z, Year."
-  const ieeeMatch = text.match(/^(.+?)[,.]?\s*[""](.+?)[""][,.]?\s*(.+?)$/s);
+  const ieeeMatch = text.match(/^(.+?)[,.]?\s*[""](.+?)[""][,.]?\s*([\s\S]+?)$/);
   if (ieeeMatch) {
     const authors = parseAuthors(ieeeMatch[1]);
     const rest = ieeeMatch[3];
