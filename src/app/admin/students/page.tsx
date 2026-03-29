@@ -68,7 +68,6 @@ export default function AdminStudentsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [filterDegree, setFilterDegree] = useState('all');
-  const [thesisMap, setThesisMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_auth');
@@ -94,36 +93,23 @@ export default function AdminStudentsPage() {
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const getSupabase = useCallback(async () => {
     const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
+    return createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
-    const [studentsRes, researchersRes, thesesRes] = await Promise.all([
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    const supabase = await getSupabase();
+    const [studentsRes, researchersRes] = await Promise.all([
       supabase.from('students').select('*').order('created_at', { ascending: false }),
       supabase.from('researchers').select('id, title_th, first_name_th, last_name_th').eq('is_active', true),
-      supabase.from('theses').select(`
-        id, student_id, title_th, title_en,
-        thesis_committee (researcher_id, committee_role)
-      `),
     ]);
     setStudents(studentsRes.data || []);
     setResearchers(researchersRes.data || []);
-    // Build thesis lookup by student_id
-    const tMap: Record<string, any> = {};
-    (thesesRes.data || []).forEach((t: any) => {
-      const mainAdvisor = t.thesis_committee?.find((tc: any) => tc.committee_role === 'main_advisor');
-      const coAdvisor = t.thesis_committee?.find((tc: any) => tc.committee_role === 'co_advisor');
-      tMap[t.student_id] = {
-        thesis_title_th: t.title_th || '',
-        thesis_title_en: t.title_en || '',
-        advisor_id: mainAdvisor?.researcher_id || '',
-        co_advisor_id: coAdvisor?.researcher_id || '',
-      };
-    });
-    setThesisMap(tMap);
-  }, []);
+  }, [getSupabase]);
 
   useEffect(() => {
     if (authenticated) fetchData();
@@ -137,11 +123,7 @@ export default function AdminStudentsPage() {
     setSaving(true);
     setMessage('');
 
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
+    const supabase = await getSupabase();
 
     const payload = {
       student_code: form.student_code || null,
@@ -164,6 +146,69 @@ export default function AdminStudentsPage() {
     let error;
     if (editingId) {
       ({ error } = await supabase.from('students').update(payload).eq('id', editingId));
+
+      // Update/create thesis + committee for ป.โท/เอก
+      if (!error && form.advisor_id && ['master', 'doctoral'].includes(form.degree_level)) {
+        // Check if thesis already exists for this student
+        const { data: existingThesis } = await supabase
+          .from('theses').select('id').eq('student_id', editingId).maybeSingle();
+
+        if (existingThesis) {
+          // Update existing thesis
+          await supabase.from('theses').update({
+            title_th: form.thesis_title_th || `วิทยานิพนธ์ - ${form.first_name_th} ${form.last_name_th}`,
+            title_en: form.thesis_title_en || null,
+            degree_level: form.degree_level,
+            program_th: form.program_th || null,
+            program_en: form.program_en || null,
+          }).eq('id', existingThesis.id);
+
+          // Replace committee: delete old, insert new
+          await supabase.from('thesis_committee').delete().eq('thesis_id', existingThesis.id);
+          await supabase.from('thesis_committee').insert({
+            thesis_id: existingThesis.id,
+            researcher_id: form.advisor_id,
+            committee_role: 'main_advisor',
+            sort_order: 1,
+          });
+          if (form.co_advisor_id) {
+            await supabase.from('thesis_committee').insert({
+              thesis_id: existingThesis.id,
+              researcher_id: form.co_advisor_id,
+              committee_role: 'co_advisor',
+              sort_order: 2,
+            });
+          }
+        } else {
+          // Create new thesis + committee
+          const { data: thesis } = await supabase.from('theses').insert({
+            student_id: editingId,
+            title_th: form.thesis_title_th || `วิทยานิพนธ์ - ${form.first_name_th} ${form.last_name_th}`,
+            title_en: form.thesis_title_en || null,
+            degree_level: form.degree_level,
+            program_th: form.program_th || null,
+            program_en: form.program_en || null,
+            academic_year: form.enrollment_year ? parseInt(form.enrollment_year) : null,
+            status: 'proposal',
+          }).select().single();
+          if (thesis) {
+            await supabase.from('thesis_committee').insert({
+              thesis_id: thesis.id,
+              researcher_id: form.advisor_id,
+              committee_role: 'main_advisor',
+              sort_order: 1,
+            });
+            if (form.co_advisor_id) {
+              await supabase.from('thesis_committee').insert({
+                thesis_id: thesis.id,
+                researcher_id: form.co_advisor_id,
+                committee_role: 'co_advisor',
+                sort_order: 2,
+              });
+            }
+          }
+        }
+      }
     } else {
       const { data: inserted, error: insertErr } = await supabase
         .from('students').insert(payload).select().single();
@@ -215,7 +260,21 @@ export default function AdminStudentsPage() {
     setSaving(false);
   };
 
-  const handleEdit = (s: any) => {
+  const handleEdit = async (s: any) => {
+    // Load thesis/advisor data directly from DB
+    const supabase = await getSupabase();
+    const { data: thesis } = await supabase
+      .from('theses')
+      .select(`
+        id, title_th, title_en,
+        thesis_committee (researcher_id, committee_role)
+      `)
+      .eq('student_id', s.id)
+      .maybeSingle();
+
+    const mainAdvisor = thesis?.thesis_committee?.find((tc: any) => tc.committee_role === 'main_advisor');
+    const coAdvisor = thesis?.thesis_committee?.find((tc: any) => tc.committee_role === 'co_advisor');
+
     setForm({
       student_code: s.student_code || '',
       title_th: s.title_th, first_name_th: s.first_name_th, last_name_th: s.last_name_th,
@@ -223,10 +282,10 @@ export default function AdminStudentsPage() {
       degree_level: s.degree_level, program_th: s.program_th || '', program_en: s.program_en || '',
       enrollment_year: s.enrollment_year?.toString() || '', graduation_year: s.graduation_year?.toString() || '',
       status: s.status, email: s.email || '', phone: s.phone || '',
-      advisor_id: thesisMap[s.id]?.advisor_id || '',
-      co_advisor_id: thesisMap[s.id]?.co_advisor_id || '',
-      thesis_title_th: thesisMap[s.id]?.thesis_title_th || '',
-      thesis_title_en: thesisMap[s.id]?.thesis_title_en || '',
+      advisor_id: mainAdvisor?.researcher_id || '',
+      co_advisor_id: coAdvisor?.researcher_id || '',
+      thesis_title_th: thesis?.title_th || '',
+      thesis_title_en: thesis?.title_en || '',
     });
     setEditingId(s.id);
     setShowForm(true);
@@ -234,11 +293,7 @@ export default function AdminStudentsPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`ลบนักศึกษา "${name}" ?`)) return;
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
+    const supabase = await getSupabase();
     await supabase.from('students').delete().eq('id', id);
     fetchData();
   };
