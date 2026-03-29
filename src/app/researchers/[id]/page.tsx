@@ -54,14 +54,48 @@ async function getResearcher(id: string) {
     `)
     .eq('researcher_id', id);
 
-  return { researcher, publications: publications || [], grants: grants || [] };
+  // Fetch thesis students (ป.โท/เอก) where this researcher is advisor
+  const { data: thesisStudents } = await supabase
+    .from('thesis_committee')
+    .select(`
+      committee_role,
+      theses (
+        id, title_th, title_en, status, degree_level, academic_year,
+        students (id, title_th, first_name_th, last_name_th, degree_level, status, student_code)
+      )
+    `)
+    .eq('researcher_id', id)
+    .in('committee_role', ['main_advisor', 'co_advisor']);
+
+  // Fetch project students (ป.ตรี) where this researcher is advisor
+  const { data: projectTopics } = await supabase
+    .from('project_topics')
+    .select(`
+      id, title_th, title_en, status, topic_level, academic_year,
+      project_groups (
+        id, status, grade, actual_end_date,
+        project_members (
+          role,
+          students (id, title_th, first_name_th, last_name_th, degree_level, status, student_code)
+        )
+      )
+    `)
+    .eq('advisor_id', id);
+
+  return {
+    researcher,
+    publications: publications || [],
+    grants: grants || [],
+    thesisStudents: thesisStudents || [],
+    projectTopics: projectTopics || [],
+  };
 }
 
 export default async function ResearcherProfilePage({ params }: { params: { id: string } }) {
   const data = await getResearcher(params.id);
   if (!data) notFound();
 
-  const { researcher: r, publications, grants } = data;
+  const { researcher: r, publications, grants, thesisStudents, projectTopics } = data;
   const fullNameTh = `${r.title_th}${r.first_name_th} ${r.last_name_th}`;
   const fullNameEn = r.first_name_en
     ? `${r.title_en || ''} ${r.first_name_en} ${r.last_name_en || ''}`
@@ -272,6 +306,137 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
           </div>
         </section>
       )}
+
+      {/* Students Section - รวม ป.ตรี/โท/เอก */}
+      {(() => {
+        const degreeLabel: Record<string, string> = {
+          bachelor: 'ป.ตรี', master: 'ป.โท', doctoral: 'ป.เอก',
+        };
+        const degreeColor: Record<string, string> = {
+          bachelor: 'bg-blue-100 text-blue-800',
+          master: 'bg-purple-100 text-purple-800',
+          doctoral: 'bg-red-100 text-red-800',
+        };
+        const studentStatusLabel: Record<string, string> = {
+          active: 'กำลังศึกษา', graduated: 'สำเร็จการศึกษา',
+          withdrawn: 'พ้นสภาพ', on_leave: 'ลาพัก',
+        };
+        const thesisStatusLabel: Record<string, string> = {
+          proposal: 'เสนอหัวข้อ', in_progress: 'กำลังดำเนินการ',
+          defense_scheduled: 'นัดสอบ', defense_passed: 'สอบผ่าน',
+          completed: 'สำเร็จ', withdrawn: 'ยกเลิก',
+        };
+
+        // Collect thesis students
+        const thesisList = thesisStudents
+          .filter((tc: any) => tc.theses?.students)
+          .map((tc: any) => ({
+            student: tc.theses.students,
+            workTitle: tc.theses.title_th || tc.theses.title_en,
+            workStatus: thesisStatusLabel[tc.theses.status] || tc.theses.status,
+            role: tc.committee_role === 'main_advisor' ? 'ที่ปรึกษาหลัก' : 'ที่ปรึกษาร่วม',
+            degree: tc.theses.degree_level,
+            year: tc.theses.academic_year,
+            type: 'thesis' as const,
+          }));
+
+        // Collect project students
+        const projectList: any[] = [];
+        projectTopics.forEach((pt: any) => {
+          pt.project_groups?.forEach((pg: any) => {
+            pg.project_members?.forEach((pm: any) => {
+              if (pm.students) {
+                projectList.push({
+                  student: pm.students,
+                  workTitle: pt.title_th || pt.title_en,
+                  workStatus: pg.status === 'completed' ? 'สำเร็จ' : pg.status === 'in_progress' ? 'กำลังทำ' : pg.status,
+                  role: 'ที่ปรึกษา',
+                  degree: 'bachelor',
+                  year: pt.academic_year,
+                  grade: pg.grade,
+                  type: 'project' as const,
+                });
+              }
+            });
+          });
+        });
+
+        const allStudents = [...thesisList, ...projectList];
+        if (allStudents.length === 0) return null;
+
+        // Group: active first, then graduated
+        const active = allStudents.filter(s => s.student.status === 'active');
+        const graduated = allStudents.filter(s => s.student.status === 'graduated');
+        const others = allStudents.filter(s => !['active', 'graduated'].includes(s.student.status));
+
+        const renderStudent = (item: any, idx: number) => (
+          <div key={`${item.student.id}-${idx}`} className="border-l-4 border-indigo-300 pl-4 py-2">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${degreeColor[item.degree] || 'bg-gray-100'}`}>
+                {degreeLabel[item.degree] || item.degree}
+              </span>
+              <h4 className="font-semibold text-gray-900 text-sm">
+                {item.student.title_th}{item.student.first_name_th} {item.student.last_name_th}
+              </h4>
+              {item.student.student_code && (
+                <span className="text-xs text-gray-400">({item.student.student_code})</span>
+              )}
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                item.student.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {studentStatusLabel[item.student.status] || item.student.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mt-1">
+              {item.type === 'thesis' ? 'วิทยานิพนธ์' : 'โครงงาน'}: {item.workTitle}
+            </p>
+            <div className="flex gap-2 mt-1 text-xs text-gray-500">
+              <span>{item.role}</span>
+              {item.year && <span>ปีการศึกษา {item.year}</span>}
+              <span>สถานะ: {item.workStatus}</span>
+              {item.grade && <span className="text-green-600">เกรด: {item.grade}</span>}
+            </div>
+          </div>
+        );
+
+        return (
+          <section className="bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">
+              นักศึกษาในที่ปรึกษา ({allStudents.length})
+            </h2>
+
+            {active.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-base font-bold text-green-700 mb-3 pb-2 border-b-2 border-green-500 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-600"></span>
+                  กำลังศึกษา ({active.length})
+                </h3>
+                <div className="space-y-3 ml-2">{active.map(renderStudent)}</div>
+              </div>
+            )}
+
+            {graduated.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-base font-bold text-gray-600 mb-3 pb-2 border-b-2 border-gray-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-gray-500"></span>
+                  สำเร็จการศึกษา ({graduated.length})
+                </h3>
+                <div className="space-y-3 ml-2">{graduated.map(renderStudent)}</div>
+              </div>
+            )}
+
+            {others.length > 0 && (
+              <div>
+                <h3 className="text-base font-bold text-gray-500 mb-3 pb-2 border-b-2 border-gray-300 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                  อื่นๆ ({others.length})
+                </h3>
+                <div className="space-y-3 ml-2">{others.map(renderStudent)}</div>
+              </div>
+            )}
+          </section>
+        );
+      })()}
     </div>
   );
 }

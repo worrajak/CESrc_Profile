@@ -96,7 +96,7 @@ export default function AdminPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <Link
           href="/admin/news"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-500 block"
@@ -109,7 +109,21 @@ export default function AdminPage() {
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
         >
           <h3 className="font-semibold text-gray-800 mb-1">นำเข้าผลงานตีพิมพ์</h3>
-          <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัยอัตโนมัติ</p>
+          <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัย</p>
+        </Link>
+        <Link
+          href="/admin/students"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-indigo-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการนักศึกษา</h3>
+          <p className="text-sm text-gray-500">เพิ่ม/แก้ไข นศ. ป.ตรี-เอก</p>
+        </Link>
+        <Link
+          href="/admin/projects"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-orange-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">หัวข้อโครงงาน</h3>
+          <p className="text-sm text-gray-500">ประกาศหัวข้อ, ออก Token</p>
         </Link>
         <a
           href="https://supabase.com/dashboard"

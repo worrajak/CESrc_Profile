@@ -96,3 +96,71 @@ export interface PublicationWithRole extends Publication {
   is_corresponding: boolean;
   role_display: string;
 }
+
+export interface Student {
+  id: string;
+  student_code: string | null;
+  title_th: string;
+  first_name_th: string;
+  last_name_th: string;
+  title_en: string | null;
+  first_name_en: string | null;
+  last_name_en: string | null;
+  degree_level: 'bachelor' | 'master' | 'doctoral';
+  program_th: string | null;
+  program_en: string | null;
+  enrollment_year: number | null;
+  graduation_year: number | null;
+  status: 'active' | 'graduated' | 'withdrawn' | 'on_leave';
+  email: string | null;
+  phone: string | null;
+  researcher_id: string | null;
+  avatar_url: string | null;
+}
+
+export interface ProjectTopic {
+  id: string;
+  title_th: string;
+  title_en: string | null;
+  description_th: string | null;
+  description_en: string | null;
+  topic_level: 'bachelor' | 'master' | 'doctoral';
+  max_students: number;
+  advisor_id: string;
+  co_advisor_id: string | null;
+  research_area_id: string | null;
+  academic_year: number | null;
+  semester: number | null;
+  max_semesters: number;
+  required_skills: string[] | null;
+  tags: string[] | null;
+  status: 'open' | 'reserved' | 'in_progress' | 'completed' | 'cancelled';
+}
+
+export interface ProjectGroup {
+  id: string;
+  topic_id: string;
+  project_name_th: string | null;
+  project_name_en: string | null;
+  start_semester: number | null;
+  start_year: number | null;
+  expected_end_semester: number | null;
+  expected_end_year: number | null;
+  actual_end_date: string | null;
+  status: 'forming' | 'approved' | 'in_progress' | 'presenting' | 'completed' | 'failed';
+  grade: string | null;
+  thesis_id: string | null;
+}
+
+export interface StudentMilestone {
+  id: string;
+  thesis_id: string | null;
+  project_group_id: string | null;
+  category: string;
+  title: string;
+  description: string | null;
+  milestone_date: string;
+  publication_id: string | null;
+  news_id: string | null;
+  is_verified: boolean;
+}
