@@ -125,6 +125,20 @@ export default function AdminPage() {
           <h3 className="font-semibold text-gray-800 mb-1">หัวข้อโครงงาน</h3>
           <p className="text-sm text-gray-500">ประกาศหัวข้อ, ออก Token</p>
         </Link>
+        <Link
+          href="/admin/equipment"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-cyan-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการครุภัณฑ์</h3>
+          <p className="text-sm text-gray-500">ทะเบียน เพิ่ม/ลด/ตัดจำหน่าย</p>
+        </Link>
+        <Link
+          href="/admin/equipment/borrowing"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-teal-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">ระบบยืม-คืน</h3>
+          <p className="text-sm text-gray-500">อนุมัติ/คืน/ติดตามเกินกำหนด</p>
+        </Link>
         <a
           href="https://supabase.com/dashboard"
           target="_blank"
