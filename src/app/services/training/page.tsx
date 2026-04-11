@@ -181,16 +181,14 @@ export default async function TrainingPage() {
                         )}
                       </div>
 
-                      {openSession ? (
-                        <Link href={`/services/request?course=${course.code}`}
-                          className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 transition font-medium">
-                          เปิดรับสมัคร
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
-                          รอเปิดรุ่นถัดไป
-                        </span>
-                      )}
+                      <Link href={`/services/training/${course.code}`}
+                        className={`text-xs px-3 py-1.5 rounded-lg transition font-medium ${
+                          openSession
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        }`}>
+                        {openSession ? 'ดูรายละเอียด & สมัคร' : 'ดูรายละเอียด'}
+                      </Link>
                     </div>
                   </div>
                 </div>

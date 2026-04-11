@@ -208,14 +208,14 @@ export default async function HomePage() {
                           )}
                         </div>
                         <Link
-                          href={`/services/request?course=${course.code}&type=training`}
+                          href={`/services/training/${course.code}`}
                           className={`text-[10px] px-3 py-1.5 rounded-lg font-medium transition ${
                             isOpen
                               ? 'bg-green-600 text-white hover:bg-green-700'
                               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                           }`}
                         >
-                          {isOpen ? 'สมัครเลย' : 'สนใจ'}
+                          {isOpen ? 'ดูรายละเอียด & สมัคร' : 'ดูรายละเอียด'}
                         </Link>
                       </div>
                     </div>
