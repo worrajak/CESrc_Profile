@@ -6,7 +6,6 @@ function extractDoi(text: string): string | null {
 }
 
 function extractYear(text: string): number | null {
-  // Match year in parentheses first, then standalone
   const m = text.match(/\((\d{4})\)/) || text.match(/,\s*(\d{4})\b/) || text.match(/\b(19\d{2}|20\d{2})\b/);
   if (m) {
     const y = parseInt(m[1]);
@@ -16,9 +15,7 @@ function extractYear(text: string): number | null {
 }
 
 function parseAuthors(authorBlock: string): { given: string; family: string; order: number }[] {
-  // Clean up
   let clean = authorBlock.replace(/\band\b/gi, ',').replace(/&/g, ',').replace(/\s+/g, ' ').trim();
-  // Remove trailing period
   clean = clean.replace(/\.$/, '');
 
   const parts = clean.split(/,\s*/).map(s => s.trim()).filter(s => s.length > 1);
@@ -26,13 +23,11 @@ function parseAuthors(authorBlock: string): { given: string; family: string; ord
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
-    // Try "Family, G." pattern (common in IEEE)
     if (i + 1 < parts.length && /^[A-Z]\.?(\s*[A-Z]\.?)*$/.test(parts[i + 1].trim())) {
       authors.push({ family: part, given: parts[i + 1].trim(), order: authors.length + 1 });
-      i++; // skip next
+      i++;
       continue;
     }
-    // Try "G. Family" or "Given Family" pattern
     const nameMatch = part.match(/^([A-Z]\.?\s*(?:[A-Z]\.?\s*)*)\s+(\S+.*)$/) ||
                       part.match(/^(\S+)\s+(\S+.*)$/);
     if (nameMatch) {
@@ -64,14 +59,12 @@ function inferPubType(journalName: string): string {
   return 'journal_international';
 }
 
-function parseCitation(citation: string) {
+function parseCitationRegex(citation: string) {
   const text = citation.trim();
   const year = extractYear(text);
   const doi = extractDoi(text);
 
-  // Try splitting by common patterns
-
-  // Pattern 1: APA-like — "Authors (Year). Title. Journal, vol(issue), pages."
+  // Pattern 1: APA-like
   const apaMatch = text.match(/^(.+?)\s*\((\d{4})\)\.\s*(.+?)\.\s*(.+?)(?:,\s*(\d+)\s*(?:\((\d+)\))?\s*(?:,\s*(.+?))?)?\.?\s*$/);
   if (apaMatch) {
     const authors = parseAuthors(apaMatch[1]);
@@ -90,16 +83,15 @@ function parseCitation(citation: string) {
     };
   }
 
-  // Pattern 2: IEEE-like — "Authors, "Title," Journal, vol. X, no. Y, pp. Z, Year."
-  const ieeeMatch = text.match(/^(.+?)[,.]?\s*[""](.+?)[""][,.]?\s*([\s\S]+?)$/);
+  // Pattern 2: IEEE-like
+  const ieeeMatch = text.match(/^(.+?)[,.]?\s*[""\u201C](.+?)[""\u201D][,.]?\s*([\s\S]+?)$/);
   if (ieeeMatch) {
     const authors = parseAuthors(ieeeMatch[1]);
     const rest = ieeeMatch[3];
 
-    // Parse journal info from rest
     const volMatch = rest.match(/vol\.?\s*(\d+)/i);
     const noMatch = rest.match(/no\.?\s*(\d+)/i);
-    const ppMatch = rest.match(/pp?\.?\s*([\d\-–]+)/i);
+    const ppMatch = rest.match(/pp?\.?\s*([\d\-\u2013]+)/i);
     const journalPart = rest.split(/,\s*vol\./i)[0]?.trim() || rest.split(',')[0]?.trim() || '';
 
     return {
@@ -117,7 +109,7 @@ function parseCitation(citation: string) {
     };
   }
 
-  // Pattern 3: Simple fallback — try to split by periods
+  // Pattern 3: Simple fallback
   const sentences = text.split(/\.\s+/).filter(s => s.length > 5);
   if (sentences.length >= 2) {
     const authors = parseAuthors(sentences[0]);
@@ -126,7 +118,7 @@ function parseCitation(citation: string) {
 
     const volMatch = journalPart.match(/vol\.?\s*(\d+)/i) || journalPart.match(/(\d+)\s*\(/);
     const issueMatch = journalPart.match(/no\.?\s*(\d+)/i) || journalPart.match(/\((\d+)\)/);
-    const ppMatch = journalPart.match(/pp?\.?\s*([\d\-–]+)/i);
+    const ppMatch = journalPart.match(/pp?\.?\s*([\d\-\u2013]+)/i);
 
     return {
       title,
@@ -143,7 +135,6 @@ function parseCitation(citation: string) {
     };
   }
 
-  // Last resort
   return {
     title: text.substring(0, 200),
     authors_raw: '',
@@ -157,9 +148,190 @@ function parseCitation(citation: string) {
   };
 }
 
+// AI-powered citation parsing using Claude API
+async function parseCitationWithAI(citation: string, clientApiKey?: string): Promise<any | null> {
+  const apiKey = clientApiKey || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: `Parse this academic citation and extract structured data. Return ONLY valid JSON, no explanation.
+
+Citation:
+${citation}
+
+Return JSON with this exact structure:
+{
+  "title": "paper title",
+  "authors": [{"given": "First", "family": "Last", "order": 1}],
+  "journal_name": "journal or conference name",
+  "volume": "vol number or null",
+  "issue": "issue number or null",
+  "pages": "page range or null",
+  "year": 2024,
+  "doi": "DOI if found or null",
+  "pub_type": "journal_international|journal_national|conference_international|conference_national|book_chapter|book|technical_report",
+  "keywords": [],
+  "scopus_indexed": false,
+  "wos_indexed": false
+}
+
+Notes:
+- For pub_type: if it mentions conference/proceedings/symposium use conference_*, if Thai journal use journal_national
+- authors should have separate given name and family name
+- year should be integer
+- If DOI is present in the citation, extract it (format: 10.xxxx/yyyy)`
+          }
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Validate and normalize
+    if (!parsed.title) return null;
+
+    const authors = (parsed.authors || []).map((a: any, i: number) => ({
+      given: a.given || '',
+      family: a.family || '',
+      order: a.order || i + 1,
+    }));
+
+    return {
+      title: parsed.title,
+      authors_raw: buildAuthorsRaw(authors),
+      authors,
+      journal_name: parsed.journal_name || '',
+      volume: parsed.volume || null,
+      issue: parsed.issue || null,
+      pages: parsed.pages || null,
+      year: parsed.year || null,
+      doi: parsed.doi || extractDoi(citation),
+      pub_type: parsed.pub_type || 'journal_international',
+      keywords: parsed.keywords || [],
+      scopus_indexed: parsed.scopus_indexed || false,
+      wos_indexed: parsed.wos_indexed || false,
+    };
+  } catch (e) {
+    console.error('Claude AI parsing failed:', e);
+    return null;
+  }
+}
+
+// AI-powered citation parsing using Google Gemini API
+async function parseCitationWithGemini(citation: string, clientApiKey?: string): Promise<any | null> {
+  const apiKey = clientApiKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `Parse this academic citation and extract structured data. Return ONLY valid JSON, no explanation.
+
+Citation:
+${citation}
+
+Return JSON with this exact structure:
+{
+  "title": "paper title",
+  "authors": [{"given": "First", "family": "Last", "order": 1}],
+  "journal_name": "journal or conference name",
+  "volume": "vol number or null",
+  "issue": "issue number or null",
+  "pages": "page range or null",
+  "year": 2024,
+  "doi": "DOI if found or null",
+  "pub_type": "journal_international|journal_national|conference_international|conference_national|book_chapter|book|technical_report",
+  "keywords": [],
+  "scopus_indexed": false,
+  "wos_indexed": false
+}
+
+Notes:
+- For pub_type: if it mentions conference/proceedings/symposium use conference_*, if Thai journal use journal_national
+- authors should have separate given name and family name
+- year should be integer
+- If DOI is present in the citation, extract it (format: 10.xxxx/yyyy)`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1024,
+          },
+        }),
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    if (!parsed.title) return null;
+
+    const authors = (parsed.authors || []).map((a: any, i: number) => ({
+      given: a.given || '',
+      family: a.family || '',
+      order: a.order || i + 1,
+    }));
+
+    return {
+      title: parsed.title,
+      authors_raw: buildAuthorsRaw(authors),
+      authors,
+      journal_name: parsed.journal_name || '',
+      volume: parsed.volume || null,
+      issue: parsed.issue || null,
+      pages: parsed.pages || null,
+      year: parsed.year || null,
+      doi: parsed.doi || extractDoi(citation),
+      pub_type: parsed.pub_type || 'journal_international',
+      keywords: parsed.keywords || [],
+      scopus_indexed: parsed.scopus_indexed || false,
+      wos_indexed: parsed.wos_indexed || false,
+    };
+  } catch (e) {
+    console.error('Gemini AI parsing failed:', e);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { password, citation } = body;
+  const { password, citation, ai_provider, ai_api_key } = body;
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -169,7 +341,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Citation is required' }, { status: 400 });
   }
 
-  // First try to extract DOI and use CrossRef
+  // Step 1: Try to extract DOI and use CrossRef
   const doi = extractDoi(citation);
   if (doi) {
     try {
@@ -214,10 +386,27 @@ export async function POST(request: NextRequest) {
           source: 'crossref',
         });
       }
-    } catch { /* CrossRef failed, fall through to parsing */ }
+    } catch { /* CrossRef failed, fall through */ }
   }
 
-  // Parse citation locally
-  const result = parseCitation(citation);
+  // Step 2: Try AI-powered parsing based on user's preference
+  if (ai_provider === 'anthropic' || (!ai_provider && (ai_api_key || process.env.ANTHROPIC_API_KEY))) {
+    const claudeKey = ai_provider === 'anthropic' ? ai_api_key : undefined;
+    const claudeResult = await parseCitationWithAI(citation, claudeKey);
+    if (claudeResult) {
+      return NextResponse.json({ ...claudeResult, source: 'ai', ai_provider: 'claude' });
+    }
+  }
+
+  if (ai_provider === 'gemini' || (!ai_provider && (ai_api_key || process.env.GEMINI_API_KEY))) {
+    const geminiKey = ai_provider === 'gemini' ? ai_api_key : undefined;
+    const geminiResult = await parseCitationWithGemini(citation, geminiKey);
+    if (geminiResult) {
+      return NextResponse.json({ ...geminiResult, source: 'ai', ai_provider: 'gemini' });
+    }
+  }
+
+  // Step 3: Fallback to regex parsing
+  const result = parseCitationRegex(citation);
   return NextResponse.json({ ...result, source: 'parsed' });
 }

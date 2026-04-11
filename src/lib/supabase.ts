@@ -71,6 +71,9 @@ export interface Grant {
   status: string;
   research_areas: string[] | null;
   description_th: string | null;
+  contract_file_url: string | null;
+  progress_report_url: string | null;
+  final_report_url: string | null;
 }
 
 export interface ResearchArea {
