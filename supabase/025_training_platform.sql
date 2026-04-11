@@ -332,30 +332,48 @@ CREATE TABLE IF NOT EXISTS service_timeline (
 
 CREATE OR REPLACE VIEW v_course_summary AS
 SELECT
-  tc.*,
-  COUNT(DISTINCT ts.id) as total_sessions,
-  COUNT(DISTINCT ts.id) FILTER (WHERE ts.status = 'open') as open_sessions,
-  COUNT(DISTINCT e.id) as total_enrollments,
-  COUNT(DISTINCT e.id) FILTER (WHERE e.passed = true) as passed_count,
-  r.title_th || r.first_name_th || ' ' || r.last_name_th as instructor_fullname
+  tc.id, tc.code, tc.title_th, tc.title_en, tc.description_th,
+  tc.category, tc.skill_domain, tc.level, tc.grants_credential_level,
+  tc.duration_hours, tc.duration_days, tc.max_participants,
+  tc.fee_internal, tc.fee_student, tc.fee_external,
+  tc.is_active, tc.created_at,
+  COUNT(DISTINCT ts.id) AS total_sessions,
+  COUNT(DISTINCT ts.id) FILTER (WHERE ts.status = 'open') AS open_sessions,
+  COUNT(DISTINCT e.id) AS total_enrollments,
+  COUNT(DISTINCT e.id) FILTER (WHERE e.passed = true) AS passed_count,
+  r.title_th || r.first_name_th || ' ' || r.last_name_th AS instructor_fullname
 FROM training_courses tc
 LEFT JOIN training_sessions ts ON ts.course_id = tc.id
 LEFT JOIN enrollments e ON e.session_id = ts.id
 LEFT JOIN researchers r ON r.id = tc.instructor_id
 WHERE tc.is_active = true
-GROUP BY tc.id, r.title_th, r.first_name_th, r.last_name_th;
+GROUP BY tc.id, tc.code, tc.title_th, tc.title_en, tc.description_th,
+  tc.category, tc.skill_domain, tc.level, tc.grants_credential_level,
+  tc.duration_hours, tc.duration_days, tc.max_participants,
+  tc.fee_internal, tc.fee_student, tc.fee_external,
+  tc.is_active, tc.created_at,
+  r.title_th, r.first_name_th, r.last_name_th;
 
 CREATE OR REPLACE VIEW v_session_enrollment AS
 SELECT
-  ts.*,
-  tc.title_th as course_title, tc.code as course_code,
+  ts.id, ts.course_id, ts.session_code, ts.batch_number,
+  ts.start_date, ts.end_date, ts.location, ts.room,
+  ts.max_participants, ts.min_participants,
+  ts.registration_open, ts.registration_close,
+  ts.status, ts.notes, ts.created_at,
+  tc.title_th AS course_title, tc.code AS course_code,
   tc.fee_external, tc.fee_student, tc.fee_internal,
-  COUNT(e.id) as enrolled_count,
-  COUNT(e.id) FILTER (WHERE e.status = 'confirmed' OR e.status = 'attending') as confirmed_count
+  COUNT(e.id) AS enrolled_count,
+  COUNT(e.id) FILTER (WHERE e.status IN ('confirmed', 'attending')) AS confirmed_count
 FROM training_sessions ts
 JOIN training_courses tc ON tc.id = ts.course_id
 LEFT JOIN enrollments e ON e.session_id = ts.id
-GROUP BY ts.id, tc.title_th, tc.code, tc.fee_external, tc.fee_student, tc.fee_internal;
+GROUP BY ts.id, ts.course_id, ts.session_code, ts.batch_number,
+  ts.start_date, ts.end_date, ts.location, ts.room,
+  ts.max_participants, ts.min_participants,
+  ts.registration_open, ts.registration_close,
+  ts.status, ts.notes, ts.created_at,
+  tc.title_th, tc.code, tc.fee_external, tc.fee_student, tc.fee_internal;
 
 -- ============================================================
 -- Indexes
