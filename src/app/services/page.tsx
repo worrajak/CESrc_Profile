@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -137,6 +138,52 @@ export default async function ServicesPage() {
         </div>
       </section>
 
+      {/* ===== Quick Links to Sub-Pages ===== */}
+      <section className="bg-white border-b">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link href="/services/training"
+              className="group bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6 hover:shadow-lg transition-all hover:-translate-y-1">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">🎓</span>
+                <div>
+                  <h3 className="font-bold text-purple-800 group-hover:text-purple-600">หลักสูตรอบรม</h3>
+                  <p className="text-xs text-purple-500">Training & NFT Certificate</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">หลักสูตร Solar PV, EV Charger, Battery — ผ่านแล้วรับใบรับรอง NFT บน Blockchain</p>
+              <span className="text-xs text-purple-600 font-medium mt-2 inline-block group-hover:underline">ดูหลักสูตรทั้งหมด →</span>
+            </Link>
+
+            <Link href="/services/consulting"
+              className="group bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6 hover:shadow-lg transition-all hover:-translate-y-1">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">💡</span>
+                <div>
+                  <h3 className="font-bold text-blue-800 group-hover:text-blue-600">ที่ปรึกษา & ออกแบบ</h3>
+                  <p className="text-xs text-blue-500">Consulting & Design</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">ออกแบบระบบ Solar PV, EV Charger, Microgrid — ตรวจสอบระบบไฟฟ้า</p>
+              <span className="text-xs text-blue-600 font-medium mt-2 inline-block group-hover:underline">ดูผลงาน →</span>
+            </Link>
+
+            <Link href="/services/request"
+              className="group bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 hover:shadow-lg transition-all hover:-translate-y-1">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-3xl">📝</span>
+                <div>
+                  <h3 className="font-bold text-green-800 group-hover:text-green-600">ส่งคำขอบริการ</h3>
+                  <p className="text-xs text-green-500">Service Request</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600">ส่งคำขออบรม ที่ปรึกษา ออกแบบ ตรวจสอบ — AI ช่วยแยกเอกสารอัตโนมัติ</p>
+              <span className="text-xs text-green-600 font-medium mt-2 inline-block group-hover:underline">ส่งคำขอ →</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ===== OUR EXPERIENCES INTRO ===== */}
       <section className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-12">
@@ -152,10 +199,11 @@ export default async function ServicesPage() {
             {categoryOrder.map((catKey) => {
               const cat = categoryConfig[catKey];
               const items = grouped[catKey] || [];
+              const linkTarget = catKey === 'training' ? '/services/training' : catKey === 'consulting' ? '/services/consulting' : `#${catKey}`;
               return (
-                <a
+                <Link
                   key={catKey}
-                  href={`#${catKey}`}
+                  href={linkTarget}
                   className={`group ${cat.bgColor} ${cat.borderColor} border rounded-xl p-5 hover:shadow-lg transition-all duration-300 hover:-translate-y-1`}
                 >
                   <div className="flex items-center gap-3 mb-2">
@@ -168,7 +216,7 @@ export default async function ServicesPage() {
                   <p className="text-2xl font-bold text-gray-800">
                     {items.length} <span className="text-sm font-normal text-gray-500">รายการ</span>
                   </p>
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -499,18 +547,24 @@ export default async function ServicesPage() {
             ด้านพลังงานแสงอาทิตย์ ระบบกักเก็บพลังงาน ยานยนต์ไฟฟ้า และอื่นๆ
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <a
-              href="/researchers"
+            <Link
+              href="/services/request"
               className="inline-flex items-center bg-white text-amber-700 font-semibold px-6 py-3 rounded-lg hover:bg-amber-50 transition shadow-lg"
             >
-              ติดต่อทีมนักวิจัย
-            </a>
-            <a
-              href="/"
+              📝 ส่งคำขอบริการ
+            </Link>
+            <Link
+              href="/services/training"
               className="inline-flex items-center border-2 border-white/80 text-white font-semibold px-6 py-3 rounded-lg hover:bg-white/10 transition"
             >
-              กลับหน้าหลัก
-            </a>
+              🎓 ดูหลักสูตรอบรม
+            </Link>
+            <Link
+              href="/researchers"
+              className="inline-flex items-center border-2 border-white/80 text-white font-semibold px-6 py-3 rounded-lg hover:bg-white/10 transition"
+            >
+              ติดต่อทีมนักวิจัย
+            </Link>
           </div>
         </div>
       </section>

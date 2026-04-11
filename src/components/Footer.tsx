@@ -1,8 +1,10 @@
+import Link from 'next/link';
+
 export default function Footer() {
   return (
     <footer className="bg-gray-800 text-gray-300 py-8 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <h3 className="text-white font-semibold mb-3">CESRU - Clean Energy System Research Unit</h3>
             <p className="text-sm">หน่วยวิจัยระบบพลังงานสะอาด</p>
@@ -16,6 +18,16 @@ export default function Footer() {
               <li>Electric Vehicles & Charging</li>
               <li>Wireless Power Transfer</li>
               <li>Microgrid & Community Energy</li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-white font-semibold mb-3">บริการวิชาการ</h3>
+            <ul className="text-sm space-y-1">
+              <li><Link href="/services/training" className="hover:text-yellow-300 transition">🎓 หลักสูตรอบรม</Link></li>
+              <li><Link href="/services/consulting" className="hover:text-yellow-300 transition">💡 ที่ปรึกษา & ออกแบบ</Link></li>
+              <li><Link href="/services" className="hover:text-yellow-300 transition">📋 ผลงานบริการวิชาการ</Link></li>
+              <li><Link href="/services/request" className="hover:text-yellow-300 transition">📝 ส่งคำขอบริการ</Link></li>
+              <li><Link href="/equipment" className="hover:text-yellow-300 transition">🔬 ครุภัณฑ์</Link></li>
             </ul>
           </div>
           <div>

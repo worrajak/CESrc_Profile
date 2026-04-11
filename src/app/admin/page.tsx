@@ -146,11 +146,25 @@ export default function AdminPage() {
           <h3 className="font-semibold text-gray-800 mb-1">ระบบยืม-คืน</h3>
           <p className="text-sm text-gray-500">อนุมัติ/คืน/ติดตามเกินกำหนด</p>
         </Link>
+        <Link
+          href="/admin/services"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-purple-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการคำขอบริการ</h3>
+          <p className="text-sm text-gray-500">อนุมัติ/มอบหมาย/ติดตามคำขอ</p>
+        </Link>
+        <Link
+          href="/admin/ai-settings"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-pink-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">ตั้งค่า AI</h3>
+          <p className="text-sm text-gray-500">API Key, เลือกโมเดล, ทดสอบ</p>
+        </Link>
         <a
           href="https://supabase.com/dashboard"
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-purple-500 block"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-gray-400 block"
         >
           <h3 className="font-semibold text-gray-800 mb-1">Supabase Dashboard</h3>
           <p className="text-sm text-gray-500">จัดการฐานข้อมูลและ Storage</p>
@@ -225,7 +239,10 @@ export default function AdminPage() {
             { path: '/publications', name: 'ผลงานวิจัย', icon: '📄' },
             { path: '/grants', name: 'ทุนวิจัย', icon: '💰' },
             { path: '/services', name: 'บริการวิชาการ', icon: '🔧' },
+            { path: '/services/training', name: 'หลักสูตรอบรม', icon: '🎓' },
+            { path: '/services/consulting', name: 'ที่ปรึกษา & ออกแบบ', icon: '💡' },
             { path: '/research-areas', name: 'สาขาวิจัย', icon: '🔬' },
+            { path: '/equipment', name: 'ครุภัณฑ์', icon: '🔬' },
           ].map((page) => (
             <div key={page.path} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <span className="text-2xl">{page.icon}</span>
