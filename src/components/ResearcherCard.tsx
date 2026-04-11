@@ -19,9 +19,13 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
     <Link href={`/researchers/${r.id}`} className="block">
       <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-300 h-full">
         <div className="flex items-start justify-between mb-3">
-          <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-xl font-bold">
-            {r.first_name_th.charAt(0)}
-          </div>
+          {r.avatar_url ? (
+            <img src={r.avatar_url} alt={fullNameTh} className="w-14 h-14 rounded-full object-cover" />
+          ) : (
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-xl font-bold">
+              {r.first_name_th.charAt(0)}
+            </div>
+          )}
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${badge.color}`}>
             {badge.label}
           </span>
