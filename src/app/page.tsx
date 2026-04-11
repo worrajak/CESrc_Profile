@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
-  const [researchersRes, pubCountRes, grantCountRes, newsRes] = await Promise.all([
+  const [researchersRes, pubCountRes, grantCountRes, newsRes, sessionsRes] = await Promise.all([
     supabase
       .from('researchers')
       .select('*')
@@ -25,6 +25,20 @@ async function getHomeData() {
       .eq('is_published', true)
       .order('published_at', { ascending: false })
       .limit(5),
+    // ดึงรุ่นอบรมที่กำลังเปิด/วางแผน พร้อมข้อมูลหลักสูตร
+    supabase
+      .from('training_sessions')
+      .select(`
+        *,
+        training_courses (
+          code, title_th, title_en, description_th,
+          skill_domain, level, duration_hours, duration_days,
+          fee_external, fee_student, grants_credential_level, image_url
+        )
+      `)
+      .in('status', ['open', 'planned'])
+      .order('start_date', { ascending: true })
+      .limit(4),
   ]);
 
   return {
@@ -32,11 +46,29 @@ async function getHomeData() {
     pubCount: pubCountRes.count || 0,
     grantCount: grantCountRes.count || 0,
     news: newsRes.data || [],
+    sessions: sessionsRes.data || [],
   };
 }
 
+const DOMAIN_ICONS: Record<string, string> = {
+  solar_pv: '☀️', ev_charger: '🔌', battery: '🔋',
+  energy_audit: '📊', microgrid: '⚡',
+};
+
+const LEVEL_LABELS: Record<string, string> = {
+  beginner: 'เริ่มต้น', intermediate: 'กลาง',
+  advanced: 'สูง', professional: 'วิชาชีพ',
+};
+
+const NFT_LABELS: Record<string, { label: string; icon: string }> = {
+  LEVEL_2: { label: 'Bronze NFT', icon: '🥉' },
+  LEVEL_3: { label: 'Silver NFT', icon: '🥈' },
+  LEVEL_4: { label: 'Gold NFT', icon: '🥇' },
+  LEVEL_5: { label: 'Diamond NFT', icon: '💎' },
+};
+
 export default async function HomePage() {
-  const { researchers, pubCount, grantCount, news } = await getHomeData();
+  const { researchers, pubCount, grantCount, news, sessions } = await getHomeData();
 
   return (
     <div>
@@ -68,6 +100,132 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Upcoming Training */}
+      {sessions.length > 0 && (
+        <section className="bg-gradient-to-b from-purple-50 to-white border-b">
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <span className="w-1 h-5 bg-purple-600 rounded-full"></span>
+                หลักสูตรอบรมเร็วๆ นี้
+              </h2>
+              <Link href="/services/training" className="text-purple-600 hover:text-purple-800 text-sm">
+                ดูหลักสูตรทั้งหมด →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {sessions.map((session: any) => {
+                const course = session.training_courses;
+                if (!course) return null;
+                const nft = course.grants_credential_level ? NFT_LABELS[course.grants_credential_level] : null;
+                const isOpen = session.status === 'open';
+                const startDate = new Date(session.start_date);
+                const endDate = new Date(session.end_date);
+                const daysUntil = Math.ceil((startDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+                return (
+                  <div key={session.id} className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-lg transition group">
+                    {/* Color Banner */}
+                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 text-white relative">
+                      <div className="flex items-start justify-between">
+                        <span className="text-2xl">{DOMAIN_ICONS[course.skill_domain] || '📚'}</span>
+                        {isOpen ? (
+                          <span className="text-[10px] bg-green-400 text-green-900 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                            เปิดรับสมัคร
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full">
+                            เร็วๆ นี้
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-sm mt-1 leading-tight line-clamp-2">{course.title_th}</h3>
+                    </div>
+
+                    <div className="p-3 space-y-2">
+                      {/* Date */}
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <span>📅</span>
+                        <span>
+                          {startDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                          {session.start_date !== session.end_date && (
+                            <> — {endDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</>
+                          )}
+                        </span>
+                        {daysUntil > 0 && daysUntil <= 30 && (
+                          <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
+                            อีก {daysUntil} วัน
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Location */}
+                      {session.location && (
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>📍</span>
+                          <span>{session.location}</span>
+                        </div>
+                      )}
+
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1">
+                        {course.duration_days && (
+                          <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                            {course.duration_days} วัน ({course.duration_hours} ชม.)
+                          </span>
+                        )}
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                          {LEVEL_LABELS[course.level] || course.level}
+                        </span>
+                        {session.batch_number && (
+                          <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">
+                            รุ่นที่ {session.batch_number}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* NFT Badge */}
+                      {nft && (
+                        <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-2 py-1.5 border border-amber-200">
+                          <span className="text-sm">{nft.icon}</span>
+                          <div>
+                            <div className="text-[10px] font-bold text-amber-700">ผ่านแล้วได้ {nft.label}</div>
+                            <div className="text-[9px] text-amber-500">ใบรับรองบน Blockchain</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Price + CTA */}
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <div>
+                          <div className="text-sm font-bold text-gray-800">
+                            {course.fee_external > 0 ? `${Number(course.fee_external).toLocaleString()} บาท` : 'ฟรี'}
+                          </div>
+                          {course.fee_student > 0 && course.fee_student !== course.fee_external && (
+                            <div className="text-[10px] text-gray-400">นศ. {Number(course.fee_student).toLocaleString()} บาท</div>
+                          )}
+                        </div>
+                        <Link
+                          href={`/services/request?course=${course.code}&type=training`}
+                          className={`text-[10px] px-3 py-1.5 rounded-lg font-medium transition ${
+                            isOpen
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {isOpen ? 'สมัครเลย' : 'สนใจ'}
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* News & IEEE Spectrum */}
       <section className="max-w-7xl mx-auto px-4 py-8">
