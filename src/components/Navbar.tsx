@@ -22,6 +22,7 @@ export default function Navbar() {
           {/* Desktop */}
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="hover:text-yellow-300 transition">หน้าแรก</Link>
+            <Link href="/news" className="hover:text-yellow-300 transition">ข่าวสาร</Link>
             <Link href="/researchers" className="hover:text-yellow-300 transition">นักวิจัย</Link>
             <Link href="/research-areas" className="hover:text-yellow-300 transition">สาขาวิจัย</Link>
             <Link href="/publications" className="hover:text-yellow-300 transition">ผลงานตีพิมพ์</Link>
@@ -29,7 +30,6 @@ export default function Navbar() {
             <Link href="/patents" className="hover:text-yellow-300 transition">สิทธิบัตร</Link>
             <Link href="/students" className="hover:text-yellow-300 transition">นักศึกษา</Link>
             <Link href="/services" className="hover:text-yellow-300 transition">บริการวิชาการ</Link>
-            <Link href="/news" className="hover:text-yellow-300 transition">ข่าวสาร</Link>
           </div>
 
           {/* Mobile toggle */}
@@ -49,6 +49,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden px-4 pb-4 space-y-2">
           <Link href="/" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>หน้าแรก</Link>
+          <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ข่าวสาร</Link>
           <Link href="/researchers" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>นักวิจัย</Link>
           <Link href="/research-areas" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>สาขาวิจัย</Link>
           <Link href="/publications" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ผลงานตีพิมพ์</Link>
@@ -56,7 +57,6 @@ export default function Navbar() {
           <Link href="/patents" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>สิทธิบัตร</Link>
           <Link href="/students" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>นักศึกษา</Link>
           <Link href="/services" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>บริการวิชาการ</Link>
-          <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ข่าวสาร</Link>
         </div>
       )}
     </nav>
