@@ -105,7 +105,7 @@ export default async function ServicesPage() {
           </div>
 
           {/* ===== KEY METRICS ===== */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 max-w-5xl mx-auto">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center border border-white/10 hover:bg-white/15 transition">
               <div className="text-3xl md:text-4xl font-bold text-amber-400 mb-1">&gt; 1 MW</div>
               <div className="text-sm text-gray-300">Design & Install</div>
@@ -128,6 +128,11 @@ export default async function ServicesPage() {
               <div className="text-sm text-gray-300">ผู้เข้าอบรม</div>
               <div className="text-xs text-gray-500 mt-1">10+ หลักสูตร</div>
             </div>
+            <a href="#equipment" className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center border border-white/10 hover:bg-white/15 transition block">
+              <div className="text-3xl md:text-4xl font-bold text-cyan-400 mb-1">20+</div>
+              <div className="text-sm text-gray-300">Lab Equipment</div>
+              <div className="text-xs text-gray-500 mt-1">เครื่องมือวัด</div>
+            </a>
           </div>
         </div>
       </section>
@@ -359,6 +364,128 @@ export default async function ServicesPage() {
             </div>
           );
         })}
+      </section>
+
+      {/* ===== LAB EQUIPMENT & INSTRUMENTS ===== */}
+      <section id="equipment" className="bg-gradient-to-b from-gray-50 to-white border-t">
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="text-center mb-10">
+            <p className="text-cyan-600 font-semibold text-sm tracking-widest uppercase mb-2">
+              Lab Equipment & Instruments
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+              เครื่องมือและครุภัณฑ์ในห้องปฏิบัติการ
+            </h2>
+            <p className="text-gray-500 max-w-xl mx-auto">
+              เครื่องมือวัดและอุปกรณ์ที่พร้อมให้บริการ ณ ห้องปฏิบัติการพลังงานแสงอาทิตย์ (Solar Lab) มทร.ล้านนา
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Test & Measurement Instruments */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-cyan-100 border border-cyan-200 rounded-xl flex items-center justify-center text-lg">
+                  <span>&#9889;</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-cyan-800">เครื่องมือวัดทางไฟฟ้า</h3>
+                  <p className="text-xs text-gray-500">Test & Measurement Instruments</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-cyan-100 divide-y divide-gray-100">
+                {[
+                  { name: 'Fluke 289 True-RMS Multimeter', qty: 4, note: 'ใช้ได้ 3 เครื่อง' },
+                  { name: 'Fluke 1730 Three-Phase Energy Logger', qty: 2, note: null },
+                  { name: 'Fluke 376 FC True-RMS Clamp Meter', qty: 2, note: null },
+                  { name: 'Fluke 337 True-RMS Clamp Meter', qty: 1, note: null },
+                  { name: 'Fluke 62 MAX+ Infrared Thermometer', qty: 1, note: null },
+                  { name: 'Fluke 971 Temperature & Humidity Meter', qty: 1, note: null },
+                  { name: 'Fluke Ti25 Thermal Imager', qty: 1, note: null },
+                  { name: 'Fluke 1625-2 GEO Earth Ground Tester Kit', qty: 1, note: null },
+                  { name: 'HIOKI Memory HiLogger LR8450-01', qty: 1, note: null },
+                  { name: 'Digital Power Clamp Meter MS2203', qty: 4, note: null },
+                  { name: 'BK Precision 879B LCR Meter', qty: 2, note: null },
+                  { name: 'DIGICON DM-690', qty: 1, note: null },
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-cyan-50/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400 font-mono w-5">{idx + 1}.</span>
+                      <span className="text-sm text-gray-800">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.note && <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">{item.note}</span>}
+                      <span className="text-xs font-bold bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-lg">{item.qty}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Solar PV Test Equipment */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-amber-100 border border-amber-200 rounded-xl flex items-center justify-center text-lg">
+                  <span>&#9728;&#65039;</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-amber-800">เครื่องมือทดสอบระบบ PV</h3>
+                  <p className="text-xs text-gray-500">Solar PV Test Equipment</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-amber-100 divide-y divide-gray-100">
+                {[
+                  { name: 'Seaward PV150 Solar Complete Kit', desc: 'ชุดทดสอบระบบ PV ครบชุด (Voc, Isc, Insulation, Continuity)' },
+                  { name: 'HT I-V 400W I-V Curve Tracer', desc: 'วัดกราฟ I-V ของแผงโซล่าเซลล์ได้ถึง 400W' },
+                  { name: 'HT Solar 300N Irradiance Meter', desc: 'วัดความเข้มแสงอาทิตย์และอุณหภูมิแผง' },
+                  { name: 'HT MPP300 MPPT Analyzer', desc: 'วิเคราะห์จุดทำงานสูงสุดของระบบ PV' },
+                  { name: 'HT PV CHECKs', desc: 'ตรวจสอบความปลอดภัยระบบ PV' },
+                  { name: 'Metrel EurotestPV Remote A1378', desc: 'ทดสอบระบบ PV ระยะไกล' },
+                  { name: 'Metrel MI 3109 EurotestPV Lite', desc: 'ทดสอบระบบ PV แบบพกพา' },
+                  { name: 'PROVA 210 Solar Module Analyzer', desc: 'วิเคราะห์แผงโซล่าเซลล์' },
+                ].map((item, idx) => (
+                  <div key={idx} className="px-4 py-3 hover:bg-amber-50/50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xs text-gray-400 font-mono w-5 mt-0.5">{idx + 1}.</span>
+                      <div>
+                        <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                        <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Lab Facilities */}
+              <div className="mt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-10 h-10 bg-gray-100 border border-gray-200 rounded-xl flex items-center justify-center text-lg">
+                    <span>&#127971;</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-700">สิ่งอำนวยความสะดวกใน Lab</h3>
+                    <p className="text-xs text-gray-500">Lab Facilities</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'Hybrid Inverter 3kW x4',
+                      'Computer All-in-One x2',
+                      'Smart TV / LED TV x2',
+                      'Air Conditioner',
+                      'Fume Hood',
+                    ].map((item, idx) => (
+                      <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ===== BOTTOM CTA ===== */}
