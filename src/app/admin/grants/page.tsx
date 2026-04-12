@@ -213,11 +213,37 @@ export default function AdminGrantsPage() {
     let savedGrantId: string | null = null;
 
     if (editing) {
-      await supabase.from('grants').update(payload).eq('id', editing.id);
+      const { error } = await supabase.from('grants').update(payload).eq('id', editing.id);
+      if (error) {
+        alert('บันทึกไม่สำเร็จ: ' + error.message);
+        setLoading(false);
+        return;
+      }
       savedGrantId = editing.id;
     } else {
-      const { data: inserted } = await supabase.from('grants').insert(payload).select('id').single();
-      savedGrantId = inserted?.id || null;
+      // insert แล้วดึง id กลับ
+      const { data: inserted, error } = await supabase.from('grants').insert(payload).select('id').single();
+      if (error) {
+        // Fallback: insert อย่างเดียว แล้วหา id จาก title + funding_agency
+        console.error('Insert with select failed:', error.message);
+        const { error: insertErr } = await supabase.from('grants').insert(payload);
+        if (insertErr) {
+          alert('บันทึกไม่สำเร็จ: ' + insertErr.message + '\n\nลองรัน 029_fix_grants_rls.sql ใน Supabase Dashboard');
+          setLoading(false);
+          return;
+        }
+        // หา id ของ record ที่เพิ่งสร้าง
+        const { data: found } = await supabase.from('grants')
+          .select('id')
+          .eq('title_th', form.title_th)
+          .eq('funding_agency', form.funding_agency)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        savedGrantId = found?.id || null;
+      } else {
+        savedGrantId = inserted?.id || null;
+      }
     }
 
     // Auto-import AI milestones + work plan + team members
@@ -235,7 +261,9 @@ export default function AdminGrantsPage() {
               work_plan: aiResult.data.work_plan || [],
             }),
           });
-        } catch {}
+        } catch (e) {
+          console.error('Import milestones failed:', e);
+        }
       }
 
       // Auto-add matched team members
