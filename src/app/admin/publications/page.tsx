@@ -30,9 +30,10 @@ export default function AdminPublicationsPage() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // AI API keys (stored in sessionStorage for convenience)
-  const [aiProvider, setAiProvider] = useState<'none' | 'gemini' | 'anthropic'>('none');
-  const [aiApiKey, setAiApiKey] = useState('');
+  // AI settings (reads from DB via api)
+  const [aiProvider, setAiProvider] = useState<string>('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiProviders, setAiProviders] = useState<any[]>([]);
   const [showApiSettings, setShowApiSettings] = useState(false);
 
   // Import state
@@ -68,18 +69,12 @@ export default function AdminPublicationsPage() {
       setAuthenticated(true);
       setPassword(sessionStorage.getItem('admin_pwd') || '');
     }
-    // Restore AI settings from sessionStorage
-    const savedProvider = sessionStorage.getItem('ai_provider') as any;
-    const savedKey = sessionStorage.getItem('ai_api_key');
-    if (savedProvider) setAiProvider(savedProvider);
-    if (savedKey) setAiApiKey(savedKey);
+    // Load AI providers from DB
+    fetch('/api/publications/parse-citation')
+      .then(r => r.json())
+      .then(d => setAiProviders(d.providers || []))
+      .catch(() => {});
   }, []);
-
-  const saveAiSettings = () => {
-    sessionStorage.setItem('ai_provider', aiProvider);
-    if (aiApiKey) sessionStorage.setItem('ai_api_key', aiApiKey);
-    setShowApiSettings(false);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,8 +166,8 @@ export default function AdminPublicationsPage() {
         body: JSON.stringify({
           password,
           citation: citationInput.trim(),
-          ai_provider: aiProvider !== 'none' ? aiProvider : undefined,
-          ai_api_key: aiApiKey || undefined,
+          ai_provider: aiProvider || undefined,
+          ai_model: aiModel || undefined,
         }),
       });
       const data = await res.json();
@@ -297,63 +292,64 @@ export default function AdminPublicationsPage() {
         <div className="flex items-center gap-3">
           <button onClick={() => setShowApiSettings(!showApiSettings)}
             className={`text-xs px-3 py-1.5 rounded-full font-medium transition ${
-              aiProvider !== 'none' && aiApiKey
+              aiProviders.length > 0
                 ? 'bg-green-100 text-green-700 hover:bg-green-200'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}>
-            {aiProvider !== 'none' && aiApiKey
-              ? `AI: ${aiProvider === 'gemini' ? 'Gemini' : 'Claude'} ✓`
-              : 'ตั้งค่า AI'}
+            {aiProvider
+              ? `AI: ${aiProviders.find(p => p.provider === aiProvider)?.name || aiProvider} ✓`
+              : aiProviders.length > 0 ? 'เลือก AI' : 'ตั้งค่า AI'}
           </button>
           <a href="/admin" className="text-sm text-blue-600 hover:underline">← กลับ Admin</a>
         </div>
       </div>
 
-      {/* AI API Settings Panel */}
+      {/* AI Settings Panel */}
       {showApiSettings && (
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-5 mb-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">ตั้งค่า AI สำหรับ Parse Citation</h3>
+            <h3 className="font-semibold text-gray-800">เลือก AI สำหรับ Parse Citation</h3>
             <button onClick={() => setShowApiSettings(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
           </div>
           <p className="text-xs text-gray-500">
-            ใช้ AI ช่วยแยกข้อมูลจาก citation ให้แม่นยำขึ้น (เลือกตัวใดตัวหนึ่ง หรือไม่ใช้ก็ได้)
+            ใช้ AI ช่วยแยกข้อมูลจาก citation ให้แม่นยำขึ้น — API Key ตั้งค่าจากหน้า{' '}
+            <a href="/admin/ai-settings" className="text-purple-600 hover:underline">ตั้งค่า AI</a>
           </p>
 
-          <div className="flex gap-2">
-            {(['none', 'gemini', 'anthropic'] as const).map((p) => (
-              <button key={p} onClick={() => setAiProvider(p)}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { setAiProvider(''); setAiModel(''); }}
+              className={`text-xs px-3 py-2 rounded-lg font-medium transition ${
+                !aiProvider ? 'ring-2 ring-purple-400 bg-white shadow-sm' : 'bg-white/50 text-gray-600 hover:bg-white'
+              }`}>
+              อัตโนมัติ
+            </button>
+            {aiProviders.map((p: any) => (
+              <button key={p.provider} onClick={() => { setAiProvider(p.provider); setAiModel(''); }}
                 className={`text-xs px-3 py-2 rounded-lg font-medium transition ${
-                  aiProvider === p ? 'ring-2 ring-purple-400 bg-white shadow-sm' : 'bg-white/50 text-gray-600 hover:bg-white'
+                  aiProvider === p.provider ? 'ring-2 ring-purple-400 bg-white shadow-sm' : 'bg-white/50 text-gray-600 hover:bg-white'
                 }`}>
-                {p === 'none' ? 'ไม่ใช้ AI' : p === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}
+                {p.name}
               </button>
             ))}
           </div>
 
-          {aiProvider !== 'none' && (
+          {aiProvider && (
             <div>
-              <label className="text-xs text-gray-600 block mb-1">
-                {aiProvider === 'gemini' ? 'Gemini API Key' : 'Anthropic API Key'}
-                <a href={aiProvider === 'gemini' ? 'https://aistudio.google.com/apikey' : 'https://console.anthropic.com/settings/keys'}
-                  target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-500 hover:underline">
-                  รับ API Key →
-                </a>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  className="flex-1 border rounded-lg p-2.5 text-sm font-mono"
-                  placeholder={aiProvider === 'gemini' ? 'AIza...' : 'sk-ant-api03-...'}
-                />
-                <button onClick={saveAiSettings}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 font-medium">
-                  บันทึก
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1">API Key จะเก็บใน browser session เท่านั้น ปิดแท็บแล้วต้องกรอกใหม่</p>
+              <label className="text-xs text-gray-600 block mb-1">เลือกโมเดล</label>
+              <select className="border rounded-lg p-2.5 text-sm w-full"
+                value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
+                <option value="">Default</option>
+                {aiProviders.find((p: any) => p.provider === aiProvider)?.models?.map((m: string) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {aiProviders.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+              ยังไม่มี AI Provider — กรุณาตั้งค่า API Key ที่หน้า{' '}
+              <a href="/admin/ai-settings" className="font-medium underline">ตั้งค่า AI</a> ก่อน
             </div>
           )}
         </div>

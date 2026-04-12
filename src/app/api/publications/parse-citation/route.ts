@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callAIText, getAvailableProviders, AIProvider } from '@/lib/ai-provider';
 
 function extractDoi(text: string): string | null {
   const match = text.match(/\b(10\.\d{4,}\/[^\s,;"\]>]+)/);
@@ -148,103 +149,8 @@ function parseCitationRegex(citation: string) {
   };
 }
 
-// AI-powered citation parsing using Claude API
-async function parseCitationWithAI(citation: string, clientApiKey?: string): Promise<any | null> {
-  const apiKey = clientApiKey || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: `Parse this academic citation and extract structured data. Return ONLY valid JSON, no explanation.
-
-Citation:
-${citation}
-
-Return JSON with this exact structure:
-{
-  "title": "paper title",
-  "authors": [{"given": "First", "family": "Last", "order": 1}],
-  "journal_name": "journal or conference name",
-  "volume": "vol number or null",
-  "issue": "issue number or null",
-  "pages": "page range or null",
-  "year": 2024,
-  "doi": "DOI if found or null",
-  "pub_type": "journal_international|journal_national|conference_international|conference_national|book_chapter|book|technical_report",
-  "keywords": [],
-  "scopus_indexed": false,
-  "wos_indexed": false
-}
-
-Notes:
-- For pub_type: if it mentions conference/proceedings/symposium use conference_*, if Thai journal use journal_national
-- authors should have separate given name and family name
-- year should be integer
-- If DOI is present in the citation, extract it (format: 10.xxxx/yyyy)`
-          }
-        ],
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    // Validate and normalize
-    if (!parsed.title) return null;
-
-    const authors = (parsed.authors || []).map((a: any, i: number) => ({
-      given: a.given || '',
-      family: a.family || '',
-      order: a.order || i + 1,
-    }));
-
-    return {
-      title: parsed.title,
-      authors_raw: buildAuthorsRaw(authors),
-      authors,
-      journal_name: parsed.journal_name || '',
-      volume: parsed.volume || null,
-      issue: parsed.issue || null,
-      pages: parsed.pages || null,
-      year: parsed.year || null,
-      doi: parsed.doi || extractDoi(citation),
-      pub_type: parsed.pub_type || 'journal_international',
-      keywords: parsed.keywords || [],
-      scopus_indexed: parsed.scopus_indexed || false,
-      wos_indexed: parsed.wos_indexed || false,
-    };
-  } catch (e) {
-    console.error('Claude AI parsing failed:', e);
-    return null;
-  }
-}
-
-// AI-powered citation parsing using Google Gemini API
-async function parseCitationWithGemini(citation: string, clientApiKey?: string): Promise<any | null> {
-  const apiKey = clientApiKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
+// AI-powered citation parsing using unified ai-provider
+async function parseCitationWithAI(citation: string, provider?: AIProvider, model?: string): Promise<any | null> {
   const prompt = `Parse this academic citation and extract structured data. Return ONLY valid JSON, no explanation.
 
 Citation:
@@ -273,33 +179,14 @@ Notes:
 - If DOI is present in the citation, extract it (format: 10.xxxx/yyyy)`;
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024,
-          },
-        }),
-        signal: AbortSignal.timeout(15000),
-      }
-    );
+    const result = await callAIText(prompt, {
+      provider: provider || undefined,
+      model: model || undefined,
+    });
 
-    if (!res.ok) return null;
+    if (result.error || !result.data) return null;
 
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
+    const parsed = result.data;
     if (!parsed.title) return null;
 
     const authors = (parsed.authors || []).map((a: any, i: number) => ({
@@ -322,16 +209,18 @@ Notes:
       keywords: parsed.keywords || [],
       scopus_indexed: parsed.scopus_indexed || false,
       wos_indexed: parsed.wos_indexed || false,
+      ai_source: result.source,
+      ai_model: result.model,
     };
   } catch (e) {
-    console.error('Gemini AI parsing failed:', e);
+    console.error('AI citation parsing failed:', e);
     return null;
   }
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { password, citation, ai_provider, ai_api_key } = body;
+  const { password, citation, ai_provider, ai_model } = body;
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -389,24 +278,25 @@ export async function POST(request: NextRequest) {
     } catch { /* CrossRef failed, fall through */ }
   }
 
-  // Step 2: Try AI-powered parsing based on user's preference
-  if (ai_provider === 'anthropic' || (!ai_provider && (ai_api_key || process.env.ANTHROPIC_API_KEY))) {
-    const claudeKey = ai_provider === 'anthropic' ? ai_api_key : undefined;
-    const claudeResult = await parseCitationWithAI(citation, claudeKey);
-    if (claudeResult) {
-      return NextResponse.json({ ...claudeResult, source: 'ai', ai_provider: 'claude' });
-    }
-  }
-
-  if (ai_provider === 'gemini' || (!ai_provider && (ai_api_key || process.env.GEMINI_API_KEY))) {
-    const geminiKey = ai_provider === 'gemini' ? ai_api_key : undefined;
-    const geminiResult = await parseCitationWithGemini(citation, geminiKey);
-    if (geminiResult) {
-      return NextResponse.json({ ...geminiResult, source: 'ai', ai_provider: 'gemini' });
+  // Step 2: Try AI-powered parsing (uses unified ai-provider system)
+  if (ai_provider !== 'none') {
+    const aiResult = await parseCitationWithAI(
+      citation,
+      ai_provider as AIProvider || undefined,
+      ai_model || undefined,
+    );
+    if (aiResult) {
+      return NextResponse.json({ ...aiResult, source: 'ai', ai_provider: aiResult.ai_source });
     }
   }
 
   // Step 3: Fallback to regex parsing
   const result = parseCitationRegex(citation);
   return NextResponse.json({ ...result, source: 'parsed' });
+}
+
+// GET: return available AI providers
+export async function GET() {
+  const providers = await getAvailableProviders();
+  return NextResponse.json({ providers });
 }
