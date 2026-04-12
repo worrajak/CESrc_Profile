@@ -133,6 +133,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">เพิ่ม/แก้ไข ทุน, แนบสัญญา</p>
         </Link>
         <Link
+          href="/admin/grants/tracking"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-lime-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">ติดตามทุนวิจัย</h3>
+          <p className="text-sm text-gray-500">Milestones, S-Curve, AI วิเคราะห์</p>
+        </Link>
+        <Link
           href="/admin/equipment"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-cyan-500 block"
         >

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -16,150 +17,245 @@ export default async function GrantsPage() {
       grant_members (
         role,
         researchers (
-          title_th, first_name_th, last_name_th
+          id, title_th, first_name_th, last_name_th, avatar_url
         )
       )
     `)
     .order('fiscal_year', { ascending: false });
 
+  // Try to get tracking data (may fail if tables don't exist yet)
+  let trackingMap: Record<string, any> = {};
+  try {
+    const { data: milestoneStats } = await supabase
+      .from('grant_milestones')
+      .select('grant_id, status, completion_pct');
+
+    const { data: progressLogs } = await supabase
+      .from('grant_progress_logs')
+      .select('grant_id, log_date, planned_pct, actual_pct')
+      .order('log_date', { ascending: false });
+
+    if (milestoneStats) {
+      for (const ms of milestoneStats) {
+        if (!trackingMap[ms.grant_id]) {
+          trackingMap[ms.grant_id] = { total: 0, completed: 0, delayed: 0, avgPct: 0, sumPct: 0 };
+        }
+        trackingMap[ms.grant_id].total++;
+        trackingMap[ms.grant_id].sumPct += (ms.completion_pct || 0);
+        if (ms.status === 'completed') trackingMap[ms.grant_id].completed++;
+        if (ms.status === 'delayed') trackingMap[ms.grant_id].delayed++;
+      }
+      for (const gid of Object.keys(trackingMap)) {
+        trackingMap[gid].avgPct = trackingMap[gid].total > 0
+          ? Math.round(trackingMap[gid].sumPct / trackingMap[gid].total) : 0;
+      }
+    }
+
+    // Latest progress per grant
+    if (progressLogs) {
+      const seen = new Set<string>();
+      for (const pl of progressLogs) {
+        if (!seen.has(pl.grant_id)) {
+          seen.add(pl.grant_id);
+          if (!trackingMap[pl.grant_id]) trackingMap[pl.grant_id] = {};
+          trackingMap[pl.grant_id].latestPlanned = pl.planned_pct;
+          trackingMap[pl.grant_id].latestActual = pl.actual_pct;
+        }
+      }
+    }
+  } catch {
+    // Tables might not exist yet
+  }
+
   const allGrants = grants || [];
+  const activeGrants = allGrants.filter((g: any) => g.status === 'active');
+  const completedGrants = allGrants.filter((g: any) => g.status === 'completed');
+  const otherGrants = allGrants.filter((g: any) => g.status !== 'active' && g.status !== 'completed');
   const totalBudget = allGrants.reduce((sum: number, g: any) => sum + (Number(g.budget) || 0), 0);
 
+  const grantRoleLabels: Record<string, string> = {
+    pi: 'หัวหน้าโครงการ',
+    co_pi: 'ผู้ร่วมโครงการ',
+    researcher: 'นักวิจัย',
+    consultant: 'ที่ปรึกษา',
+  };
+
+  const statusConfig: Record<string, { label: string; color: string; borderColor: string }> = {
+    active: { label: 'กำลังดำเนินการ', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-400' },
+    completed: { label: 'เสร็จสิ้น', color: 'bg-green-100 text-green-700', borderColor: 'border-green-400' },
+    pending: { label: 'รอดำเนินการ', color: 'bg-yellow-100 text-yellow-700', borderColor: 'border-yellow-400' },
+    cancelled: { label: 'ยกเลิก', color: 'bg-red-100 text-red-700', borderColor: 'border-red-400' },
+  };
+
+  const renderGrantCard = (g: any) => {
+    const st = statusConfig[g.status] || statusConfig.active;
+    const tracking = trackingMap[g.id];
+
+    return (
+      <Link key={g.id} href={`/grants/${g.id}`} className="block group">
+        <div className={`bg-white rounded-xl shadow-sm border-l-4 ${st.borderColor} p-5 hover:shadow-lg transition-all`}>
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h3 className="font-semibold text-gray-900 group-hover:text-blue-700 transition line-clamp-2">{g.title_th}</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${st.color}`}>{st.label}</span>
+          </div>
+
+          {g.title_en && <p className="text-xs text-gray-400 mb-3 line-clamp-1">{g.title_en}</p>}
+
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
+            <div>
+              <span className="text-gray-400">แหล่งทุน</span>
+              <div className="font-medium text-gray-800">{g.funding_agency}</div>
+            </div>
+            {g.budget && (
+              <div>
+                <span className="text-gray-400">งบประมาณ</span>
+                <div className="font-semibold text-green-700">{Number(g.budget).toLocaleString()} บาท</div>
+              </div>
+            )}
+            {g.fiscal_year && (
+              <div>
+                <span className="text-gray-400">ปีงบประมาณ</span>
+                <div className="font-medium">พ.ศ. {g.fiscal_year}</div>
+              </div>
+            )}
+            {(g.start_date || g.end_date) && (
+              <div>
+                <span className="text-gray-400">ระยะเวลา</span>
+                <div className="font-medium">{g.start_date || '?'} — {g.end_date || '?'}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Tracking Progress */}
+          {tracking && tracking.total > 0 && (
+            <div className="mb-3 pt-3 border-t">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-gray-500">ความก้าวหน้า</span>
+                <span className="font-bold text-blue-700">{tracking.avgPct}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className={`h-2 rounded-full transition-all ${
+                  tracking.avgPct >= 100 ? 'bg-green-500' :
+                  tracking.delayed > 0 ? 'bg-orange-500' : 'bg-blue-500'
+                }`} style={{ width: `${Math.min(tracking.avgPct, 100)}%` }} />
+              </div>
+              <div className="flex gap-3 mt-1.5 text-[10px] text-gray-400">
+                <span>Milestones: {tracking.completed}/{tracking.total}</span>
+                {tracking.delayed > 0 && <span className="text-red-500">ล่าช้า: {tracking.delayed}</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Team */}
+          {g.grant_members && g.grant_members.length > 0 && (
+            <div className="flex items-center gap-1 pt-3 border-t">
+              <div className="flex -space-x-2">
+                {g.grant_members.slice(0, 4).map((gm: any, i: number) => {
+                  const r = gm.researchers;
+                  if (!r) return null;
+                  return r.avatar_url ? (
+                    <img key={i} src={r.avatar_url} alt="" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
+                  ) : (
+                    <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-[9px] text-blue-700 font-bold">
+                      {r.first_name_th?.[0]}
+                    </div>
+                  );
+                })}
+                {g.grant_members.length > 4 && (
+                  <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[9px] text-gray-500">
+                    +{g.grant_members.length - 4}
+                  </div>
+                )}
+              </div>
+              <span className="text-[10px] text-gray-400 ml-2">
+                {g.grant_members.find((gm: any) => gm.role === 'pi')?.researchers
+                  ? `${g.grant_members.find((gm: any) => gm.role === 'pi').researchers.title_th}${g.grant_members.find((gm: any) => gm.role === 'pi').researchers.first_name_th}`
+                  : ''
+                }
+              </span>
+            </div>
+          )}
+
+          {/* Research areas */}
+          {g.research_areas && g.research_areas.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {g.research_areas.slice(0, 3).map((area: string, i: number) => (
+                <span key={i} className="text-[10px] bg-blue-50 text-blue-500 px-2 py-0.5 rounded">{area}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">ทุนวิจัย / โครงการวิจัย</h1>
-      <p className="text-gray-500 mb-4">
-        โครงการวิจัยที่ได้รับทุนสนับสนุน ({allGrants.length} โครงการ)
-      </p>
-      {totalBudget > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-8 inline-block">
-          <span className="text-green-800 font-semibold">งบประมาณรวม (ที่ระบุ): </span>
-          <span className="text-green-700 text-lg font-bold">{totalBudget.toLocaleString()} บาท</span>
+    <div className="max-w-7xl mx-auto px-4 py-12">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">ทุนวิจัย / โครงการวิจัย</h1>
+        <p className="text-gray-500">
+          โครงการวิจัยที่ได้รับทุนสนับสนุน ({allGrants.length} โครงการ)
+        </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-xl shadow-sm p-4 border">
+          <div className="text-3xl font-bold text-gray-800">{allGrants.length}</div>
+          <div className="text-sm text-gray-500">โครงการทั้งหมด</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4 border">
+          <div className="text-3xl font-bold text-blue-600">{activeGrants.length}</div>
+          <div className="text-sm text-gray-500">กำลังดำเนินการ</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-4 border">
+          <div className="text-3xl font-bold text-green-600">{completedGrants.length}</div>
+          <div className="text-sm text-gray-500">เสร็จสิ้น</div>
+        </div>
+        {totalBudget > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-4 border">
+            <div className="text-2xl font-bold text-green-700">{(totalBudget / 1000000).toFixed(1)}M</div>
+            <div className="text-sm text-gray-500">งบรวม ({totalBudget.toLocaleString()} บาท)</div>
+          </div>
+        )}
+      </div>
+
+      {/* Active Grants */}
+      {activeGrants.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+            กำลังดำเนินการ ({activeGrants.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {activeGrants.map(renderGrantCard)}
+          </div>
         </div>
       )}
 
-      <div className="space-y-6">
-        {allGrants.map((g: any) => {
-          const grantRoleLabels: Record<string, string> = {
-            pi: 'หัวหน้าโครงการ',
-            co_pi: 'ผู้ร่วมโครงการ',
-            researcher: 'นักวิจัย',
-            consultant: 'ที่ปรึกษา',
-          };
+      {/* Completed Grants */}
+      {completedGrants.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span className="w-3 h-3 bg-green-500 rounded-full" />
+            เสร็จสิ้น ({completedGrants.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {completedGrants.map(renderGrantCard)}
+          </div>
+        </div>
+      )}
 
-          return (
-            <div key={g.id} className="bg-white rounded-lg shadow-sm p-6 border hover:shadow-md transition">
-              <h3 className="font-semibold text-gray-900 text-lg">{g.title_th}</h3>
-              {g.title_en && <p className="text-sm text-gray-500 mt-1">{g.title_en}</p>}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-700">แหล่งทุน: </span>
-                  <span className="text-gray-600">{g.funding_agency}</span>
-                </div>
-                {g.budget && (
-                  <div>
-                    <span className="font-medium text-gray-700">งบประมาณ: </span>
-                    <span className="text-green-700 font-semibold">{Number(g.budget).toLocaleString()} บาท</span>
-                  </div>
-                )}
-                {g.contract_number && (
-                  <div>
-                    <span className="font-medium text-gray-700">เลขที่สัญญา: </span>
-                    <span className="text-gray-600">{g.contract_number}</span>
-                  </div>
-                )}
-                {g.fiscal_year && (
-                  <div>
-                    <span className="font-medium text-gray-700">ปีงบประมาณ: </span>
-                    <span className="text-gray-600">พ.ศ. {g.fiscal_year}</span>
-                  </div>
-                )}
-                {(g.start_date || g.end_date) && (
-                  <div>
-                    <span className="font-medium text-gray-700">ระยะเวลา: </span>
-                    <span className="text-gray-600">
-                      {g.start_date || '?'} — {g.end_date || '?'}
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <span className="font-medium text-gray-700">สถานะ: </span>
-                  <span className={`px-2 py-0.5 rounded text-xs ${
-                    g.status === 'completed' ? 'bg-green-100 text-green-700' :
-                    g.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {g.status === 'completed' ? 'เสร็จสิ้น' : g.status === 'active' ? 'กำลังดำเนินการ' : g.status}
-                  </span>
-                </div>
-              </div>
-
-              {g.description_th && (
-                <p className="text-sm text-gray-500 mt-3">{g.description_th}</p>
-              )}
-
-              {g.grant_members && g.grant_members.length > 0 && (
-                <div className="mt-3 pt-3 border-t">
-                  <span className="text-sm font-medium text-gray-700">ทีมวิจัย: </span>
-                  {g.grant_members.map((gm: any, i: number) => {
-                    const r = gm.researchers;
-                    if (!r) return null;
-                    return (
-                      <span key={i} className="text-sm text-gray-600">
-                        {i > 0 && ', '}
-                        {r.title_th}{r.first_name_th} {r.last_name_th}
-                        <span className="text-xs text-gray-400 ml-1">({grantRoleLabels[gm.role] || gm.role})</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* เอกสารแนบ */}
-              {(g.contract_file_url || g.progress_report_url || g.final_report_url) && (
-                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
-                  {g.contract_file_url && (
-                    <a href={g.contract_file_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      สัญญาทุน
-                    </a>
-                  )}
-                  {g.progress_report_url && (
-                    <a href={g.progress_report_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      รายงานความก้าวหน้า
-                    </a>
-                  )}
-                  {g.final_report_url && (
-                    <a href={g.final_report_url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 transition">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      รายงานฉบับสมบูรณ์
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {g.research_areas && g.research_areas.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-3">
-                  {g.research_areas.map((area: string, i: number) => (
-                    <span key={i} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{area}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* Other Grants */}
+      {otherGrants.length > 0 && (
+        <div className="mb-10">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">อื่นๆ ({otherGrants.length})</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {otherGrants.map(renderGrantCard)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

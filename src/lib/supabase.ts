@@ -76,6 +76,47 @@ export interface Grant {
   final_report_url: string | null;
 }
 
+export interface GrantMilestone {
+  id: string;
+  grant_id: string;
+  title: string;
+  description: string | null;
+  milestone_type: string;
+  planned_date: string;
+  actual_date: string | null;
+  planned_weight: number;
+  status: string;
+  completion_pct: number;
+  notes: string | null;
+  evidence_url: string | null;
+  sort_order: number;
+}
+
+export interface GrantDeliverable {
+  id: string;
+  milestone_id: string;
+  grant_id: string;
+  title: string;
+  description: string | null;
+  deliverable_type: string;
+  planned_date: string | null;
+  actual_date: string | null;
+  status: string;
+  file_url: string | null;
+}
+
+export interface GrantProgressLog {
+  id: string;
+  grant_id: string;
+  log_date: string;
+  planned_pct: number;
+  actual_pct: number;
+  budget_spent: number;
+  summary: string | null;
+  issues: string | null;
+  logged_by: string | null;
+}
+
 export interface ResearchArea {
   id: string;
   name_th: string;

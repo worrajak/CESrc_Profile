@@ -203,6 +203,9 @@ export default function AdminGrantsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/grants/tracking" className="text-sm bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg hover:bg-emerald-200 font-medium">
+            📊 ติดตามทุนวิจัย
+          </Link>
           <Link href="/admin" className="text-sm bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300">
             กลับ Admin
           </Link>
@@ -488,6 +491,8 @@ export default function AdminGrantsPage() {
                     className="text-xs bg-purple-100 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-200">
                     ทีมวิจัย
                   </button>
+                  <Link href={`/grants/${g.id}`}
+                    className="text-xs bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg hover:bg-emerald-200">📊 Track</Link>
                   <button onClick={() => handleDelete(g.id)}
                     className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100">ลบ</button>
                 </div>

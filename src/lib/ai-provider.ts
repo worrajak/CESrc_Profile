@@ -70,10 +70,10 @@ export async function getAvailableProviders(): Promise<{ provider: AIProvider; n
 
   // ถ้า DB ว่าง ใช้ env vars
   if (available.length === 0) {
-    if (process.env.CLAUDE_API_KEY) available.push({ provider: 'claude', name: 'Claude', models: ['claude-sonnet-4-20250514'] });
-    if (process.env.GEMINI_API_KEY) available.push({ provider: 'gemini', name: 'Gemini', models: ['gemini-2.0-flash'] });
-    if (process.env.OPENAI_API_KEY) available.push({ provider: 'openai', name: 'GPT', models: ['gpt-4o'] });
-    if (process.env.LOCAL_AI_ENDPOINT) available.push({ provider: 'local', name: 'Local', models: ['llama3'] });
+    if (process.env.CLAUDE_API_KEY) available.push({ provider: 'claude', name: 'Claude', models: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-35-20250414'] });
+    if (process.env.GEMINI_API_KEY) available.push({ provider: 'gemini', name: 'Gemini', models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] });
+    if (process.env.OPENAI_API_KEY) available.push({ provider: 'openai', name: 'GPT', models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o4-mini'] });
+    if (process.env.LOCAL_AI_ENDPOINT) available.push({ provider: 'local', name: 'Local', models: ['llama4-scout', 'llama4-maverick', 'llama3.3', 'gemma3', 'mistral'] });
   }
 
   return available;
@@ -113,7 +113,7 @@ async function resolveConfig(overrides?: Partial<AIConfig>): Promise<AIConfig> {
     }
   }
 
-  return { provider: 'claude', model: 'claude-sonnet-4-20250514' };
+  return { provider: 'claude', model: 'claude-sonnet-4-20250514' }; // fallback เมื่อไม่มี config เลย
 }
 
 // Universal AI call with vision support
@@ -176,7 +176,7 @@ async function callClaude(base64: string, mimeType: string, prompt: string, mode
 
 // === Gemini ===
 async function callGemini(base64: string, mimeType: string, prompt: string, model: string, apiKey: string): Promise<AIParseResult> {
-  const modelName = model || 'gemini-2.0-flash';
+  const modelName = model || 'gemini-2.5-flash';
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
     {
@@ -200,9 +200,9 @@ async function callGemini(base64: string, mimeType: string, prompt: string, mode
     : { data: null, source: 'Gemini', model: modelName, error: 'No JSON in response' };
 }
 
-// === OpenAI GPT-4 Vision ===
+// === OpenAI GPT Vision ===
 async function callOpenAI(base64: string, mimeType: string, prompt: string, model: string, apiKey: string): Promise<AIParseResult> {
-  const modelName = model || 'gpt-4o';
+  const modelName = model || 'gpt-4.1';
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -233,7 +233,7 @@ async function callOpenAI(base64: string, mimeType: string, prompt: string, mode
 
 // === Local AI (Ollama) ===
 async function callLocal(base64: string, _mimeType: string, prompt: string, model: string, endpoint: string): Promise<AIParseResult> {
-  const modelName = model || 'llama3';
+  const modelName = model || 'llama4-scout';
   const response = await fetch(`${endpoint}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -270,7 +270,7 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resolved.apiKey!}` },
-          body: JSON.stringify({ model: resolved.model || 'gpt-4o', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify({ model: resolved.model || 'gpt-4.1', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
         });
         const result = await res.json();
         const text = result.choices?.[0]?.message?.content || '';
@@ -278,7 +278,7 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
         return { data: m ? JSON.parse(m[0]) : null, source: 'OpenAI', model: resolved.model };
       }
       case 'gemini': {
-        const modelName = resolved.model || 'gemini-2.0-flash';
+        const modelName = resolved.model || 'gemini-2.5-flash';
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${resolved.apiKey!}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
@@ -290,7 +290,7 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
       }
       case 'local': {
         const endpoint = resolved.endpoint || 'http://localhost:11434';
-        const modelName = resolved.model || 'llama3';
+        const modelName = resolved.model || 'llama4-scout';
         const res = await fetch(`${endpoint}/api/generate`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ model: modelName, prompt, stream: false }),

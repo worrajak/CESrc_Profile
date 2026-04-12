@@ -97,20 +97,20 @@ CREATE TABLE IF NOT EXISTS ai_config (
 -- Default AI configs (ไม่มี API key — ต้องกรอกจากหน้า Admin)
 INSERT INTO ai_config (provider, model_name, display_name, is_active, is_default, capabilities, models, api_endpoint) VALUES
   ('claude', 'claude-sonnet-4-20250514', 'Anthropic Claude', false, false,
-   '["document_parse","course_parse","evaluation"]'::jsonb,
-   '["claude-sonnet-4-20250514","claude-3-5-sonnet-20241022","claude-3-haiku-20240307"]'::jsonb,
+   '["document_parse","course_parse","evaluation","grant_parse"]'::jsonb,
+   '["claude-sonnet-4-20250514","claude-opus-4-20250514","claude-haiku-35-20250414"]'::jsonb,
    'https://api.anthropic.com'),
-  ('gemini', 'gemini-2.0-flash', 'Google Gemini', false, false,
-   '["document_parse","course_parse"]'::jsonb,
-   '["gemini-2.0-flash","gemini-1.5-pro","gemini-1.5-flash"]'::jsonb,
+  ('gemini', 'gemini-2.5-flash', 'Google Gemini', false, false,
+   '["document_parse","course_parse","grant_parse"]'::jsonb,
+   '["gemini-2.5-flash","gemini-2.5-pro","gemini-2.0-flash"]'::jsonb,
    'https://generativelanguage.googleapis.com'),
-  ('openai', 'gpt-4o', 'OpenAI GPT', false, false,
-   '["document_parse","course_parse","evaluation"]'::jsonb,
-   '["gpt-4o","gpt-4o-mini","gpt-4-turbo"]'::jsonb,
+  ('openai', 'gpt-4.1', 'OpenAI GPT', false, false,
+   '["document_parse","course_parse","evaluation","grant_parse"]'::jsonb,
+   '["gpt-4.1","gpt-4.1-mini","gpt-4.1-nano","o4-mini"]'::jsonb,
    'https://api.openai.com'),
-  ('local', 'llama3', 'Local AI (Ollama)', false, false,
+  ('local', 'llama4-scout', 'Local AI (Ollama)', false, false,
    '["document_parse"]'::jsonb,
-   '["llama3","llama3.1","mistral","gemma2","llava"]'::jsonb,
+   '["llama4-scout","llama4-maverick","llama3.3","gemma3","mistral"]'::jsonb,
    'http://localhost:11434')
 ON CONFLICT (provider) DO NOTHING;
 
