@@ -34,6 +34,17 @@ export default function AdminGrantsPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [newMember, setNewMember] = useState({ researcher_id: '', role: 'researcher' });
 
+  // AI parsing
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [aiResult, setAiResult] = useState<any>(null);
+  const [aiError, setAiError] = useState('');
+  const [aiProviders, setAiProviders] = useState<any[]>([]);
+  const [aiProvider, setAiProvider] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [showAI, setShowAI] = useState(false);
+  const [aiImportingMilestones, setAiImportingMilestones] = useState(false);
+
   const emptyForm = {
     title_th: '', title_en: '', contract_number: '',
     funding_agency: '', funding_agency_en: '', budget: '',
@@ -49,7 +60,7 @@ export default function AdminGrantsPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     });
-    if (res.ok) { setAuthed(true); loadGrants(); loadResearchers(); } else alert('รหัสผ่านไม่ถูกต้อง');
+    if (res.ok) { setAuthed(true); loadGrants(); loadResearchers(); loadAIProviders(); } else alert('รหัสผ่านไม่ถูกต้อง');
   };
 
   const loadResearchers = async () => {
@@ -70,6 +81,95 @@ export default function AdminGrantsPage() {
       .select('id, role, researcher_id, researchers(title_th, first_name_th, last_name_th)')
       .eq('grant_id', grantId);
     setMembers(data || []);
+  };
+
+  const loadAIProviders = async () => {
+    try {
+      const res = await fetch('/api/grants/parse-contract');
+      const data = await res.json();
+      setAiProviders(data.providers || []);
+    } catch {}
+  };
+
+  const handleAIParse = async () => {
+    if (!aiFile) return;
+    setAiParsing(true);
+    setAiError('');
+    setAiResult(null);
+
+    const formData = new FormData();
+    formData.append('file', aiFile);
+    if (aiProvider) formData.append('ai_provider', aiProvider);
+    if (aiModel) formData.append('ai_model', aiModel);
+
+    try {
+      const res = await fetch('/api/grants/parse-contract', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) {
+        setAiError(data.error);
+      } else {
+        setAiResult(data);
+        // Auto-fill form
+        const d = data.data;
+        if (d) {
+          setForm(prev => ({
+            ...prev,
+            title_th: d.project_title_th || prev.title_th,
+            title_en: d.project_title_en || prev.title_en,
+            funding_agency: d.funding_agency || prev.funding_agency,
+            contract_number: d.contract_number || prev.contract_number,
+            budget: d.budget ? String(d.budget) : prev.budget,
+            start_date: d.start_date || prev.start_date,
+            end_date: d.end_date || prev.end_date,
+            research_areas: d.research_areas ? d.research_areas.join(', ') : prev.research_areas,
+            description_th: d.objectives ? d.objectives.join('\n') : prev.description_th,
+          }));
+          // Auto-calc fiscal year from start_date
+          if (d.start_date) {
+            const year = new Date(d.start_date).getFullYear() + 543;
+            setForm(prev => ({ ...prev, fiscal_year: String(year) }));
+          }
+        }
+      }
+    } catch (err: any) {
+      setAiError(err.message);
+    }
+    setAiParsing(false);
+  };
+
+  const handleAIImportMilestones = async (grantId: string) => {
+    if (!aiResult?.data) return;
+    setAiImportingMilestones(true);
+    try {
+      await fetch('/api/grants/tracking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'import_from_ai',
+          grant_id: grantId,
+          milestones: aiResult.data.milestones || [],
+          work_plan: aiResult.data.work_plan || [],
+        }),
+      });
+      alert('นำเข้า Milestones และแผนงาน S-Curve เรียบร้อย!');
+      setAiResult(null);
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+    setAiImportingMilestones(false);
+  };
+
+  // Match AI team members to researchers in DB
+  const matchTeamMembers = (aiMembers: any[]) => {
+    if (!aiMembers || !researchers.length) return [];
+    return aiMembers.map((m: any) => {
+      const name = m.name?.replace(/^(ผศ\.|รศ\.|ศ\.|ดร\.|อ\.|นาย|นาง|นางสาว)\s*/g, '').trim();
+      const matched = researchers.find((r: any) => {
+        const fullName = `${r.first_name_th} ${r.last_name_th}`.trim();
+        return name && (fullName.includes(name) || name.includes(r.first_name_th) || name.includes(r.last_name_th));
+      });
+      return { ...m, matched_researcher: matched || null };
+    });
   };
 
   const handleUpload = async (field: 'contract_file_url' | 'progress_report_url' | 'final_report_url', file: File) => {
@@ -110,15 +210,57 @@ export default function AdminGrantsPage() {
       final_report_url: form.final_report_url || null,
     };
 
+    let savedGrantId: string | null = null;
+
     if (editing) {
       await supabase.from('grants').update(payload).eq('id', editing.id);
+      savedGrantId = editing.id;
     } else {
-      await supabase.from('grants').insert(payload);
+      const { data: inserted } = await supabase.from('grants').insert(payload).select('id').single();
+      savedGrantId = inserted?.id || null;
+    }
+
+    // Auto-import AI milestones + work plan + team members
+    if (savedGrantId && aiResult?.data) {
+      // Import milestones & work plan
+      if (aiResult.data.milestones?.length || aiResult.data.work_plan?.length) {
+        try {
+          await fetch('/api/grants/tracking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'import_from_ai',
+              grant_id: savedGrantId,
+              milestones: aiResult.data.milestones || [],
+              work_plan: aiResult.data.work_plan || [],
+            }),
+          });
+        } catch {}
+      }
+
+      // Auto-add matched team members
+      if (aiResult.data.team_members?.length && researchers.length) {
+        const matched = matchTeamMembers(aiResult.data.team_members);
+        for (const m of matched) {
+          if (m.matched_researcher) {
+            try {
+              await supabase.from('grant_members').insert({
+                grant_id: savedGrantId,
+                researcher_id: m.matched_researcher.id,
+                role: m.role || 'researcher',
+              });
+            } catch {}
+          }
+        }
+      }
     }
 
     setShowForm(false);
     setEditing(null);
     setForm(emptyForm);
+    setAiResult(null);
+    setAiFile(null);
+    setShowAI(false);
     await loadGrants();
     setLoading(false);
   };
@@ -175,6 +317,7 @@ export default function AdminGrantsPage() {
       setAuthed(true);
       loadGrants();
       loadResearchers();
+      loadAIProviders();
     }
   }, []);
 
@@ -240,6 +383,120 @@ export default function AdminGrantsPage() {
             <h2 className="text-lg font-bold text-gray-800">{editing ? 'แก้ไขทุนวิจัย' : 'เพิ่มทุนวิจัยใหม่'}</h2>
             <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyForm); }}
               className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+
+          {/* AI Document Parse */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-purple-800 text-sm flex items-center gap-2">
+                🤖 AI กรอกข้อมูลจากเอกสาร
+              </h3>
+              <button onClick={() => setShowAI(!showAI)}
+                className="text-xs text-purple-600 hover:text-purple-800">
+                {showAI ? 'ซ่อน' : 'เปิดใช้ AI'}
+              </button>
+            </div>
+
+            {showAI && (
+              <div className="space-y-3">
+                <p className="text-xs text-purple-600">
+                  อัปโหลดเอกสารข้อเสนอโครงการ หรือสัญญารับทุน → AI จะกรอกข้อมูลให้อัตโนมัติ + สร้าง Milestones / แผน S-Curve
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2">
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      onChange={(e) => setAiFile(e.target.files?.[0] || null)}
+                      className="w-full border border-purple-200 bg-white rounded-lg p-2 text-sm" />
+                  </div>
+                  <div className="flex gap-2">
+                    <select className="flex-1 border border-purple-200 bg-white rounded-lg p-2 text-xs"
+                      value={aiProvider} onChange={(e) => { setAiProvider(e.target.value); setAiModel(''); }}>
+                      <option value="">AI อัตโนมัติ</option>
+                      {aiProviders.map((p: any) => <option key={p.provider} value={p.provider}>{p.name}</option>)}
+                    </select>
+                    {aiProvider && (
+                      <select className="flex-1 border border-purple-200 bg-white rounded-lg p-2 text-xs"
+                        value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
+                        <option value="">Default</option>
+                        {aiProviders.find((p: any) => p.provider === aiProvider)?.models?.map((m: string) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+                <button onClick={handleAIParse} disabled={aiParsing || !aiFile}
+                  className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50 font-medium">
+                  {aiParsing ? '🔄 กำลังวิเคราะห์เอกสาร...' : '🤖 วิเคราะห์ด้วย AI'}
+                </button>
+
+                {aiError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">{aiError}</div>
+                )}
+
+                {aiResult?.data && (
+                  <div className="bg-white border border-purple-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-purple-600 font-medium">
+                        ✅ วิเคราะห์สำเร็จ ({aiResult.source} / {aiResult.model}) — ข้อมูลถูกกรอกในฟอร์มแล้ว
+                      </span>
+                    </div>
+
+                    {/* AI Preview: Milestones */}
+                    {aiResult.data.milestones && aiResult.data.milestones.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-1">
+                          Milestones ที่พบ ({aiResult.data.milestones.length}) — จะนำเข้าหลังบันทึกทุนวิจัย
+                        </h4>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {aiResult.data.milestones.map((m: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 text-xs bg-gray-50 rounded p-2">
+                              <span className="font-mono bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{i + 1}</span>
+                              <span className="flex-1 text-gray-700">{m.title}</span>
+                              <span className="text-gray-400">{m.planned_date}</span>
+                              <span className="text-purple-600 font-medium">{m.planned_weight}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Preview: Work Plan */}
+                    {aiResult.data.work_plan && aiResult.data.work_plan.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-1">
+                          แผนงาน S-Curve ({aiResult.data.work_plan.length} เดือน)
+                        </h4>
+                        <div className="flex gap-1 flex-wrap">
+                          {aiResult.data.work_plan.map((wp: any) => (
+                            <span key={wp.month} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
+                              M{wp.month}: {wp.planned_pct}%
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Preview: Team */}
+                    {aiResult.data.team_members && aiResult.data.team_members.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-1">ทีมวิจัยที่พบ</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {matchTeamMembers(aiResult.data.team_members).map((m: any, i: number) => (
+                            <span key={i} className={`text-xs px-2 py-1 rounded ${
+                              m.matched_researcher ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-600 border border-gray-200'
+                            }`}>
+                              {m.name} ({m.role === 'pi' ? 'หัวหน้า' : m.role === 'co_pi' ? 'ผู้ร่วม' : m.role})
+                              {m.matched_researcher && ' ✓'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ข้อมูลพื้นฐาน */}
