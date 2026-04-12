@@ -98,6 +98,12 @@ export default function AISettingsPage() {
       }
       if (editModels[provider]) {
         body.model_name = editModels[provider];
+        // ถ้า model ที่พิมพ์ไม่อยู่ใน list → เพิ่มเข้าไป
+        const currentConfig = configs.find(c => c.provider === provider);
+        const currentModels = currentConfig?.models || [];
+        if (!currentModels.includes(editModels[provider])) {
+          body.models = [...currentModels, editModels[provider]];
+        }
       }
       if (editEndpoints[provider] !== undefined) {
         body.api_endpoint = editEndpoints[provider];
@@ -328,22 +334,32 @@ export default function AISettingsPage() {
                 {/* Model Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">โมเดล</label>
-                  <select
-                    value={editModels[config.provider] || config.model_name}
-                    onChange={(e) => setEditModels(prev => ({ ...prev, [config.provider]: e.target.value }))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  >
-                    {(config.models || []).map((m: string) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={editModels[config.provider] || config.model_name}
+                      onChange={(e) => setEditModels(prev => ({ ...prev, [config.provider]: e.target.value }))}
+                      className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {(config.models || []).map((m: string) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={editModels[config.provider] || config.model_name}
+                      onChange={(e) => setEditModels(prev => ({ ...prev, [config.provider]: e.target.value }))}
+                      placeholder="หรือพิมพ์ชื่อ model เอง"
+                      className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">เลือกจาก dropdown หรือพิมพ์ชื่อ model ใหม่ได้เลย</p>
                 </div>
 
                 {/* Capabilities */}
                 <div className="flex flex-wrap gap-1">
                   {(config.capabilities || []).map((cap: string) => (
                     <span key={cap} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
-                      {cap === 'document_parse' ? 'แยกเอกสาร' : cap === 'course_parse' ? 'แยกหลักสูตร' : cap === 'evaluation' ? 'ประเมินผล' : cap}
+                      {cap === 'document_parse' ? 'แยกเอกสาร' : cap === 'course_parse' ? 'แยกหลักสูตร' : cap === 'evaluation' ? 'ประเมินผล' : cap === 'grant_parse' ? 'วิเคราะห์ทุนวิจัย' : cap}
                     </span>
                   ))}
                 </div>

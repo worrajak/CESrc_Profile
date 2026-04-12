@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     }
     if (api_endpoint !== undefined) updateData.api_endpoint = api_endpoint;
     if (model_name !== undefined) updateData.model_name = model_name;
+    if (body.models !== undefined) updateData.models = body.models;
     if (is_active !== undefined) updateData.is_active = is_active;
     if (is_default !== undefined) updateData.is_default = is_default;
 
