@@ -87,7 +87,7 @@ export async function GET(
   const researcherId = params.id;
 
   // Fetch all data
-  const [researcherRes, pubsRes, grantsRes, patentsRes] = await Promise.all([
+  const [researcherRes, pubsRes, grantsRes, patentsRes, servicesRes, instructorCoursesRes] = await Promise.all([
     supabase.from('researchers').select('*').eq('id', researcherId).single(),
     supabase.from('publication_authors')
       .select('author_role, author_order, is_corresponding, publications (*)')
@@ -95,6 +95,8 @@ export async function GET(
       .order('author_order', { ascending: true }),
     supabase.from('grant_members').select('role, grants (*)').eq('researcher_id', researcherId),
     supabase.from('patent_inventors').select('inventor_order, patents (*)').eq('researcher_id', researcherId),
+    supabase.from('service_members').select('role, academic_services (*)').eq('researcher_id', researcherId),
+    supabase.from('training_courses').select('*, training_sessions (*)').order('created_at', { ascending: false }),
   ]);
 
   const researcher = researcherRes.data;
@@ -108,6 +110,14 @@ export async function GET(
   const pubs = (pubsRes.data || []) as unknown as PubWithRole[];
   const grantList = (grantsRes.data || []) as any[];
   const patentList = (patentsRes.data || []) as any[];
+  const serviceList = (servicesRes.data || []) as any[];
+  // Filter training courses where this researcher is an instructor
+  const allCourses = (instructorCoursesRes.data || []) as any[];
+  const instructorCourses = allCourses.filter((c: any) => {
+    if (c.instructor_id === researcherId) return true;
+    if (Array.isArray(c.instructor_ids) && c.instructor_ids.includes(researcherId)) return true;
+    return false;
+  });
 
   const children: Paragraph[] = [];
 
@@ -337,6 +347,158 @@ export async function GET(
         indent: { left: convertMillimetersToTwip(10) },
         spacing: { after: 80 },
       }));
+    });
+  }
+
+  // ============================================================
+  // 8. ACADEMIC SERVICES - งานบริการวิชาการ
+  // ============================================================
+  if (serviceList.length > 0) {
+    children.push(headerParagraph('8. งานบริการวิชาการ'));
+
+    const serviceTypeMap: Record<string, string> = {
+      design_install: 'ออกแบบและติดตั้ง',
+      consulting: 'ที่ปรึกษา',
+      inspection: 'ตรวจสอบ',
+      training: 'ฝึกอบรม',
+    };
+
+    const serviceRoleMap: Record<string, string> = {
+      lead: 'หัวหน้าโครงการ',
+      member: 'ผู้ร่วมโครงการ',
+      consultant: 'ที่ปรึกษา',
+      inspector: 'ผู้ตรวจสอบ',
+    };
+
+    // Sort by start_date descending (latest first)
+    const sortedServices = [...serviceList].sort((a, b) => {
+      const dateA = a.academic_services?.start_date || a.academic_services?.created_at || '';
+      const dateB = b.academic_services?.start_date || b.academic_services?.created_at || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    sortedServices.forEach((sm: any, i: number) => {
+      const s = sm.academic_services;
+      if (!s) return;
+
+      const typeLabel = serviceTypeMap[s.service_type] || s.service_type;
+      const roleLabel = serviceRoleMap[sm.role] || sm.role;
+
+      // Date range
+      let dateStr = '';
+      if (s.start_date) {
+        const start = new Date(s.start_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+        if (s.end_date && s.end_date !== s.start_date) {
+          const end = new Date(s.end_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+          dateStr = `${start} — ${end}`;
+        } else {
+          dateStr = start;
+        }
+      }
+
+      children.push(new Paragraph({
+        children: [
+          fontBold(`${i + 1}. `),
+          font(s.title_th),
+        ],
+        spacing: { after: 20 },
+        indent: { left: convertMillimetersToTwip(5) },
+      }));
+
+      const details: string[] = [];
+      details.push(`ประเภท: ${typeLabel}`);
+      details.push(`บทบาท: ${roleLabel}`);
+      if (s.client) details.push(`ผู้รับบริการ: ${s.client}`);
+      if (s.location) details.push(`สถานที่: ${s.location}`);
+      if (s.capacity) details.push(`ขนาด: ${s.capacity}`);
+      if (s.budget) details.push(`งบประมาณ: ${Number(s.budget).toLocaleString()} บาท`);
+      if (dateStr) details.push(`วันที่: ${dateStr}`);
+
+      children.push(new Paragraph({
+        children: [font(`   ${details.join(' | ')}`, { size: FONT_SIZE_SMALL, color: '444444' })],
+        indent: { left: convertMillimetersToTwip(10) },
+        spacing: { after: 80 },
+      }));
+    });
+  }
+
+  // ============================================================
+  // 9. INSTRUCTOR / SPEAKER — การเป็นวิทยากร
+  // ============================================================
+  if (instructorCourses.length > 0) {
+    children.push(headerParagraph(
+      serviceList.length > 0 ? '9. การเป็นวิทยากร' : '8. การเป็นวิทยากร'
+    ));
+
+    // Sort by latest session date descending
+    const sortedCourses = [...instructorCourses].sort((a, b) => {
+      const sessA = (a.training_sessions || []).sort((x: any, y: any) => (y.start_date || '').localeCompare(x.start_date || ''))[0];
+      const sessB = (b.training_sessions || []).sort((x: any, y: any) => (y.start_date || '').localeCompare(x.start_date || ''))[0];
+      const dateA = sessA?.start_date || a.created_at || '';
+      const dateB = sessB?.start_date || b.created_at || '';
+      return dateB.localeCompare(dateA);
+    });
+
+    sortedCourses.forEach((course: any, i: number) => {
+      const sessions = (course.training_sessions || []).sort(
+        (a: any, b: any) => (b.start_date || '').localeCompare(a.start_date || '')
+      );
+
+      children.push(new Paragraph({
+        children: [
+          fontBold(`${i + 1}. `),
+          font(course.title_th),
+          course.title_en ? font(` (${course.title_en})`, { size: FONT_SIZE_SMALL, color: '666666' }) : font(''),
+        ],
+        spacing: { after: 20 },
+        indent: { left: convertMillimetersToTwip(5) },
+      }));
+
+      // Course info
+      const infoLine: string[] = [];
+      if (course.duration_hours) infoLine.push(`${course.duration_hours} ชั่วโมง`);
+      if (course.duration_days) infoLine.push(`${course.duration_days} วัน`);
+      const levelMap: Record<string, string> = { beginner: 'เริ่มต้น', intermediate: 'กลาง', advanced: 'สูง', professional: 'วิชาชีพ' };
+      if (course.level) infoLine.push(`ระดับ: ${levelMap[course.level] || course.level}`);
+
+      if (infoLine.length > 0) {
+        children.push(new Paragraph({
+          children: [font(`   ${infoLine.join(' | ')}`, { size: FONT_SIZE_SMALL, color: '444444' })],
+          indent: { left: convertMillimetersToTwip(10) },
+          spacing: { after: 20 },
+        }));
+      }
+
+      // Sessions (each batch with dates)
+      if (sessions.length > 0) {
+        sessions.forEach((sess: any) => {
+          let sessLine = `รุ่นที่ ${sess.batch_number || '-'}`;
+          if (sess.start_date) {
+            const start = new Date(sess.start_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+            if (sess.end_date && sess.end_date !== sess.start_date) {
+              const end = new Date(sess.end_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+              sessLine += ` : ${start} — ${end}`;
+            } else {
+              sessLine += ` : ${start}`;
+            }
+          }
+          if (sess.location) sessLine += ` | ${sess.location}`;
+
+          const statusMap: Record<string, string> = {
+            planned: 'วางแผน', open: 'เปิดรับสมัคร', closed: 'ปิดรับสมัคร',
+            in_progress: 'กำลังอบรม', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก',
+          };
+          if (sess.status) sessLine += ` [${statusMap[sess.status] || sess.status}]`;
+
+          children.push(new Paragraph({
+            children: [font(`   • ${sessLine}`, { size: FONT_SIZE_SMALL, color: '555555' })],
+            indent: { left: convertMillimetersToTwip(15) },
+            spacing: { after: 20 },
+          }));
+        });
+      }
+
+      children.push(new Paragraph({ spacing: { after: 60 } }));
     });
   }
 
