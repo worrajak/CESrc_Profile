@@ -47,9 +47,21 @@ export default function AdminServicesPage() {
   const [parsingCourse, setParsingCourse] = useState(false);
   const [parsedCourse, setParsedCourse] = useState<any>(null);
   const courseFileRef = useRef<HTMLInputElement>(null);
+  const [aiProviders, setAiProviders] = useState<{provider: string; name: string; models: string[]}[]>([]);
+  const [selProvider, setSelProvider] = useState('');
+  const [selModel, setSelModel] = useState('');
 
   useEffect(() => {
     fetchRequests();
+    // Load AI providers
+    fetch('/api/services/parse-course').then(r => r.json()).then(async (d) => {
+      const provs = d.providers instanceof Promise ? await d.providers : d.providers;
+      if (Array.isArray(provs) && provs.length > 0) {
+        setAiProviders(provs);
+        setSelProvider(provs[0].provider);
+        setSelModel(provs[0].models?.[0] || '');
+      }
+    }).catch(() => {});
   }, [filter]);
 
   const fetchRequests = async () => {
@@ -130,6 +142,8 @@ export default function AdminServicesPage() {
     try {
       const formData = new FormData();
       formData.append('file', courseFile);
+      if (selProvider) formData.append('ai_provider', selProvider);
+      if (selModel) formData.append('ai_model', selModel);
 
       const res = await fetch('/api/services/parse-course', {
         method: 'POST',
@@ -243,21 +257,48 @@ export default function AdminServicesPage() {
           <h1 className="text-3xl font-bold text-gray-800">จัดการคำขอบริการ</h1>
           <p className="text-gray-500 text-sm">Admin Panel — อนุมัติ/มอบหมาย/ติดตามคำขอบริการวิชาการ</p>
         </div>
-        <button
-          onClick={() => setShowCourseCreator(!showCourseCreator)}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition"
-        >
-          📚 สร้างหลักสูตรจากเอกสาร (AI)
-        </button>
+        <div className="flex gap-2">
+          <a href="/admin/training" className="border border-purple-300 text-purple-600 px-4 py-2 rounded-lg text-sm hover:bg-purple-50 transition">
+            📚 จัดการหลักสูตร
+          </a>
+          <button
+            onClick={() => setShowCourseCreator(!showCourseCreator)}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition"
+          >
+            📄 นำเข้าหลักสูตร (AI)
+          </button>
+        </div>
       </div>
 
       {/* AI Course Creator */}
       {showCourseCreator && (
         <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6 mb-8">
           <h3 className="font-bold text-purple-800 mb-2">📚 สร้างหลักสูตรจากเอกสาร (AI Auto-parse)</h3>
-          <p className="text-xs text-purple-600 mb-4">
-            อัพโหลดเล่มหลักสูตร กำหนดการอบรม หรือเอกสารหลักสูตร — AI จะแยกโมดูล สมรรถนะ ตัวชี้วัด และสร้างเกณฑ์การประเมินอัตโนมัติ
+          <p className="text-xs text-purple-600 mb-3">
+            อัพโหลดเล่มหลักสูตร กำหนดการอบรม หรือเอกสารหลักสูตร — AI จะแยกกำหนดการ โมดูล สมรรถนะ ตัวชี้วัด และเกณฑ์การวัดผลอัตโนมัติ
           </p>
+          <p className="text-xs text-purple-500 mb-4">
+            สำหรับ preview กำหนดการ/เกณฑ์ประเมินแบบเต็ม ใช้ <a href="/admin/training" className="underline font-medium">หน้าจัดการหลักสูตร</a>
+          </p>
+          {/* AI Provider */}
+          {aiProviders.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {aiProviders.map(p => (
+                <button key={p.provider} onClick={() => { setSelProvider(p.provider); setSelModel(p.models?.[0] || ''); }}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium ${selProvider === p.provider ? 'bg-purple-600 text-white' : 'bg-white border text-purple-700'}`}>
+                  {p.name}
+                </button>
+              ))}
+              {(aiProviders.find(p => p.provider === selProvider)?.models || []).length > 0 && (
+                <select value={selModel} onChange={e => setSelModel(e.target.value)}
+                  className="border rounded-lg px-2 py-1 text-xs bg-white">
+                  {(aiProviders.find(p => p.provider === selProvider)?.models || []).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
           <div className="flex gap-3 mb-4">
             <input
               ref={courseFileRef}

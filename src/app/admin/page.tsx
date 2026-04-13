@@ -154,6 +154,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">อนุมัติ/คืน/ติดตามเกินกำหนด</p>
         </Link>
         <Link
+          href="/admin/training"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-violet-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการหลักสูตรอบรม</h3>
+          <p className="text-sm text-gray-500">นำเข้าเอกสาร AI แยกกำหนดการ/เกณฑ์</p>
+        </Link>
+        <Link
           href="/admin/services"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-purple-500 block"
         >
