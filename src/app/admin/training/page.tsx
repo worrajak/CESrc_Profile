@@ -57,6 +57,9 @@ export default function AdminTrainingPage() {
   // Tab for preview
   const [previewTab, setPreviewTab] = useState<'overview' | 'schedule' | 'modules' | 'evaluation'>('overview');
 
+  // Researchers list for instructor dropdown
+  const [researchers, setResearchers] = useState<any[]>([]);
+
   // Edit/Add form
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
@@ -67,6 +70,7 @@ export default function AdminTrainingPage() {
     fee_external: 0, fee_student: 0, fee_internal: 0,
     instructor_name: '', is_active: true,
   });
+  const [selectedInstructors, setSelectedInstructors] = useState<string[]>([]);
   const [formModules, setFormModules] = useState<any[]>([]);
   const [formSessions, setFormSessions] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -86,13 +90,15 @@ export default function AdminTrainingPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
       );
 
-      const [coursesRes, sessionsRes] = await Promise.all([
+      const [coursesRes, sessionsRes, researchersRes] = await Promise.all([
         supabase.from('training_courses').select('*').order('created_at', { ascending: false }),
         supabase.from('training_sessions').select('*').order('start_date', { ascending: false }),
+        supabase.from('researchers').select('id, title_th, first_name_th, last_name_th, first_name_en, last_name_en, position').order('last_name_th'),
       ]);
 
       setCourses(coursesRes.data || []);
       setSessions(sessionsRes.data || []);
+      setResearchers(researchersRes.data || []);
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -301,6 +307,7 @@ export default function AdminTrainingPage() {
       fee_external: 0, fee_student: 0, fee_internal: 0,
       instructor_name: '', is_active: true,
     });
+    setSelectedInstructors([]);
     setFormModules([]);
     setFormSessions([]);
     setShowForm(true);
@@ -324,6 +331,9 @@ export default function AdminTrainingPage() {
       instructor_name: courseItem.instructor_name || '',
       is_active: courseItem.is_active ?? true,
     });
+    setSelectedInstructors(
+      Array.isArray(courseItem.instructor_ids) ? courseItem.instructor_ids : []
+    );
     setShowForm(true);
     setLoadingDetail(true);
 
@@ -371,6 +381,7 @@ export default function AdminTrainingPage() {
         fee_student: formData.fee_student || 0,
         fee_internal: formData.fee_internal || 0,
         instructor_name: formData.instructor_name || null,
+        instructor_ids: selectedInstructors,
         is_active: formData.is_active,
       };
 
@@ -1014,13 +1025,64 @@ export default function AdminTrainingPage() {
                     <option value="other">อื่นๆ</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">วิทยากร</label>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    วิทยากร (นักวิจัยในหน่วย — สูงสุด 5 ท่าน)
+                  </label>
+                  {/* Selected instructors */}
+                  {selectedInstructors.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedInstructors.map((rid) => {
+                        const r = researchers.find(r => r.id === rid);
+                        const name = r ? `${r.title_th || ''}${r.first_name_th} ${r.last_name_th}` : rid;
+                        return (
+                          <span key={rid} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5">
+                            {name}
+                            <button
+                              onClick={() => setSelectedInstructors(selectedInstructors.filter(id => id !== rid))}
+                              className="text-indigo-400 hover:text-red-500 font-bold"
+                            >
+                              x
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Dropdown to add */}
+                  {selectedInstructors.length < 5 && (
+                    <select
+                      value=""
+                      onChange={e => {
+                        if (e.target.value && !selectedInstructors.includes(e.target.value)) {
+                          setSelectedInstructors([...selectedInstructors, e.target.value]);
+                        }
+                      }}
+                      className="w-full border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="">-- เลือกนักวิจัย เพิ่มวิทยากร --</option>
+                      {researchers
+                        .filter(r => !selectedInstructors.includes(r.id))
+                        .map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.title_th || ''}{r.first_name_th} {r.last_name_th}
+                            {r.position ? ` (${r.position})` : ''}
+                          </option>
+                        ))
+                      }
+                    </select>
+                  )}
+                  {selectedInstructors.length >= 5 && (
+                    <p className="text-xs text-amber-600 mt-1">เพิ่มวิทยากรครบ 5 ท่านแล้ว</p>
+                  )}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">วิทยากรภายนอก (ถ้ามี)</label>
                   <input
                     value={formData.instructor_name}
                     onChange={e => setFormData({ ...formData, instructor_name: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm"
-                    placeholder="ชื่อวิทยากรหลัก"
+                    placeholder="ชื่อวิทยากรภายนอก เช่น ดร.สมชาย จาก กฟภ."
                   />
                 </div>
               </div>
@@ -1301,6 +1363,20 @@ export default function AdminTrainingPage() {
                         {c.duration_days && <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{c.duration_days} วัน ({c.duration_hours} ชม.)</span>}
                         {c.fee_external > 0 && <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded">{Number(c.fee_external).toLocaleString()} บาท</span>}
                         <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded">{courseSessions.length} รุ่น</span>
+                        {/* Show instructors */}
+                        {Array.isArray(c.instructor_ids) && c.instructor_ids.length > 0 && (
+                          c.instructor_ids.map((rid: string) => {
+                            const r = researchers.find(r => r.id === rid);
+                            return r ? (
+                              <span key={rid} className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded">
+                                {r.title_th || ''}{r.first_name_th} {r.last_name_th?.charAt(0)}.
+                              </span>
+                            ) : null;
+                          })
+                        )}
+                        {c.instructor_name && (
+                          <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded">{c.instructor_name}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-1.5 ml-4">
