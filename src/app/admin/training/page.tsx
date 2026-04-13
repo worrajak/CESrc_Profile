@@ -65,7 +65,7 @@ export default function AdminTrainingPage() {
     level: 'intermediate', skill_domain: 'other',
     duration_hours: 0, duration_days: 0,
     fee_external: 0, fee_student: 0, fee_internal: 0,
-    instructor: '', is_active: true,
+    instructor_name: '', is_active: true,
   });
   const [formModules, setFormModules] = useState<any[]>([]);
   const [formSessions, setFormSessions] = useState<any[]>([]);
@@ -299,7 +299,7 @@ export default function AdminTrainingPage() {
       level: 'intermediate', skill_domain: 'other',
       duration_hours: 0, duration_days: 0,
       fee_external: 0, fee_student: 0, fee_internal: 0,
-      instructor: '', is_active: true,
+      instructor_name: '', is_active: true,
     });
     setFormModules([]);
     setFormSessions([]);
@@ -321,7 +321,7 @@ export default function AdminTrainingPage() {
       fee_external: courseItem.fee_external || 0,
       fee_student: courseItem.fee_student || 0,
       fee_internal: courseItem.fee_internal || 0,
-      instructor: courseItem.instructor || '',
+      instructor_name: courseItem.instructor_name || '',
       is_active: courseItem.is_active ?? true,
     });
     setShowForm(true);
@@ -370,7 +370,7 @@ export default function AdminTrainingPage() {
         fee_external: formData.fee_external || 0,
         fee_student: formData.fee_student || 0,
         fee_internal: formData.fee_internal || 0,
-        instructor: formData.instructor || null,
+        instructor_name: formData.instructor_name || null,
         is_active: formData.is_active,
       };
 
@@ -1017,8 +1017,8 @@ export default function AdminTrainingPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">วิทยากร</label>
                   <input
-                    value={formData.instructor}
-                    onChange={e => setFormData({ ...formData, instructor: e.target.value })}
+                    value={formData.instructor_name}
+                    onChange={e => setFormData({ ...formData, instructor_name: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm"
                     placeholder="ชื่อวิทยากรหลัก"
                   />
