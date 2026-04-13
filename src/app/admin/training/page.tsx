@@ -57,9 +57,20 @@ export default function AdminTrainingPage() {
   // Tab for preview
   const [previewTab, setPreviewTab] = useState<'overview' | 'schedule' | 'modules' | 'evaluation'>('overview');
 
-  // Edit mode
+  // Edit/Add form
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '', title_th: '', title_en: '', description_th: '',
+    level: 'intermediate', skill_domain: 'other',
+    duration_hours: 0, duration_days: 0,
+    fee_external: 0, fee_student: 0, fee_internal: 0,
+    instructor: '', is_active: true,
+  });
+  const [formModules, setFormModules] = useState<any[]>([]);
+  const [formSessions, setFormSessions] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -280,6 +291,160 @@ export default function AdminTrainingPage() {
     } catch {}
   };
 
+  // Open add form
+  const handleAdd = () => {
+    setEditingCourse(null);
+    setFormData({
+      code: '', title_th: '', title_en: '', description_th: '',
+      level: 'intermediate', skill_domain: 'other',
+      duration_hours: 0, duration_days: 0,
+      fee_external: 0, fee_student: 0, fee_internal: 0,
+      instructor: '', is_active: true,
+    });
+    setFormModules([]);
+    setFormSessions([]);
+    setShowForm(true);
+  };
+
+  // Open edit form — load course + modules + sessions
+  const handleEdit = async (courseItem: any) => {
+    setEditingCourse(courseItem);
+    setFormData({
+      code: courseItem.code || '',
+      title_th: courseItem.title_th || '',
+      title_en: courseItem.title_en || '',
+      description_th: courseItem.description_th || '',
+      level: courseItem.level || 'intermediate',
+      skill_domain: courseItem.skill_domain || 'other',
+      duration_hours: courseItem.duration_hours || 0,
+      duration_days: courseItem.duration_days || 0,
+      fee_external: courseItem.fee_external || 0,
+      fee_student: courseItem.fee_student || 0,
+      fee_internal: courseItem.fee_internal || 0,
+      instructor: courseItem.instructor || '',
+      is_active: courseItem.is_active ?? true,
+    });
+    setShowForm(true);
+    setLoadingDetail(true);
+
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+
+      const [modsRes, sessRes] = await Promise.all([
+        supabase.from('course_modules').select('*').eq('course_id', courseItem.id).order('module_number'),
+        supabase.from('training_sessions').select('*').eq('course_id', courseItem.id).order('batch_number'),
+      ]);
+
+      setFormModules(modsRes.data || []);
+      setFormSessions(sessRes.data || []);
+    } catch {} finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Save course (add or update)
+  const handleSaveForm = async () => {
+    if (!formData.title_th.trim()) { alert('กรุณากรอกชื่อหลักสูตร'); return; }
+    setSaving(true);
+
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+
+      const payload = {
+        code: formData.code || 'CRS-' + Date.now().toString(36).toUpperCase(),
+        title_th: formData.title_th,
+        title_en: formData.title_en || null,
+        description_th: formData.description_th || null,
+        level: formData.level,
+        skill_domain: formData.skill_domain,
+        duration_hours: formData.duration_hours || null,
+        duration_days: formData.duration_days || null,
+        fee_external: formData.fee_external || 0,
+        fee_student: formData.fee_student || 0,
+        fee_internal: formData.fee_internal || 0,
+        instructor: formData.instructor || null,
+        is_active: formData.is_active,
+      };
+
+      if (editingCourse) {
+        // Update
+        const { error } = await supabase.from('training_courses').update(payload).eq('id', editingCourse.id);
+        if (error) { alert('ไม่สามารถอัปเดตได้: ' + error.message); setSaving(false); return; }
+      } else {
+        // Insert
+        const { error } = await supabase.from('training_courses').insert(payload);
+        if (error) { alert('ไม่สามารถเพิ่มได้: ' + error.message); setSaving(false); return; }
+      }
+
+      setShowForm(false);
+      setEditingCourse(null);
+      fetchData();
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + (err.message || ''));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add session to course
+  const handleAddSession = async () => {
+    if (!editingCourse) return;
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+
+      const nextBatch = formSessions.length + 1;
+      const { data, error } = await supabase.from('training_sessions').insert({
+        course_id: editingCourse.id,
+        session_code: editingCourse.code + '-' + String(nextBatch).padStart(2, '0'),
+        batch_number: nextBatch,
+        status: 'planned',
+        max_participants: 30,
+      }).select().single();
+
+      if (data) setFormSessions([...formSessions, data]);
+      if (error) alert('ไม่สามารถเพิ่มรุ่นได้: ' + error.message);
+    } catch {}
+  };
+
+  // Update session
+  const handleUpdateSession = async (sessionId: string, updates: any) => {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+      await supabase.from('training_sessions').update(updates).eq('id', sessionId);
+      setFormSessions(formSessions.map(s => s.id === sessionId ? { ...s, ...updates } : s));
+    } catch {}
+  };
+
+  // Delete session
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm('ลบรุ่นนี้?')) return;
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      );
+      await supabase.from('training_sessions').delete().eq('id', sessionId);
+      setFormSessions(formSessions.filter(s => s.id !== sessionId));
+    } catch {}
+  };
+
   const currentModels = providers.find(p => p.provider === selectedProvider)?.models || [];
   const course = parsedCourse?.course;
 
@@ -296,10 +461,16 @@ export default function AdminTrainingPage() {
             ดูหน้าหลักสูตร
           </Link>
           <button
+            onClick={handleAdd}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition font-medium"
+          >
+            + เพิ่มหลักสูตร
+          </button>
+          <button
             onClick={() => { setShowImporter(!showImporter); setParsedCourse(null); setParseError(''); }}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition font-medium"
           >
-            {showImporter ? 'ปิด' : '📄 นำเข้าเอกสารหลักสูตร (AI)'}
+            {showImporter ? 'ปิด' : '📄 นำเข้าด้วย AI'}
           </button>
         </div>
       </div>
@@ -771,6 +942,292 @@ export default function AdminTrainingPage() {
         </div>
       )}
 
+      {/* Edit/Add Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8">
+            {/* Form Header */}
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-5 rounded-t-2xl text-white">
+              <h3 className="font-bold text-lg">
+                {editingCourse ? `แก้ไขหลักสูตร: ${editingCourse.title_th}` : 'เพิ่มหลักสูตรใหม่'}
+              </h3>
+              <p className="text-indigo-200 text-xs mt-1">
+                {editingCourse ? 'แก้ไขข้อมูลหลักสูตรและจัดการรุ่นการอบรม' : 'กรอกข้อมูลหลักสูตรใหม่'}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อหลักสูตร (ไทย) *</label>
+                  <input
+                    value={formData.title_th}
+                    onChange={e => setFormData({ ...formData, title_th: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="เช่น หลักสูตรช่างติดตั้งระบบโซลาร์เซลล์ ระดับ 2"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อหลักสูตร (อังกฤษ)</label>
+                  <input
+                    value={formData.title_en}
+                    onChange={e => setFormData({ ...formData, title_en: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="Solar PV Installation Level 2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">รหัสหลักสูตร</label>
+                  <input
+                    value={formData.code}
+                    onChange={e => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
+                    placeholder="SOLAR-PV-L2 (ว่างได้ = auto)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ระดับ</label>
+                  <select
+                    value={formData.level}
+                    onChange={e => setFormData({ ...formData, level: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="beginner">เริ่มต้น</option>
+                    <option value="intermediate">กลาง</option>
+                    <option value="advanced">สูง</option>
+                    <option value="professional">วิชาชีพ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">สาขา</label>
+                  <select
+                    value={formData.skill_domain}
+                    onChange={e => setFormData({ ...formData, skill_domain: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="solar_pv">Solar PV</option>
+                    <option value="ev_charger">EV Charger</option>
+                    <option value="battery">Battery/HESS</option>
+                    <option value="energy_audit">Energy Audit</option>
+                    <option value="microgrid">Microgrid</option>
+                    <option value="other">อื่นๆ</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">วิทยากร</label>
+                  <input
+                    value={formData.instructor}
+                    onChange={e => setFormData({ ...formData, instructor: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                    placeholder="ชื่อวิทยากรหลัก"
+                  />
+                </div>
+              </div>
+
+              {/* Duration & Fee */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">จำนวนชั่วโมง</label>
+                  <input
+                    type="number" min={0}
+                    value={formData.duration_hours}
+                    onChange={e => setFormData({ ...formData, duration_hours: Number(e.target.value) })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">จำนวนวัน</label>
+                  <input
+                    type="number" min={0}
+                    value={formData.duration_days}
+                    onChange={e => setFormData({ ...formData, duration_days: Number(e.target.value) })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ค่าลงทะเบียน (บุคคลทั่วไป)</label>
+                  <input
+                    type="number" min={0}
+                    value={formData.fee_external}
+                    onChange={e => setFormData({ ...formData, fee_external: Number(e.target.value) })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ค่าลงทะเบียน (นักศึกษา)</label>
+                  <input
+                    type="number" min={0}
+                    value={formData.fee_student}
+                    onChange={e => setFormData({ ...formData, fee_student: Number(e.target.value) })}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">คำอธิบายหลักสูตร</label>
+                <textarea
+                  value={formData.description_th}
+                  onChange={e => setFormData({ ...formData, description_th: e.target.value })}
+                  rows={3}
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  placeholder="รายละเอียดหลักสูตร..."
+                />
+              </div>
+
+              {/* Active toggle */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="rounded"
+                />
+                <span className="text-sm text-gray-700">เปิดใช้งานหลักสูตร</span>
+              </label>
+
+              {/* Modules (read-only for existing) */}
+              {editingCourse && (
+                <div>
+                  <h4 className="font-medium text-gray-700 text-sm mb-2">
+                    โมดูล ({formModules.length})
+                    {loadingDetail && <span className="text-gray-400 ml-2">กำลังโหลด...</span>}
+                  </h4>
+                  {formModules.length > 0 ? (
+                    <div className="space-y-2">
+                      {formModules.map((mod, i) => (
+                        <div key={mod.id} className="bg-gray-50 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                          <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                            M{mod.module_number}
+                          </span>
+                          <span className="text-sm text-gray-800 flex-1">{mod.title}</span>
+                          <span className="text-[10px] text-gray-400">{mod.hours} ชม.</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${mod.is_practical ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {mod.is_practical ? 'ปฏิบัติ' : 'ทฤษฎี'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : !loadingDetail ? (
+                    <p className="text-xs text-gray-400">ยังไม่มีโมดูล — ใช้ AI นำเข้าเอกสารเพื่อสร้างโมดูลอัตโนมัติ</p>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Sessions (manage for existing) */}
+              {editingCourse && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-700 text-sm">
+                      รุ่นการอบรม ({formSessions.length})
+                    </h4>
+                    <button
+                      onClick={handleAddSession}
+                      className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg hover:bg-indigo-200 font-medium"
+                    >
+                      + เพิ่มรุ่น
+                    </button>
+                  </div>
+                  {formSessions.length > 0 ? (
+                    <div className="space-y-2">
+                      {formSessions.map((sess) => (
+                        <div key={sess.id} className="bg-gray-50 rounded-lg px-4 py-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-indigo-600 font-bold">{sess.session_code}</span>
+                              <span className="text-xs text-gray-500">รุ่นที่ {sess.batch_number}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={sess.status}
+                                onChange={e => handleUpdateSession(sess.id, { status: e.target.value })}
+                                className="border rounded-lg px-2 py-1 text-xs"
+                              >
+                                <option value="planned">วางแผน</option>
+                                <option value="open">เปิดรับสมัคร</option>
+                                <option value="closed">ปิดรับสมัคร</option>
+                                <option value="in_progress">กำลังอบรม</option>
+                                <option value="completed">เสร็จสิ้น</option>
+                                <option value="cancelled">ยกเลิก</option>
+                              </select>
+                              <button
+                                onClick={() => handleDeleteSession(sess.id)}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                              >
+                                ลบ
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div>
+                              <label className="text-[10px] text-gray-400">วันเริ่ม</label>
+                              <input
+                                type="date"
+                                value={sess.start_date || ''}
+                                onChange={e => handleUpdateSession(sess.id, { start_date: e.target.value || null })}
+                                className="w-full border rounded px-2 py-1 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400">วันสิ้นสุด</label>
+                              <input
+                                type="date"
+                                value={sess.end_date || ''}
+                                onChange={e => handleUpdateSession(sess.id, { end_date: e.target.value || null })}
+                                className="w-full border rounded px-2 py-1 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400">สถานที่</label>
+                              <input
+                                value={sess.location || ''}
+                                onChange={e => handleUpdateSession(sess.id, { location: e.target.value || null })}
+                                className="w-full border rounded px-2 py-1 text-xs"
+                                placeholder="สถานที่อบรม"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400">จำนวนรับ</label>
+                              <input
+                                type="number" min={1}
+                                value={sess.max_participants || 30}
+                                onChange={e => handleUpdateSession(sess.id, { max_participants: Number(e.target.value) })}
+                                className="w-full border rounded px-2 py-1 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">ยังไม่มีรุ่น — กดเพิ่มรุ่นเพื่อเปิดการอบรม</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Form Actions */}
+            <div className="border-t px-6 py-4 flex gap-3">
+              <button
+                onClick={handleSaveForm}
+                disabled={saving}
+                className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 text-sm"
+              >
+                {saving ? 'กำลังบันทึก...' : editingCourse ? 'บันทึกการแก้ไข' : 'เพิ่มหลักสูตร'}
+              </button>
+              <button
+                onClick={() => { setShowForm(false); setEditingCourse(null); }}
+                className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-600 text-sm hover:bg-gray-50"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl border p-5 text-center">
@@ -797,6 +1254,12 @@ export default function AdminTrainingPage() {
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
           <h3 className="font-bold text-gray-700">หลักสูตรในระบบ</h3>
+          <button
+            onClick={handleAdd}
+            className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium"
+          >
+            + เพิ่มหลักสูตร
+          </button>
         </div>
 
         {loading ? (
@@ -841,6 +1304,12 @@ export default function AdminTrainingPage() {
                       </div>
                     </div>
                     <div className="flex gap-1.5 ml-4">
+                      <button
+                        onClick={() => handleEdit(c)}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 font-medium"
+                      >
+                        แก้ไข
+                      </button>
                       <button
                         onClick={() => handleToggleActive(c.id, c.is_active)}
                         className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
