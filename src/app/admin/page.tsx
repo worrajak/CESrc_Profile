@@ -168,6 +168,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">อนุมัติ/มอบหมาย/ติดตามคำขอ</p>
         </Link>
         <Link
+          href="/admin/orcid"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">ORCID Integration</h3>
+          <p className="text-sm text-gray-500">ดึงผลงาน/ทุนจาก ORCID ลง DB</p>
+        </Link>
+        <Link
           href="/admin/ai-settings"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-pink-500 block"
         >
