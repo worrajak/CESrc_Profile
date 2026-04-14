@@ -94,6 +94,12 @@ export default async function HomePage() {
               <div className="text-xs text-blue-200">ผลงานตีพิมพ์</div>
             </div>
             <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-300">
+                {researchers.reduce((sum: number, r: any) => sum + (r.cited_by_count || 0), 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-blue-200">Citations</div>
+            </div>
+            <div className="text-center">
               <div className="text-2xl font-bold text-yellow-300">{grantCount}</div>
               <div className="text-xs text-blue-200">ทุนวิจัย</div>
             </div>

@@ -34,6 +34,10 @@ export interface Researcher {
   bio_en: string | null;
   avatar_url: string | null;
   is_active: boolean;
+  openalex_id: string | null;
+  cited_by_count: number;
+  h_index: number;
+  i10_index: number;
 }
 
 export interface Publication {

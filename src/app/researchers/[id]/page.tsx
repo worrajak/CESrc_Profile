@@ -229,6 +229,44 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
                 </a>
               </p>
             )}
+            {r.openalex_id && (
+              <p className="text-gray-600">
+                <span className="font-medium">OpenAlex:</span>{' '}
+                <a href={`https://openalex.org/${r.openalex_id}`} target="_blank" className="text-blue-600 hover:underline">
+                  {r.openalex_id}
+                </a>
+              </p>
+            )}
+
+            {/* Citation Stats */}
+            {(r.cited_by_count > 0 || r.h_index > 0) && (
+              <div className="flex items-center gap-6 mt-4 p-3 bg-gradient-to-r from-orange-50 to-purple-50 rounded-lg">
+                {r.cited_by_count > 0 && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-orange-600">{r.cited_by_count.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">Citations</p>
+                  </div>
+                )}
+                {r.h_index > 0 && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-600">{r.h_index}</p>
+                    <p className="text-xs text-gray-500">H-index</p>
+                  </div>
+                )}
+                {r.i10_index > 0 && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-600">{r.i10_index}</p>
+                    <p className="text-xs text-gray-500">i10-index</p>
+                  </div>
+                )}
+                {publications.length > 0 && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-blue-600">{publications.length}</p>
+                    <p className="text-xs text-gray-500">Publications</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* CV Download */}
             <div className="mt-4 flex gap-3">
