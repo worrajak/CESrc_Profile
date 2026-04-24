@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import Comments from '@/components/Comments';
 
 export const dynamic = 'force-dynamic';
 
@@ -343,6 +344,9 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
           </div>
         </div>
       )}
+
+      {/* Comments */}
+      <Comments targetType="news" targetId={news.id} />
     </div>
   );
 }

@@ -189,6 +189,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">สรุปผลงาน/ทุน/เดินทาง/อบรม รายปี</p>
         </Link>
         <Link
+          href="/admin/engagement"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-rose-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">Engagement Analytics</h3>
+          <p className="text-sm text-gray-500">Heatmap, comments, ผู้เยี่ยมชม (PDPA)</p>
+        </Link>
+        <Link
           href="/admin/ai-settings"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-pink-500 block"
         >

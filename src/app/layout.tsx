@@ -4,6 +4,9 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import { AuthProvider } from "@/lib/AuthContext";
+import ConsentBanner from "@/components/ConsentBanner";
+import EngagementTracker from "@/components/EngagementTracker";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -28,9 +31,13 @@ export default function RootLayout({
         <GoogleAnalytics />
       </head>
       <body className={`${geistSans.variable} antialiased bg-gray-50 min-h-screen flex flex-col`}>
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+          <EngagementTracker />
+          <ConsentBanner />
+        </AuthProvider>
       </body>
     </html>
   );
