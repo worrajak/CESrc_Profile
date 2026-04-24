@@ -138,7 +138,7 @@ SELECT
     SELECT COUNT(*)
     FROM training_courses tc
     WHERE tc.instructor_id = r.id
-      OR tc.instructor_ids @> to_jsonb(r.id::text)
+       OR (tc.instructor_ids IS NOT NULL AND tc.instructor_ids @> to_jsonb(r.id::text))
   ) AS total_courses_as_instructor,
   -- Academic services
   (
@@ -146,12 +146,13 @@ SELECT
     FROM service_members sm
     WHERE sm.researcher_id = r.id
   ) AS total_academic_services,
-  -- Student supervision
+  -- Student supervision (via thesis_committee: main_advisor or co_advisor)
   (
-    SELECT COUNT(DISTINCT s.id)
-    FROM students s
-    WHERE s.advisor_id = r.id
-       OR s.co_advisors @> to_jsonb(r.id::text)
+    SELECT COUNT(DISTINCT t.student_id)
+    FROM thesis_committee tc
+    JOIN theses t ON t.id = tc.thesis_id
+    WHERE tc.researcher_id = r.id
+      AND tc.committee_role IN ('main_advisor', 'co_advisor')
   ) AS total_students
 FROM researchers r
 WHERE r.is_active = true;

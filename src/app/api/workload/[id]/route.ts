@@ -91,23 +91,48 @@ export async function GET(
       return sum + Math.max(1, days);
     }, 0);
 
-    // Training courses as instructor
-    const { data: courses } = await supabase
+    // Training courses as instructor (primary or co-instructor via JSONB array)
+    const { data: coursesPrimary } = await supabase
       .from('training_courses')
       .select('id, code, title_th, level, duration_hours, duration_days, instructor_id, instructor_ids, is_active')
-      .or(`instructor_id.eq.${researcherId},instructor_ids.cs.["${researcherId}"]`);
+      .eq('instructor_id', researcherId);
 
-    // Academic services
+    // JSONB contains filter for co-instructors
+    const { data: coursesCo } = await supabase
+      .from('training_courses')
+      .select('id, code, title_th, level, duration_hours, duration_days, instructor_id, instructor_ids, is_active')
+      .contains('instructor_ids', [researcherId]);
+
+    // Merge + dedupe by id
+    const courseMap = new Map<string, any>();
+    [...(coursesPrimary || []), ...(coursesCo || [])].forEach((c: any) => courseMap.set(c.id, c));
+    const courses = Array.from(courseMap.values());
+
+    // Academic services (service_members table — role not role_in_service)
     const { data: serviceMembers } = await supabase
       .from('service_members')
-      .select('id, role_in_service, service_requests(id, service_type, title, requester_name, location, start_date, end_date, status)')
+      .select('id, role, academic_services(id, title_th, title_en, service_type, client_name, location, budget, start_date, end_date, status)')
       .eq('researcher_id', researcherId);
 
-    // Students supervised
-    const { data: students } = await supabase
-      .from('students')
-      .select('id, title_th, first_name_th, last_name_th, degree_level, enrollment_year, graduation_year, status')
-      .or(`advisor_id.eq.${researcherId},co_advisors.cs.["${researcherId}"]`);
+    // Students supervised — via thesis_committee (main_advisor or co_advisor)
+    const { data: committeeRows } = await supabase
+      .from('thesis_committee')
+      .select('thesis_id, committee_role, theses(id, student_id, title_th, academic_year, status, students(id, title_th, first_name_th, last_name_th, degree_level, enrollment_year, graduation_year, status))')
+      .eq('researcher_id', researcherId)
+      .in('committee_role', ['main_advisor', 'co_advisor']);
+
+    // Extract unique students from committee rows
+    const studentMap = new Map<string, any>();
+    for (const row of (committeeRows || []) as any[]) {
+      const thesis = row.theses;
+      if (thesis && thesis.students) {
+        const s = thesis.students;
+        if (!studentMap.has(s.id)) {
+          studentMap.set(s.id, { ...s, advisor_role: row.committee_role });
+        }
+      }
+    }
+    const students = Array.from(studentMap.values());
 
     // Summary counts
     const pubsThisYear = (publications || []).filter((p: any) => p.year === yearFilter).length;
