@@ -34,26 +34,62 @@ export async function GET(request: NextRequest) {
 // POST - create news (requires admin password)
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { password, title, content, category, cover_image_url, images, tags, sdg_goals } = body;
+  const {
+    password, title, content, category, cover_image_url, images, tags, sdg_goals,
+    author_id,
+    // Travel fields
+    is_official_travel,
+    travel_purpose,
+    travel_location,
+    travel_start_date,
+    travel_end_date,
+    travel_approval_number,
+    travel_approval_doc_url,
+    travel_approval_link,
+    travel_budget,
+    travel_funding_source,
+    travel_participants,
+    travel_activity_type,
+  } = body;
 
   // Verify admin
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const insertData: any = {
+    title,
+    content,
+    category: category || 'team_activity',
+    cover_image_url: cover_image_url || null,
+    tags: tags || [],
+    sdg_goals: sdg_goals || [],
+    is_published: true,
+    published_at: new Date().toISOString(),
+  };
+
+  if (author_id) insertData.author_id = author_id;
+
+  // Travel fields (only if is_official_travel is true)
+  if (is_official_travel) {
+    insertData.is_official_travel = true;
+    insertData.travel_purpose = travel_purpose || null;
+    insertData.travel_location = travel_location || null;
+    insertData.travel_start_date = travel_start_date || null;
+    insertData.travel_end_date = travel_end_date || null;
+    insertData.travel_approval_number = travel_approval_number || null;
+    insertData.travel_approval_doc_url = travel_approval_doc_url || null;
+    insertData.travel_approval_link = travel_approval_link || null;
+    insertData.travel_budget = travel_budget ? parseFloat(travel_budget) : null;
+    insertData.travel_funding_source = travel_funding_source || null;
+    insertData.travel_participants = Array.isArray(travel_participants) ? travel_participants : [];
+    insertData.travel_activity_type = travel_activity_type || null;
+  }
+
   // Insert news
   const { data: news, error: newsError } = await supabase
     .from('news')
-    .insert({
-      title,
-      content,
-      category: category || 'team_activity',
-      cover_image_url: cover_image_url || null,
-      tags: tags || [],
-      sdg_goals: sdg_goals || [],
-      is_published: true,
-      published_at: new Date().toISOString(),
-    })
+    .insert(insertData)
     .select()
     .single();
 

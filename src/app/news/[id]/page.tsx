@@ -16,7 +16,32 @@ interface NewsDetail {
   sdg_goals: string[] | null;
   news_images: { id: string; image_url: string; caption: string | null; sort_order: number }[];
   researchers: { title_th: string; first_name_th: string; last_name_th: string } | null;
+  // Travel fields
+  is_official_travel?: boolean;
+  travel_purpose?: string | null;
+  travel_location?: string | null;
+  travel_start_date?: string | null;
+  travel_end_date?: string | null;
+  travel_approval_number?: string | null;
+  travel_approval_doc_url?: string | null;
+  travel_approval_link?: string | null;
+  travel_budget?: number | null;
+  travel_funding_source?: string | null;
+  travel_participants?: string[] | null;
+  travel_activity_type?: string | null;
 }
+
+const TRAVEL_TYPE_LABELS: Record<string, string> = {
+  conference: '🎤 ประชุมวิชาการ',
+  seminar: '💼 สัมมนา',
+  training: '📚 อบรม',
+  field_work: '🔬 ภาคสนาม',
+  meeting: '🗣️ ประชุม',
+  inspection: '🔍 ตรวจสอบ',
+  exhibition: '🎪 นิทรรศการ',
+  consulting: '💡 ที่ปรึกษา',
+  other: '📌 อื่นๆ',
+};
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const { data } = await supabase
@@ -95,6 +120,24 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
   const sortedImages = (news.news_images || []).sort((a, b) => a.sort_order - b.sort_order);
   const relatedPubs = await getRelatedPublications(news.tags || []);
 
+  // Fetch participant details if this is a travel news
+  let travelParticipants: any[] = [];
+  if (news.is_official_travel && news.travel_participants && news.travel_participants.length > 0) {
+    const { data } = await supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th')
+      .in('id', news.travel_participants);
+    travelParticipants = data || [];
+  }
+
+  // Calculate travel duration
+  let travelDays = 0;
+  if (news.is_official_travel && news.travel_start_date && news.travel_end_date) {
+    const start = new Date(news.travel_start_date);
+    const end = new Date(news.travel_end_date);
+    travelDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Back */}
@@ -137,6 +180,119 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
               {sdg}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Official Travel Card */}
+      {news.is_official_travel && (
+        <div className="mb-6 rounded-2xl overflow-hidden border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 shadow-sm">
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-5 py-3 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">✈️</span>
+              <div>
+                <h3 className="font-bold text-sm md:text-base">การเดินทางไปราชการ</h3>
+                <p className="text-[11px] text-white/80">Official Duty Travel Record</p>
+              </div>
+            </div>
+            {news.travel_activity_type && (
+              <span className="text-xs bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
+                {TRAVEL_TYPE_LABELS[news.travel_activity_type] || news.travel_activity_type}
+              </span>
+            )}
+          </div>
+
+          <div className="p-5 space-y-3">
+            {news.travel_purpose && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">วัตถุประสงค์</p>
+                <p className="text-sm text-gray-800">{news.travel_purpose}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              {news.travel_location && (
+                <div className="bg-white/60 rounded-lg p-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📍 สถานที่</p>
+                  <p className="text-gray-800 font-medium">{news.travel_location}</p>
+                </div>
+              )}
+
+              {(news.travel_start_date || news.travel_end_date) && (
+                <div className="bg-white/60 rounded-lg p-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📅 ระยะเวลา</p>
+                  <p className="text-gray-800 font-medium text-xs">
+                    {news.travel_start_date && new Date(news.travel_start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {news.travel_end_date && news.travel_end_date !== news.travel_start_date && (
+                      <> — {new Date(news.travel_end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                    )}
+                  </p>
+                  {travelDays > 0 && (
+                    <p className="text-[10px] text-emerald-600 mt-0.5">รวม {travelDays} วัน</p>
+                  )}
+                </div>
+              )}
+
+              {news.travel_approval_number && (
+                <div className="bg-white/60 rounded-lg p-2.5">
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📋 เลขที่อนุมัติ</p>
+                  <p className="text-gray-800 font-medium text-xs font-mono">{news.travel_approval_number}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Budget & Funding */}
+            {(news.travel_budget || news.travel_funding_source) && (
+              <div className="flex flex-wrap gap-2">
+                {news.travel_budget && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-medium">
+                    💰 งบประมาณ {Number(news.travel_budget).toLocaleString()} บาท
+                  </span>
+                )}
+                {news.travel_funding_source && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-violet-100 text-violet-800 px-3 py-1 rounded-full">
+                    แหล่งทุน: {news.travel_funding_source}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Participants */}
+            {travelParticipants.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold mb-1">
+                  👥 ผู้ร่วมเดินทาง ({travelParticipants.length} คน)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {travelParticipants.map((p: any) => (
+                    <Link key={p.id} href={`/researchers/${p.id}`}
+                      className="text-xs bg-white border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full hover:bg-emerald-50 transition">
+                      {p.title_th}{p.first_name_th} {p.last_name_th}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Approval Document */}
+            {(news.travel_approval_doc_url || news.travel_approval_link) && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-200">
+                {news.travel_approval_doc_url && (
+                  <a href={news.travel_approval_doc_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition font-medium">
+                    <span>📄</span>
+                    <span>ดูเอกสารอนุมัติ (PDF)</span>
+                  </a>
+                )}
+                {news.travel_approval_link && (
+                  <a href={news.travel_approval_link} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs bg-white border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition font-medium">
+                    <span>🔗</span>
+                    <span>ลิงก์เอกสาร</span>
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

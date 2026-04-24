@@ -12,7 +12,18 @@ interface NewsItem {
   published_at: string;
   tags: string[];
   sdg_goals: string[];
+  is_official_travel?: boolean;
+  travel_location?: string | null;
+  travel_start_date?: string | null;
+  travel_end_date?: string | null;
   news_images: { id: string; image_url: string; caption: string | null }[];
+}
+
+interface SimpleResearcher {
+  id: string;
+  first_name_th: string;
+  last_name_th: string;
+  first_name_en: string | null;
 }
 
 const categoryOptions = [
@@ -20,6 +31,18 @@ const categoryOptions = [
   { value: 'energy_news', label: 'ข่าวสารพลังงาน' },
   { value: 'academic', label: 'ข่าววิชาการ' },
   { value: 'announcement', label: 'ประกาศทั่วไป' },
+];
+
+const TRAVEL_ACTIVITY_TYPES = [
+  { value: 'conference', label: '🎤 ประชุมวิชาการ / Conference' },
+  { value: 'seminar', label: '💼 สัมมนา / Seminar' },
+  { value: 'training', label: '📚 อบรม / Training' },
+  { value: 'field_work', label: '🔬 ภาคสนาม / Field Work' },
+  { value: 'meeting', label: '🗣️ ประชุม / Meeting' },
+  { value: 'inspection', label: '🔍 ตรวจสอบ / Inspection' },
+  { value: 'exhibition', label: '🎪 นิทรรศการ / Exhibition' },
+  { value: 'consulting', label: '💡 ที่ปรึกษา / Consulting' },
+  { value: 'other', label: '📌 อื่นๆ' },
 ];
 
 const SDG_COLORS: Record<string, string> = {
@@ -56,8 +79,26 @@ export default function AdminNewsPage() {
   const [suggesting, setSuggesting] = useState(false);
   const [message, setMessage] = useState('');
 
+  // Travel fields
+  const [isOfficialTravel, setIsOfficialTravel] = useState(false);
+  const [travelPurpose, setTravelPurpose] = useState('');
+  const [travelLocation, setTravelLocation] = useState('');
+  const [travelStartDate, setTravelStartDate] = useState('');
+  const [travelEndDate, setTravelEndDate] = useState('');
+  const [travelActivityType, setTravelActivityType] = useState('conference');
+  const [travelApprovalNumber, setTravelApprovalNumber] = useState('');
+  const [travelApprovalDocUrl, setTravelApprovalDocUrl] = useState('');
+  const [travelApprovalLink, setTravelApprovalLink] = useState('');
+  const [travelBudget, setTravelBudget] = useState('');
+  const [travelFundingSource, setTravelFundingSource] = useState('');
+  const [travelParticipants, setTravelParticipants] = useState<string[]>([]);
+  const [researchers, setResearchers] = useState<SimpleResearcher[]>([]);
+  const [authorId, setAuthorId] = useState<string>('');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   // Auth
   const handleLogin = async (e: React.FormEvent) => {
@@ -76,6 +117,7 @@ export default function AdminNewsPage() {
         sessionStorage.setItem('admin_pwd', password);
         fetchNews();
         fetchTagOptions();
+        fetchResearchers();
       } else {
         setAuthError('รหัสผ่านไม่ถูกต้อง');
       }
@@ -93,8 +135,19 @@ export default function AdminNewsPage() {
       setPassword(storedPwd);
       fetchNews();
       fetchTagOptions();
+      fetchResearchers();
     }
   }, []);
+
+  const fetchResearchers = async () => {
+    try {
+      const res = await fetch('/api/researchers');
+      if (res.ok) {
+        const data = await res.json();
+        setResearchers(data || []);
+      }
+    } catch { /* ignore */ }
+  };
 
   const getPassword = () => sessionStorage.getItem('admin_pwd') || password;
 
@@ -155,6 +208,44 @@ export default function AdminNewsPage() {
     finally { setUploading(false); }
   };
 
+  // Upload approval document (PDF)
+  const handleUploadDoc = async (file: File) => {
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('password', getPassword());
+      formData.append('folder', 'travel-approvals');
+      formData.append('type', 'document');
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setTravelApprovalDocUrl(data.url);
+      } else {
+        setMessage('อัพโหลด PDF ไม่สำเร็จ: ' + (data.error || 'unknown error'));
+      }
+    } catch { setMessage('อัพโหลด PDF ไม่สำเร็จ'); }
+    finally { setUploadingDoc(false); }
+  };
+
+  const resetForm = () => {
+    setTitle(''); setContent(''); setCategory('team_activity');
+    setCoverUrl(''); setImages([]); setTags([]); setSdgGoals([]);
+    setIsOfficialTravel(false);
+    setTravelPurpose(''); setTravelLocation('');
+    setTravelStartDate(''); setTravelEndDate('');
+    setTravelActivityType('conference');
+    setTravelApprovalNumber(''); setTravelApprovalDocUrl(''); setTravelApprovalLink('');
+    setTravelBudget(''); setTravelFundingSource(''); setTravelParticipants([]);
+    setAuthorId('');
+  };
+
+  const toggleParticipant = (rid: string) => {
+    setTravelParticipants((prev) =>
+      prev.includes(rid) ? prev.filter((p) => p !== rid) : [...prev, rid]
+    );
+  };
+
   // Save news
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,16 +262,28 @@ export default function AdminNewsPage() {
         body: JSON.stringify({
           password: getPassword(),
           title, content, category,
+          author_id: authorId || null,
           cover_image_url: coverUrl || null,
           images: images.filter((img) => img.url),
           tags,
           sdg_goals: sdgGoals,
+          is_official_travel: isOfficialTravel,
+          travel_purpose: isOfficialTravel ? travelPurpose : null,
+          travel_location: isOfficialTravel ? travelLocation : null,
+          travel_start_date: isOfficialTravel ? travelStartDate : null,
+          travel_end_date: isOfficialTravel ? travelEndDate : null,
+          travel_activity_type: isOfficialTravel ? travelActivityType : null,
+          travel_approval_number: isOfficialTravel ? travelApprovalNumber : null,
+          travel_approval_doc_url: isOfficialTravel ? travelApprovalDocUrl : null,
+          travel_approval_link: isOfficialTravel ? travelApprovalLink : null,
+          travel_budget: isOfficialTravel && travelBudget ? parseFloat(travelBudget) : null,
+          travel_funding_source: isOfficialTravel ? travelFundingSource : null,
+          travel_participants: isOfficialTravel ? travelParticipants : [],
         }),
       });
       if (res.ok) {
         setMessage('บันทึกข่าวสำเร็จ!');
-        setTitle(''); setContent(''); setCategory('team_activity');
-        setCoverUrl(''); setImages([]); setTags([]); setSdgGoals([]);
+        resetForm();
         setShowForm(false);
         fetchNews();
       } else {
@@ -261,15 +364,173 @@ export default function AdminNewsPage() {
               placeholder="หัวข้อข่าว..." required />
           </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-              {categoryOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+          {/* Category + Author */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                {categoryOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ผู้โพสต์ (Author)</label>
+              <select value={authorId} onChange={(e) => setAuthorId(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">-- ไม่ระบุ --</option>
+                {researchers.map((r) => (
+                  <option key={r.id} value={r.id}>{r.first_name_th} {r.last_name_th}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* === TRAVEL SECTION === */}
+          <div className="border-2 border-dashed border-emerald-300 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isOfficialTravel}
+                onChange={(e) => setIsOfficialTravel(e.target.checked)}
+                className="w-4 h-4 rounded" />
+              <span className="font-semibold text-emerald-800">
+                ✈️ เป็นการเดินทางไปราชการ
+              </span>
+              <span className="text-xs text-emerald-600">(สำหรับประเมินภาระงาน)</span>
+            </label>
+
+            {isOfficialTravel && (
+              <div className="mt-4 space-y-3">
+                {/* Activity Type */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">ประเภทกิจกรรม</label>
+                  <select value={travelActivityType} onChange={(e) => setTravelActivityType(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-lg text-sm">
+                    {TRAVEL_ACTIVITY_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Purpose */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">วัตถุประสงค์</label>
+                  <input type="text" value={travelPurpose} onChange={(e) => setTravelPurpose(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-lg text-sm"
+                    placeholder="เช่น นำเสนองานวิจัยในงาน IEEE ECTI-CON 2026" />
+                </div>
+
+                {/* Location */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">สถานที่</label>
+                  <input type="text" value={travelLocation} onChange={(e) => setTravelLocation(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-lg text-sm"
+                    placeholder="เช่น โรงแรม Shangri-La, กรุงเทพฯ หรือ Tokyo, Japan" />
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">วันที่เริ่ม</label>
+                    <input type="date" value={travelStartDate} onChange={(e) => setTravelStartDate(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">วันที่สิ้นสุด</label>
+                    <input type="date" value={travelEndDate} onChange={(e) => setTravelEndDate(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-lg text-sm" />
+                  </div>
+                </div>
+
+                {/* Approval Number + Budget */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">เลขที่หนังสืออนุมัติ</label>
+                    <input type="text" value={travelApprovalNumber} onChange={(e) => setTravelApprovalNumber(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-lg text-sm"
+                      placeholder="เช่น ศธ 0584.17/ว.123" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">งบประมาณ (บาท)</label>
+                    <input type="number" value={travelBudget} onChange={(e) => setTravelBudget(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-lg text-sm"
+                      placeholder="เช่น 15000" step="0.01" />
+                  </div>
+                </div>
+
+                {/* Funding Source */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">แหล่งงบประมาณ</label>
+                  <input type="text" value={travelFundingSource} onChange={(e) => setTravelFundingSource(e.target.value)}
+                    className="w-full px-3 py-1.5 border rounded-lg text-sm"
+                    placeholder="เช่น เงินรายได้ มทร.ล้านนา 2569 หรือ ทุน บพข. รหัส..." />
+                </div>
+
+                {/* Approval Document Upload + External Link */}
+                <div className="bg-white rounded-lg p-3 border border-emerald-200">
+                  <label className="block text-xs font-semibold text-emerald-800 mb-2">
+                    📎 เอกสารอนุมัติเดินทาง
+                  </label>
+                  <div className="space-y-2">
+                    {/* PDF Upload */}
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={travelApprovalDocUrl}
+                        onChange={(e) => setTravelApprovalDocUrl(e.target.value)}
+                        className="flex-1 px-3 py-1.5 border rounded-lg text-xs"
+                        placeholder="URL ของ PDF หรือกดปุ่มอัพโหลด →" />
+                      <input ref={docInputRef} type="file" accept="application/pdf,.pdf,.doc,.docx" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadDoc(f); }} />
+                      <button type="button" onClick={() => docInputRef.current?.click()} disabled={uploadingDoc}
+                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs whitespace-nowrap disabled:opacity-50">
+                        {uploadingDoc ? 'กำลังอัพ...' : '📄 อัพโหลด PDF'}
+                      </button>
+                    </div>
+                    {travelApprovalDocUrl && (
+                      <div className="flex items-center gap-2 text-xs bg-emerald-50 rounded px-2 py-1">
+                        <span>✅</span>
+                        <a href={travelApprovalDocUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-700 underline truncate flex-1">
+                          ดูเอกสาร
+                        </a>
+                        <button type="button" onClick={() => setTravelApprovalDocUrl('')}
+                          className="text-red-500 hover:text-red-700 text-xs">ลบ</button>
+                      </div>
+                    )}
+
+                    {/* External Link */}
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-0.5">หรือลิงก์ภายนอก (Google Drive, SharePoint)</label>
+                      <input type="url" value={travelApprovalLink} onChange={(e) => setTravelApprovalLink(e.target.value)}
+                        className="w-full px-3 py-1.5 border rounded-lg text-xs"
+                        placeholder="https://drive.google.com/..." />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Team Members (Participants) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    ผู้ร่วมเดินทาง (เลือกจากสมาชิกหน่วย — {travelParticipants.length} คน)
+                  </label>
+                  <div className="max-h-40 overflow-y-auto bg-white rounded-lg border p-2 grid grid-cols-2 md:grid-cols-3 gap-1">
+                    {researchers.map((r) => (
+                      <label key={r.id} className="flex items-center gap-1 text-xs cursor-pointer hover:bg-emerald-50 rounded px-1 py-0.5">
+                        <input type="checkbox"
+                          checked={travelParticipants.includes(r.id)}
+                          onChange={() => toggleParticipant(r.id)}
+                          className="w-3 h-3 rounded" />
+                        <span>{r.first_name_th} {r.last_name_th}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                  💡 <strong>ประโยชน์:</strong> ข้อมูลนี้จะถูกใช้ในการประเมินภาระงานและสรุปเป็น Progress Report อัตโนมัติ
+                  — ดูได้ที่ <code className="bg-blue-100 px-1 rounded">/admin/workload</code>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -428,6 +689,12 @@ export default function AdminNewsPage() {
                       <span className="text-xs text-gray-400">
                         {new Date(item.published_at).toLocaleDateString('th-TH')}
                       </span>
+                      {item.is_official_travel && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded flex items-center gap-1">
+                          ✈️ ไปราชการ
+                          {item.travel_location && <span className="opacity-70">· {item.travel_location}</span>}
+                        </span>
+                      )}
                     </div>
                     {/* Tags & SDGs */}
                     {((item.tags && item.tags.length > 0) || (item.sdg_goals && item.sdg_goals.length > 0)) && (
