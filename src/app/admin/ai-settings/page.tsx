@@ -17,13 +17,24 @@ interface AIConfigItem {
   updated_at: string;
 }
 
-const PROVIDER_INFO: Record<string, { icon: string; color: string; keyPlaceholder: string; keyLabel: string; helpUrl: string }> = {
+const PROVIDER_INFO: Record<string, {
+  icon: string; color: string; keyPlaceholder: string; keyLabel: string; helpUrl: string;
+  pricing?: string; latestModels: string[];
+}> = {
   claude: {
     icon: '🟣',
     color: 'purple',
     keyPlaceholder: 'sk-ant-api03-xxxx...',
     keyLabel: 'Anthropic API Key',
     helpUrl: 'https://console.anthropic.com/settings/keys',
+    pricing: '$3/$15 per M tokens (Sonnet) · Pay-per-use',
+    latestModels: [
+      'claude-sonnet-4-7-20251015',
+      'claude-sonnet-4-6-20250812',
+      'claude-sonnet-4-5-20250929',
+      'claude-opus-4-1-20250805',
+      'claude-haiku-4-5-20251029',
+    ],
   },
   gemini: {
     icon: '🔵',
@@ -31,6 +42,15 @@ const PROVIDER_INFO: Record<string, { icon: string; color: string; keyPlaceholde
     keyPlaceholder: 'AIzaSyxxxx...',
     keyLabel: 'Google AI API Key',
     helpUrl: 'https://aistudio.google.com/app/apikey',
+    pricing: '✨ ฟรี (15 RPM, 1M TPM) · Paid: $0.075/$0.30 per M',
+    latestModels: [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-pro',
+    ],
   },
   openai: {
     icon: '🟢',
@@ -38,6 +58,17 @@ const PROVIDER_INFO: Record<string, { icon: string; color: string; keyPlaceholde
     keyPlaceholder: 'sk-proj-xxxx...',
     keyLabel: 'OpenAI API Key',
     helpUrl: 'https://platform.openai.com/api-keys',
+    pricing: 'GPT-4.1: $2/$8 · GPT-5: $5/$20 · Pay-per-use',
+    latestModels: [
+      'gpt-5',
+      'gpt-5-mini',
+      'gpt-4.5',
+      'gpt-4.1',
+      'gpt-4.1-mini',
+      'gpt-4o',
+      'o3',
+      'o4-mini',
+    ],
   },
   local: {
     icon: '🖥️',
@@ -45,6 +76,17 @@ const PROVIDER_INFO: Record<string, { icon: string; color: string; keyPlaceholde
     keyPlaceholder: '',
     keyLabel: 'ไม่ต้องใช้ API Key',
     helpUrl: 'https://ollama.com/download',
+    pricing: '✨ ฟรี 100% (รันบนเครื่องตัวเอง)',
+    latestModels: [
+      'llama3.3:70b',
+      'llama3.1:8b',
+      'qwen2.5:14b',
+      'qwen2.5-coder:14b',
+      'deepseek-r1:32b',
+      'deepseek-v3:67b',
+      'gemma2:9b',
+      'mistral:7b',
+    ],
   },
 };
 
@@ -333,26 +375,75 @@ export default function AISettingsPage() {
 
                 {/* Model Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">โมเดล</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={editModels[config.provider] || config.model_name}
-                      onChange={(e) => setEditModels(prev => ({ ...prev, [config.provider]: e.target.value }))}
-                      className="flex-1 border rounded-lg px-3 py-2 text-sm"
-                    >
-                      {(config.models || []).map((m: string) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">โมเดล</label>
+                    {info.pricing && (
+                      <span className="text-[10px] text-gray-500 italic">{info.pricing}</span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {/* Active model input */}
                     <input
                       type="text"
-                      value={editModels[config.provider] || config.model_name}
+                      value={editModels[config.provider] ?? config.model_name}
                       onChange={(e) => setEditModels(prev => ({ ...prev, [config.provider]: e.target.value }))}
-                      placeholder="หรือพิมพ์ชื่อ model เอง"
-                      className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
+                      placeholder="พิมพ์ชื่อ model เช่น claude-sonnet-4-5-20250929"
+                      className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500"
                     />
+
+                    {/* Quick pick: Latest models from PROVIDER_INFO */}
+                    {info.latestModels && info.latestModels.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-1">⚡ Latest models (คลิกเพื่อใช้):</p>
+                        <div className="flex flex-wrap gap-1">
+                          {info.latestModels.map((m) => {
+                            const isActive = (editModels[config.provider] ?? config.model_name) === m;
+                            return (
+                              <button
+                                key={m}
+                                onClick={() => setEditModels(prev => ({ ...prev, [config.provider]: m }))}
+                                className={`text-[10px] px-2 py-1 rounded-md font-mono transition ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Saved models from DB (if any extra) */}
+                    {config.models && config.models.length > 0 && config.models.some((m) => !info.latestModels?.includes(m)) && (
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-1">📦 Saved in DB:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {config.models.filter((m) => !info.latestModels?.includes(m)).map((m: string) => {
+                            const isActive = (editModels[config.provider] ?? config.model_name) === m;
+                            return (
+                              <button
+                                key={m}
+                                onClick={() => setEditModels(prev => ({ ...prev, [config.provider]: m }))}
+                                className={`text-[10px] px-2 py-1 rounded-md font-mono transition ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">เลือกจาก dropdown หรือพิมพ์ชื่อ model ใหม่ได้เลย</p>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    💡 พิมพ์ model ใหม่ได้เลย — ระบบจะบันทึกลง DB ตอนกด &quot;บันทึก&quot;
+                  </p>
                 </div>
 
                 {/* Capabilities */}

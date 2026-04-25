@@ -65,27 +65,38 @@ export default function AdminBorrowingPage() {
     const approverName = prompt('ชื่อผู้อนุมัติ:');
     if (!approverName) return;
 
+    let updateError: any = null;
     if (action === 'reject') {
       const reason = prompt('เหตุผลในการปฏิเสธ:');
-      await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('borrow_requests').update({
         status: 'rejected', rejection_reason: reason, approved_by: approverName, approved_at: new Date().toISOString(),
       }).eq('id', req.id);
+      updateError = error;
     } else if (action === 'advisor_approve') {
-      await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('borrow_requests').update({
         status: 'advisor_approved', advisor_approved_by: approverName, advisor_approved_at: new Date().toISOString(),
       }).eq('id', req.id);
+      updateError = error;
     } else {
-      await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('borrow_requests').update({
         status: 'borrowed', approved_by: approverName, approved_at: new Date().toISOString(),
       }).eq('id', req.id);
-      // Decrement available quantity
-      const { data: eq } = await supabase.from('equipment').select('quantity_available').eq('id', req.equipment_id).single();
-      if (eq) {
-        await supabase.from('equipment').update({
-          quantity_available: Math.max(0, eq.quantity_available - req.quantity),
-          status: eq.quantity_available - req.quantity <= 0 ? 'borrowed' : 'available',
-        }).eq('id', req.equipment_id);
+      updateError = error;
+      if (!error) {
+        // Decrement available quantity
+        const { data: eq } = await supabase.from('equipment').select('quantity_available').eq('id', req.equipment_id).single();
+        if (eq) {
+          const { error: eqErr } = await supabase.from('equipment').update({
+            quantity_available: Math.max(0, eq.quantity_available - req.quantity),
+            status: eq.quantity_available - req.quantity <= 0 ? 'borrowed' : 'available',
+          }).eq('id', req.equipment_id);
+          if (eqErr) console.warn('Equipment qty update failed:', eqErr.message);
+        }
       }
+    }
+    if (updateError) {
+      alert('อัปเดตคำขอไม่สำเร็จ: ' + updateError.message);
+      return;
     }
     await loadRequests();
   };
@@ -94,21 +105,26 @@ export default function AdminBorrowingPage() {
     if (!returnModal) return;
     const { data: eq } = await supabase.from('equipment').select('quantity_available, quantity_total').eq('id', returnModal.equipment_id).single();
 
-    await supabase.from('borrow_requests').update({
+    const { error: returnErr } = await supabase.from('borrow_requests').update({
       status: 'returned',
       actual_return_date: new Date().toISOString().split('T')[0],
       return_condition: returnForm.condition,
       return_notes: returnForm.notes,
       returned_to: returnForm.returned_to,
     }).eq('id', returnModal.id);
+    if (returnErr) {
+      alert('อัปเดตการคืนไม่สำเร็จ: ' + returnErr.message);
+      return;
+    }
 
     // Increment available quantity
     if (eq) {
       const newQty = Math.min(eq.quantity_total, eq.quantity_available + returnModal.quantity);
-      await supabase.from('equipment').update({
+      const { error: eqErr } = await supabase.from('equipment').update({
         quantity_available: newQty,
         status: newQty > 0 ? 'available' : 'borrowed',
       }).eq('id', returnModal.equipment_id);
+      if (eqErr) console.warn('Equipment qty update failed:', eqErr.message);
     }
 
     setReturnModal(null);

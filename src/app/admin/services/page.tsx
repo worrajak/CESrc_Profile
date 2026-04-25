@@ -109,19 +109,31 @@ export default function AdminServicesPage() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
       );
 
-      // Update request status
-      await supabase
+      // Update request status (with verification)
+      const { data: updated, error: updateErr } = await supabase
         .from('service_requests')
         .update({ status: statusUpdate.status })
-        .eq('id', selectedRequest.id);
+        .eq('id', selectedRequest.id)
+        .select()
+        .single();
+      if (updateErr) {
+        alert('อัปเดตสถานะไม่สำเร็จ: ' + updateErr.message);
+        return;
+      }
+      if (updated && updated.status !== statusUpdate.status) {
+        alert(`เตือน: status ที่บันทึกไม่ตรงกับที่ส่ง\nส่ง: ${statusUpdate.status}\nDB: ${updated.status}`);
+      }
 
       // Add timeline entry
-      await supabase.from('service_timeline').insert({
+      const { error: timelineErr } = await supabase.from('service_timeline').insert({
         request_id: selectedRequest.id,
         status: statusUpdate.status,
         note: statusUpdate.note || `สถานะเปลี่ยนเป็น ${STATUS_OPTIONS.find(s => s.value === statusUpdate.status)?.label}`,
         actor: 'Admin',
       });
+      if (timelineErr) {
+        console.warn('Timeline insert failed:', timelineErr.message);
+      }
 
       setSelectedRequest(null);
       setStatusUpdate({ status: '', note: '' });

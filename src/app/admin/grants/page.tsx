@@ -213,11 +213,22 @@ export default function AdminGrantsPage() {
     let savedGrantId: string | null = null;
 
     if (editing) {
-      const { error } = await supabase.from('grants').update(payload).eq('id', editing.id);
+      // Use .select().single() to verify the update actually persisted
+      const { data: updated, error } = await supabase
+        .from('grants')
+        .update(payload)
+        .eq('id', editing.id)
+        .select()
+        .single();
       if (error) {
-        alert('บันทึกไม่สำเร็จ: ' + error.message);
+        alert('บันทึกไม่สำเร็จ: ' + error.message + '\n\nหากเป็นปัญหา RLS ให้รัน 029_fix_grants_rls.sql');
         setLoading(false);
         return;
+      }
+      // Verify status matches what we sent
+      if (updated && updated.status !== payload.status) {
+        console.warn('⚠️ Status mismatch: sent', payload.status, 'but DB returned', updated.status);
+        alert(`เตือน: บันทึกแล้วแต่ status ไม่ตรง\nส่ง: ${payload.status}\nDB คืน: ${updated.status}\n\nอาจมี trigger หรือ default value ใน DB`);
       }
       savedGrantId = editing.id;
     } else {

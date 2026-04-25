@@ -437,9 +437,15 @@ export default function AdminTrainingPage() {
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
       );
-      await supabase.from('training_sessions').update(updates).eq('id', sessionId);
+      const { error } = await supabase.from('training_sessions').update(updates).eq('id', sessionId);
+      if (error) {
+        alert('อัปเดตรุ่นอบรมไม่สำเร็จ: ' + error.message);
+        return;
+      }
       setFormSessions(formSessions.map(s => s.id === sessionId ? { ...s, ...updates } : s));
-    } catch {}
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
   };
 
   // Delete session
