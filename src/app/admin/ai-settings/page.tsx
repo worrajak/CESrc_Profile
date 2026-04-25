@@ -70,6 +70,28 @@ const PROVIDER_INFO: Record<string, {
       'o4-mini',
     ],
   },
+  openrouter: {
+    icon: '🌐',
+    color: 'orange',
+    keyPlaceholder: 'sk-or-v1-xxxx...',
+    keyLabel: 'OpenRouter API Key',
+    helpUrl: 'https://openrouter.ai/keys',
+    pricing: '🌟 1 key ใช้ได้ทุกโมเดล + ฟรีหลายตัว · Pay-per-use',
+    latestModels: [
+      // ฟรี
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'google/gemini-2.0-flash-exp:free',
+      'deepseek/deepseek-r1:free',
+      'deepseek/deepseek-chat-v3-0324:free',
+      'nvidia/llama-3.1-nemotron-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      // Premium
+      'anthropic/claude-sonnet-4.5',
+      'openai/gpt-4.1',
+      'google/gemini-2.5-pro',
+      'deepseek/deepseek-v3',
+    ],
+  },
   local: {
     icon: '🖥️',
     color: 'gray',

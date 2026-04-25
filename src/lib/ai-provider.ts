@@ -5,7 +5,7 @@
 
 import { supabase } from '@/lib/supabase';
 
-export type AIProvider = 'claude' | 'gemini' | 'openai' | 'local';
+export type AIProvider = 'claude' | 'gemini' | 'openai' | 'local' | 'openrouter';
 
 export interface AIConfig {
   provider: AIProvider;
@@ -27,6 +27,7 @@ const ENV_MAP: Record<string, string> = {
   gemini: 'GEMINI_API_KEY',
   openai: 'OPENAI_API_KEY',
   local: 'LOCAL_AI_ENDPOINT',
+  openrouter: 'OPENROUTER_API_KEY',
 };
 
 // Cache DB config (reload ทุก 5 นาที)
@@ -73,6 +74,7 @@ export async function getAvailableProviders(): Promise<{ provider: AIProvider; n
     if (process.env.CLAUDE_API_KEY) available.push({ provider: 'claude', name: 'Claude', models: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-35-20250414'] });
     if (process.env.GEMINI_API_KEY) available.push({ provider: 'gemini', name: 'Gemini', models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] });
     if (process.env.OPENAI_API_KEY) available.push({ provider: 'openai', name: 'GPT', models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o4-mini'] });
+    if (process.env.OPENROUTER_API_KEY) available.push({ provider: 'openrouter', name: 'OpenRouter', models: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemini-2.0-flash-exp:free', 'deepseek/deepseek-r1:free'] });
     if (process.env.LOCAL_AI_ENDPOINT) available.push({ provider: 'local', name: 'Local', models: ['llama4-scout', 'llama4-maverick', 'llama3.3', 'gemma3', 'mistral'] });
   }
 
@@ -133,6 +135,8 @@ export async function callAIWithVision(
         return await callGemini(base64, mimeType, systemPrompt, resolved.model, resolved.apiKey!);
       case 'openai':
         return await callOpenAI(base64, mimeType, systemPrompt, resolved.model, resolved.apiKey!);
+      case 'openrouter':
+        return await callOpenRouter(base64, mimeType, systemPrompt, resolved.model, resolved.apiKey!);
       case 'local':
         return await callLocal(base64, mimeType, systemPrompt, resolved.model, resolved.endpoint || 'http://localhost:11434');
       default:
@@ -231,6 +235,39 @@ async function callOpenAI(base64: string, mimeType: string, prompt: string, mode
     : { data: null, source: 'OpenAI', model: modelName, error: 'No JSON in response' };
 }
 
+// === OpenRouter (Universal Gateway) — รองรับ Claude, GPT, Gemini, Llama, DeepSeek ฯลฯ ===
+async function callOpenRouter(base64: string, mimeType: string, prompt: string, model: string, apiKey: string): Promise<AIParseResult> {
+  const modelName = model || 'meta-llama/llama-3.3-70b-instruct:free';
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://ce-src-profile.vercel.app',
+      'X-Title': 'CESRU Researcher Profile',
+    },
+    body: JSON.stringify({
+      model: modelName,
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          { type: 'text', text: prompt },
+        ],
+      }],
+    }),
+  });
+
+  if (!response.ok) return { data: null, source: 'OpenRouter', model: modelName, error: await response.text() };
+  const result = await response.json();
+  const text = result.choices?.[0]?.message?.content || '';
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return jsonMatch
+    ? { data: JSON.parse(jsonMatch[0]), source: `OpenRouter (${modelName})`, model: modelName }
+    : { data: null, source: 'OpenRouter', model: modelName, error: 'No JSON in response' };
+}
+
 // === Local AI (Ollama) ===
 async function callLocal(base64: string, _mimeType: string, prompt: string, model: string, endpoint: string): Promise<AIParseResult> {
   const modelName = model || 'llama4-scout';
@@ -299,6 +336,27 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
         const text = result.response || '';
         const m = text.match(/\{[\s\S]*\}/);
         return { data: m ? JSON.parse(m[0]) : null, source: `Local (${modelName})`, model: modelName };
+      }
+      case 'openrouter': {
+        const modelName = resolved.model || 'meta-llama/llama-3.3-70b-instruct:free';
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resolved.apiKey!}`,
+            'HTTP-Referer': 'https://ce-src-profile.vercel.app',
+            'X-Title': 'CESRU Researcher Profile',
+          },
+          body: JSON.stringify({
+            model: modelName,
+            max_tokens: 4096,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+        const result = await res.json();
+        const text = result.choices?.[0]?.message?.content || '';
+        const m = text.match(/\{[\s\S]*\}/);
+        return { data: m ? JSON.parse(m[0]) : null, source: `OpenRouter (${modelName})`, model: modelName };
       }
       default:
         return { data: null, source: resolved.provider, model: resolved.model, error: 'Unknown provider' };
