@@ -38,6 +38,11 @@ export interface Researcher {
   cited_by_count: number;
   h_index: number;
   i10_index: number;
+  is_pursuing_phd?: boolean;
+  phd_advisor_id?: string | null;
+  phd_program?: string | null;
+  phd_university?: string | null;
+  phd_start_year?: number | null;
 }
 
 export interface Publication {

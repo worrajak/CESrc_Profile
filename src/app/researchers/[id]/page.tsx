@@ -88,12 +88,31 @@ async function getResearcher(id: string) {
     `)
     .eq('advisor_id', id);
 
+  // Fetch PhD advisor (if researcher is pursuing PhD)
+  let phdAdvisor = null;
+  if (researcher.phd_advisor_id) {
+    const { data } = await supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th')
+      .eq('id', researcher.phd_advisor_id)
+      .single();
+    phdAdvisor = data;
+  }
+
+  // Fetch PhD students that this researcher advises
+  const { data: phdAdvisees } = await supabase
+    .from('researchers')
+    .select('id, title_th, first_name_th, last_name_th, unit_role, phd_program, phd_start_year')
+    .eq('phd_advisor_id', id);
+
   return {
     researcher,
     publications: publications || [],
     grants: grants || [],
     thesisStudents: thesisStudents || [],
     projectTopics: projectTopics || [],
+    phdAdvisor,
+    phdAdvisees: phdAdvisees || [],
   };
 }
 
@@ -101,7 +120,7 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
   const data = await getResearcher(params.id);
   if (!data) notFound();
 
-  const { researcher: r, publications, grants, thesisStudents, projectTopics } = data;
+  const { researcher: r, publications, grants, thesisStudents, projectTopics, phdAdvisor, phdAdvisees } = data;
   const fullNameTh = `${r.title_th}${r.first_name_th} ${r.last_name_th}`;
   const fullNameEn = r.first_name_en
     ? `${r.title_en || ''} ${r.first_name_en} ${r.last_name_en || ''}`
@@ -319,6 +338,52 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
                 <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
                   {exp}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PhD Status: This researcher is pursuing PhD */}
+        {(r.is_pursuing_phd || r.unit_role === 'phd_student') && phdAdvisor && (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              🎓 <span>กำลังศึกษาปริญญาเอก</span>
+            </h3>
+            <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-4 border border-pink-200">
+              <p className="text-xs text-gray-500">อาจารย์ที่ปรึกษาวิทยานิพนธ์</p>
+              <Link href={`/researchers/${phdAdvisor.id}`}
+                className="text-base font-semibold text-pink-700 hover:text-pink-900 hover:underline">
+                {phdAdvisor.title_th}{phdAdvisor.first_name_th} {phdAdvisor.last_name_th}
+              </Link>
+              {(r.phd_program || r.phd_university || r.phd_start_year) && (
+                <div className="mt-2 text-sm text-gray-600">
+                  {r.phd_program && <p><span className="text-gray-400">หลักสูตร:</span> {r.phd_program}</p>}
+                  {r.phd_university && <p><span className="text-gray-400">สถาบัน:</span> {r.phd_university}</p>}
+                  {r.phd_start_year && <p><span className="text-gray-400">เริ่มศึกษา:</span> {r.phd_start_year + 543} ({r.phd_start_year})</p>}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PhD Advisees: This researcher advises PhD students */}
+        {phdAdvisees && phdAdvisees.length > 0 && (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              👨‍🎓 <span>นักศึกษา ป.เอก ในความดูแล ({phdAdvisees.length} คน)</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {phdAdvisees.map((advisee: any) => (
+                <Link key={advisee.id} href={`/researchers/${advisee.id}`}
+                  className="block bg-white border border-pink-200 hover:border-pink-400 rounded-lg p-3 transition">
+                  <p className="text-sm font-medium text-gray-800">
+                    {advisee.title_th}{advisee.first_name_th} {advisee.last_name_th}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {advisee.unit_role === 'phd_student' ? 'นักศึกษาปริญญาเอก' : 'สมาชิก + นศ.ป.เอก'}
+                    {advisee.phd_program && ` · ${advisee.phd_program}`}
+                  </p>
+                </Link>
               ))}
             </div>
           </div>

@@ -27,9 +27,16 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
               {r.first_name_th.charAt(0)}
             </div>
           )}
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${badge.color}`}>
-            {badge.label}
-          </span>
+          <div className="flex flex-col gap-1 items-end">
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${badge.color}`}>
+              {badge.label}
+            </span>
+            {r.is_pursuing_phd && r.unit_role !== 'phd_student' && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-pink-100 text-pink-700">
+                + นศ.ป.เอก
+              </span>
+            )}
+          </div>
         </div>
 
         <h3 className="font-semibold text-gray-900 text-lg">{fullNameTh}</h3>
