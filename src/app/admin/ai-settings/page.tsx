@@ -550,8 +550,8 @@ export default function AISettingsPage() {
                       : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <span>{result.success ? '✅' : '❌'}</span>
-                      <span className="break-all">{result.message || (result as any).error || 'ไม่มีรายละเอียดข้อผิดพลาด'}</span>
+                      <span className="flex-shrink-0">{result.success ? '✅' : '❌'}</span>
+                      <span className="break-words whitespace-pre-line">{result.message || (result as any).error || 'ไม่มีรายละเอียดข้อผิดพลาด'}</span>
                     </div>
                     {result.latency && (
                       <p className="text-[10px] mt-1 opacity-60">Latency: {result.latency}ms</p>

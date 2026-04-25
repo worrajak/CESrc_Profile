@@ -183,13 +183,38 @@ async function testOpenRouter(apiKey: string, model: string) {
 
     const errBody = await res.text();
     let errMsg = res.statusText;
+    let metadataRaw = '';
     try {
       const parsed = JSON.parse(errBody);
       errMsg = parsed.error?.message || parsed.message || errBody.substring(0, 200);
+      // Extract upstream error details from metadata.raw
+      if (parsed.error?.metadata?.raw) {
+        try {
+          const innerParsed = JSON.parse(parsed.error.metadata.raw);
+          metadataRaw = innerParsed.error?.message || innerParsed.message || parsed.error.metadata.raw.substring(0, 200);
+        } catch {
+          metadataRaw = String(parsed.error.metadata.raw).substring(0, 200);
+        }
+      }
     } catch {
       errMsg = errBody.substring(0, 200);
     }
-    return { success: false, message: `OpenRouter Error (${res.status}): ${errMsg}` };
+
+    // Provide actionable guidance for 429
+    let guidance = '';
+    if (res.status === 429) {
+      guidance = '\n💡 วิธีแก้: (1) ใช้ Gemini direct ฟรี quota สูงกว่า https://aistudio.google.com/app/apikey หรือ (2) เติม OpenRouter credit $1-10 จะปลดล็อค 1000 req/day ที่ https://openrouter.ai/credits หรือ (3) รอ 24 ชม. ให้ daily quota reset';
+    } else if (res.status === 404) {
+      guidance = '\n💡 Model ไม่มีให้ใช้ — กดปุ่ม "🔄 ดู Models ทั้งหมด" เพื่อดูรายการล่าสุด';
+    } else if (res.status === 401) {
+      guidance = '\n💡 API key ผิด/หมดอายุ — สมัครใหม่ที่ https://openrouter.ai/keys';
+    }
+
+    const fullMsg = metadataRaw
+      ? `OpenRouter Error (${res.status}): ${errMsg} — Upstream: ${metadataRaw}${guidance}`
+      : `OpenRouter Error (${res.status}): ${errMsg}${guidance}`;
+
+    return { success: false, message: fullMsg };
   } catch (e: any) {
     return { success: false, message: `Connection failed: ${e.message}` };
   }
