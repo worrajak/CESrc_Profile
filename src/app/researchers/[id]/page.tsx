@@ -218,24 +218,48 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
 
             {r.email && (
               <p className="text-gray-600 mt-3">
-                <span className="font-medium">Email:</span> {r.email}
+                <span className="font-medium">Email:</span>{' '}
+                <a href={`mailto:${r.email}`} className="text-blue-600 hover:underline">{r.email}</a>
               </p>
             )}
-            {r.orcid_id && (
-              <p className="text-gray-600">
-                <span className="font-medium">ORCID:</span>{' '}
-                <a href={`https://orcid.org/${r.orcid_id}`} target="_blank" className="text-blue-600 hover:underline">
-                  {r.orcid_id}
-                </a>
-              </p>
-            )}
-            {r.openalex_id && (
-              <p className="text-gray-600">
-                <span className="font-medium">OpenAlex:</span>{' '}
-                <a href={`https://openalex.org/${r.openalex_id}`} target="_blank" className="text-blue-600 hover:underline">
-                  {r.openalex_id}
-                </a>
-              </p>
+
+            {/* Identifier Badges */}
+            {(r.orcid_id || r.openalex_id || r.scopus_id || r.google_scholar) && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {r.orcid_id && (
+                  <a href={`https://orcid.org/${r.orcid_id}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs text-emerald-800 transition group">
+                    <svg viewBox="0 0 256 256" className="w-4 h-4">
+                      <path d="M256,128c0,70.7-57.3,128-128,128C57.3,256,0,198.7,0,128C0,57.3,57.3,0,128,0C198.7,0,256,57.3,256,128z" fill="#A6CE39"/>
+                      <path d="M86.3,186.2H70.9V79.1h15.4v107.1z M108.9,79.1h41.6c39.6,0,57,28.3,57,53.6c0,27.5-21.5,53.6-56.8,53.6h-41.8V79.1z M124.3,172.4h24.5c34.9,0,42.9-26.5,42.9-39.7c0-21.5-13.7-39.7-43.7-39.7h-23.7V172.4z M88.7,56.8c0,5.5-4.5,10.1-10.1,10.1c-5.6,0-10.1-4.6-10.1-10.1c0-5.6,4.5-10.1,10.1-10.1C84.2,46.7,88.7,51.3,88.7,56.8z" fill="#FFF"/>
+                    </svg>
+                    <span className="font-medium">ORCID</span>
+                    <span className="font-mono text-[10px] text-emerald-600 group-hover:text-emerald-800">{r.orcid_id}</span>
+                  </a>
+                )}
+                {r.openalex_id && (
+                  <a href={`https://openalex.org/${r.openalex_id}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs text-blue-800 transition group">
+                    <span className="font-bold text-sm">OA</span>
+                    <span className="font-medium">OpenAlex</span>
+                    <span className="font-mono text-[10px] text-blue-600 group-hover:text-blue-800">{r.openalex_id}</span>
+                  </a>
+                )}
+                {r.scopus_id && (
+                  <a href={`https://www.scopus.com/authid/detail.uri?authorId=${r.scopus_id}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg text-xs text-orange-800 transition">
+                    <span className="font-bold">S</span>
+                    <span className="font-medium">Scopus</span>
+                  </a>
+                )}
+                {r.google_scholar && (
+                  <a href={r.google_scholar} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg text-xs text-violet-800 transition">
+                    <span className="font-bold">G</span>
+                    <span className="font-medium">Scholar</span>
+                  </a>
+                )}
+              </div>
             )}
 
             {/* Citation Stats */}

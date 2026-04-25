@@ -5,6 +5,7 @@ const roleBadge: Record<string, { label: string; color: string }> = {
   advisor: { label: 'ที่ปรึกษา', color: 'bg-purple-100 text-purple-800' },
   head: { label: 'หัวหน้าหน่วยฯ', color: 'bg-yellow-100 text-yellow-800' },
   member: { label: 'สมาชิก', color: 'bg-blue-100 text-blue-800' },
+  phd_student: { label: 'นศ. ปริญญาเอก', color: 'bg-pink-100 text-pink-800' },
 };
 
 export default function ResearcherCard({ researcher }: { researcher: Researcher }) {
@@ -40,8 +41,35 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
           <p className="text-sm text-blue-600 mt-2">{r.position_th}</p>
         )}
 
+        {/* Identifiers Row: ORCID + OpenAlex */}
+        {(r.orcid_id || r.openalex_id) && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+            {r.orcid_id && (
+              <a href={`https://orcid.org/${r.orcid_id}`} target="_blank" rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition"
+                title={`ORCID: ${r.orcid_id}`}>
+                <svg viewBox="0 0 256 256" className="w-3 h-3" fill="#A6CE39">
+                  <path d="M256,128c0,70.7-57.3,128-128,128C57.3,256,0,198.7,0,128C0,57.3,57.3,0,128,0C198.7,0,256,57.3,256,128z" />
+                  <path d="M86.3,186.2H70.9V79.1h15.4v107.1z M108.9,79.1h41.6c39.6,0,57,28.3,57,53.6c0,27.5-21.5,53.6-56.8,53.6h-41.8V79.1z M124.3,172.4h24.5c34.9,0,42.9-26.5,42.9-39.7c0-21.5-13.7-39.7-43.7-39.7h-23.7V172.4z M88.7,56.8c0,5.5-4.5,10.1-10.1,10.1c-5.6,0-10.1-4.6-10.1-10.1c0-5.6,4.5-10.1,10.1-10.1C84.2,46.7,88.7,51.3,88.7,56.8z" fill="#FFF" />
+                </svg>
+                <span>ORCID</span>
+              </a>
+            )}
+            {r.openalex_id && (
+              <a href={`https://openalex.org/${r.openalex_id}`} target="_blank" rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded transition"
+                title={`OpenAlex: ${r.openalex_id}`}>
+                <span className="font-bold">OA</span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Citations Row */}
         {(r.cited_by_count > 0 || r.h_index > 0) && (
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 mt-2">
             {r.cited_by_count > 0 && (
               <div className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">

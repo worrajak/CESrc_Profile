@@ -16,7 +16,7 @@ export interface Researcher {
   title_en: string | null;
   first_name_en: string | null;
   last_name_en: string | null;
-  unit_role: 'head' | 'member' | 'advisor';
+  unit_role: 'head' | 'member' | 'advisor' | 'phd_student';
   position_th: string | null;
   position_en: string | null;
   department: string;

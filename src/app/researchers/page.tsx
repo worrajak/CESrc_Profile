@@ -20,6 +20,7 @@ export default async function ResearchersPage() {
     advisor: (researchers || []).filter((r: any) => r.unit_role === 'advisor'),
     head: (researchers || []).filter((r: any) => r.unit_role === 'head'),
     member: (researchers || []).filter((r: any) => r.unit_role === 'member'),
+    phd_student: (researchers || []).filter((r: any) => r.unit_role === 'phd_student'),
   };
 
   return (
@@ -52,12 +53,23 @@ export default async function ResearchersPage() {
       )}
 
       {grouped.member.length > 0 && (
-        <section>
+        <section className="mb-10">
           <h2 className="text-xl font-semibold text-blue-700 mb-4 pb-2 border-b border-blue-200">
             สมาชิก ({grouped.member.length} คน)
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {grouped.member.map((r: any) => <ResearcherCard key={r.id} researcher={r} />)}
+          </div>
+        </section>
+      )}
+
+      {grouped.phd_student.length > 0 && (
+        <section>
+          <h2 className="text-xl font-semibold text-pink-700 mb-4 pb-2 border-b border-pink-200">
+            นักศึกษาปริญญาเอก ({grouped.phd_student.length} คน)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {grouped.phd_student.map((r: any) => <ResearcherCard key={r.id} researcher={r} />)}
           </div>
         </section>
       )}
