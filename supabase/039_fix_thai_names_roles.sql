@@ -1,64 +1,14 @@
 -- ============================================================
--- 039: Fix Thai names + Add PhD student role + update roles
--- แก้ไขชื่อไทยให้ถูกต้อง + เพิ่ม unit_role 'phd_student' + กำหนดสถานะ
+-- 039: Add 'phd_student' enum value (PART 1 of 2)
+-- !!! IMPORTANT: ต้องรันไฟล์นี้ก่อน แล้วรอให้ commit เสร็จ
+--     จากนั้นค่อยรัน 039b_update_thai_names_roles.sql
+-- เพราะ PostgreSQL ไม่อนุญาตให้ใช้ enum value ใหม่ใน transaction
+-- เดียวกับที่เพิ่มมัน
 -- ============================================================
 
--- 1) Add 'phd_student' to researcher_role enum
-DO $$ BEGIN
-  ALTER TYPE researcher_role ADD VALUE IF NOT EXISTS 'phd_student';
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- 2) Update Thai names + roles for the 5 new researchers
-
--- เสถียร ธัญญศรีรัตน์ (ที่ปรึกษา)
-UPDATE researchers SET
-  title_th = 'รศ.ดร.',
-  first_name_th = 'เสถียร',
-  last_name_th = 'ธัญญศรีรัตน์',
-  unit_role = 'advisor',
-  position_th = 'ที่ปรึกษาหน่วยวิจัยระบบพลังงานสะอาด',
-  position_en = 'Research Unit Advisor'
-WHERE id = 'a0000001-0000-0000-0000-000000000019';
-
--- ธเนศ ภู่กัน (นักศึกษาปริญญาเอก)
-UPDATE researchers SET
-  first_name_th = 'ธเนศ',
-  last_name_th = 'ภู่กัน',
-  unit_role = 'phd_student',
-  position_th = 'นักศึกษาปริญญาเอก',
-  position_en = 'PhD Student'
-WHERE id = 'a0000001-0000-0000-0000-000000000015';
-
--- วุฒิไกร ธรรมวัน (นักศึกษาปริญญาเอก)
-UPDATE researchers SET
-  first_name_th = 'วุฒิไกร',
-  last_name_th = 'ธรรมวัน',
-  unit_role = 'phd_student',
-  position_th = 'นักศึกษาปริญญาเอก',
-  position_en = 'PhD Student'
-WHERE id = 'a0000001-0000-0000-0000-000000000016';
-
--- กิตตินัน สระสวย (นักศึกษาปริญญาเอก)
-UPDATE researchers SET
-  first_name_th = 'กิตตินัน',
-  last_name_th = 'สระสวย',
-  unit_role = 'phd_student',
-  position_th = 'นักศึกษาปริญญาเอก',
-  position_en = 'PhD Student'
-WHERE id = 'a0000001-0000-0000-0000-000000000017';
-
--- ณรงค์ นันทกุศล (นักศึกษาปริญญาเอก)
-UPDATE researchers SET
-  first_name_th = 'ณรงค์',
-  last_name_th = 'นันทกุศล',
-  unit_role = 'phd_student',
-  position_th = 'นักศึกษาปริญญาเอก',
-  position_en = 'PhD Student'
-WHERE id = 'a0000001-0000-0000-0000-000000000018';
+-- Add 'phd_student' to researcher_role enum
+ALTER TYPE researcher_role ADD VALUE IF NOT EXISTS 'phd_student';
 
 -- ============================================================
--- Summary:
---   1 advisor: เสถียร ธัญญศรีรัตน์
---   4 PhD students: ธเนศ, วุฒิไกร, กิตตินัน, ณรงค์
+-- หลังรันสำเร็จ: รัน 039b_update_thai_names_roles.sql ต่อ
 -- ============================================================
