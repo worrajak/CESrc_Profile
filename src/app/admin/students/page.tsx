@@ -106,11 +106,64 @@ export default function AdminStudentsPage() {
 
   const fetchData = useCallback(async () => {
     const supabase = await getSupabase();
-    const [studentsRes, researchersRes] = await Promise.all([
-      supabase.from('students').select('*').order('created_at', { ascending: false }),
-      supabase.from('researchers').select('id, title_th, first_name_th, last_name_th').eq('is_active', true),
-    ]);
-    setStudents(studentsRes.data || []);
+
+    // Fetch students from students table
+    const studentsPromise = supabase
+      .from('students')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    // Fetch researchers (for advisor dropdowns)
+    const researchersPromise = supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th')
+      .eq('is_active', true);
+
+    // Fetch PhD students from researchers table
+    // (those with unit_role='phd_student' OR is_pursuing_phd=true)
+    let phdResearchers: any[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('researchers')
+        .select('id, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, avatar_url, unit_role, expertise, is_pursuing_phd, phd_advisor_id, phd_program, phd_university, phd_start_year, orcid_id, openalex_id, cited_by_count, h_index')
+        .eq('is_active', true)
+        .or('unit_role.eq.phd_student,is_pursuing_phd.eq.true');
+      if (!error) phdResearchers = data || [];
+    } catch {
+      // Fallback if migration 040 not run
+      const { data } = await supabase
+        .from('researchers')
+        .select('id, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, avatar_url, unit_role, expertise')
+        .eq('is_active', true)
+        .eq('unit_role', 'phd_student');
+      phdResearchers = data || [];
+    }
+
+    const [studentsRes, researchersRes] = await Promise.all([studentsPromise, researchersPromise]);
+
+    // Merge: convert phdResearchers to student-like records with _source flag
+    const phdAsStudents = phdResearchers.map((r: any) => ({
+      id: r.id,
+      _source: 'researcher',
+      _researcher: r,
+      student_code: null,
+      title_th: r.title_th,
+      first_name_th: r.first_name_th,
+      last_name_th: r.last_name_th,
+      title_en: r.title_en,
+      first_name_en: r.first_name_en,
+      last_name_en: r.last_name_en,
+      degree_level: 'doctoral',
+      program_th: r.phd_program || 'ปริญญาเอก',
+      enrollment_year: r.phd_start_year || null,
+      graduation_year: null,
+      status: 'active',
+      email: r.email,
+      avatar_url: r.avatar_url,
+      _is_member_phd: r.unit_role !== 'phd_student',
+    }));
+
+    setStudents([...phdAsStudents, ...(studentsRes.data || [])]);
     setResearchers(researchersRes.data || []);
   }, [getSupabase]);
 
@@ -357,6 +410,18 @@ export default function AdminStudentsPage() {
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('สำเร็จ') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
           {message}
+        </div>
+      )}
+
+      {/* Info banner: explain data sources */}
+      {students.some((s: any) => s._source === 'researcher') && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800">
+          <p>
+            💡 <strong>หมายเหตุ:</strong> นักศึกษาที่มี badge <span className="bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded">🎓/🔬 นักวิจัย-นศ.ป.เอก</span>
+            {' '}คือนักวิจัยในกลุ่มที่กำลังศึกษา ป.เอก — แก้ไขข้อมูลที่หน้า{' '}
+            <Link href="/admin" className="text-blue-600 underline">โปรไฟล์นักวิจัย</Link>
+            {' '}(ผ่าน Supabase Dashboard) ส่วนนักศึกษาทั่วไปจัดการได้จากหน้านี้
+          </p>
         </div>
       )}
 
@@ -609,38 +674,57 @@ export default function AdminStudentsPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filtered.map((s: any) => (
-              <tr key={s.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <p className="font-medium">{s.title_th}{s.first_name_th} {s.last_name_th}</p>
-                  {s.first_name_en && (
-                    <p className="text-xs text-gray-500">{s.title_en} {s.first_name_en} {s.last_name_en}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-600">{s.student_code || '-'}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    s.degree_level === 'doctoral' ? 'bg-red-100 text-red-700' :
-                    s.degree_level === 'master' ? 'bg-purple-100 text-purple-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>{degreeLabel[s.degree_level]}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    s.status === 'active' ? 'bg-green-100 text-green-700' :
-                    s.status === 'graduated' ? 'bg-gray-100 text-gray-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>{statusLabel[s.status]}</span>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{s.enrollment_year || '-'}</td>
-                <td className="px-4 py-3 text-center">
-                  <button onClick={() => handleEdit(s)}
-                    className="text-blue-600 hover:text-blue-800 mr-3 text-xs">แก้ไข</button>
-                  <button onClick={() => handleDelete(s.id, `${s.first_name_th} ${s.last_name_th}`)}
-                    className="text-red-600 hover:text-red-800 text-xs">ลบ</button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((s: any) => {
+              const isResearcher = s._source === 'researcher';
+              return (
+                <tr key={s.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{s.title_th}{s.first_name_th} {s.last_name_th}</p>
+                      {isResearcher && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 font-medium">
+                          {s._is_member_phd ? '🔬 นักวิจัย+นศ.ป.เอก' : '🎓 นักวิจัย-นศ.ป.เอก'}
+                        </span>
+                      )}
+                    </div>
+                    {s.first_name_en && (
+                      <p className="text-xs text-gray-500">{s.title_en} {s.first_name_en} {s.last_name_en}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{s.student_code || (isResearcher ? '(researcher)' : '-')}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      s.degree_level === 'doctoral' ? 'bg-red-100 text-red-700' :
+                      s.degree_level === 'master' ? 'bg-purple-100 text-purple-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>{degreeLabel[s.degree_level]}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      s.status === 'active' ? 'bg-green-100 text-green-700' :
+                      s.status === 'graduated' ? 'bg-gray-100 text-gray-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>{statusLabel[s.status]}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{s.enrollment_year || '-'}</td>
+                  <td className="px-4 py-3 text-center">
+                    {isResearcher ? (
+                      <Link href={`/researchers/${s.id}`} target="_blank"
+                        className="text-purple-600 hover:text-purple-800 text-xs mr-3">
+                        ดูโปรไฟล์ →
+                      </Link>
+                    ) : (
+                      <>
+                        <button onClick={() => handleEdit(s)}
+                          className="text-blue-600 hover:text-blue-800 mr-3 text-xs">แก้ไข</button>
+                        <button onClick={() => handleDelete(s.id, `${s.first_name_th} ${s.last_name_th}`)}
+                          className="text-red-600 hover:text-red-800 text-xs">ลบ</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && (
