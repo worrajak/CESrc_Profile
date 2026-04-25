@@ -94,12 +94,23 @@ export default function AdminGrantsPage() {
   const handleAIParse = async () => {
     if (!aiFile) return;
 
-    // Client-side size validation (Vercel limit ~4.5MB)
-    const MAX_SIZE = 4 * 1024 * 1024; // 4MB safe limit
+    // Size validation:
+    // - Vercel Pro: 50MB body limit
+    // - AI providers: Claude 5MB, GPT-4 20MB, Gemini 20MB, OpenRouter varies
+    // → Safe limit 25MB (server) but warn at 5MB (AI provider)
+    const MAX_SIZE = 25 * 1024 * 1024; // 25MB hard limit
+    const AI_WARN_SIZE = 5 * 1024 * 1024; // 5MB AI provider warning
+
     if (aiFile.size > MAX_SIZE) {
       const sizeMB = (aiFile.size / 1024 / 1024).toFixed(1);
-      setAiError(`ไฟล์ใหญ่เกินไป (${sizeMB}MB) — Vercel จำกัด 4.5MB\n\n💡 วิธีแก้:\n1. Compress PDF ที่ https://smallpdf.com/compress-pdf หรือ ilovepdf.com\n2. แยกหน้าที่สำคัญ (ปกหน้า + เนื้อหา) เหลือ ≤4MB\n3. ส่งออกเป็น PDF แบบ "ลดขนาด" จาก Word/Excel`);
+      setAiError(`ไฟล์ใหญ่เกินไป (${sizeMB}MB) — สูงสุด 25MB\n\n💡 วิธีแก้:\n1. Compress PDF ที่ https://smallpdf.com/compress-pdf หรือ ilovepdf.com\n2. แยกหน้าที่สำคัญ (ปกหน้า + เนื้อหา + งบประมาณ + Milestones)\n3. ส่งออกเป็น PDF แบบ "ลดขนาด" จาก Word`);
       return;
+    }
+
+    if (aiFile.size > AI_WARN_SIZE) {
+      const sizeMB = (aiFile.size / 1024 / 1024).toFixed(1);
+      const proceed = confirm(`⚠️ ไฟล์ ${sizeMB}MB อาจเกิน limit ของ AI provider\n\n- Claude: max 5MB\n- GPT-4 / Gemini: max ~20MB\n- DeepSeek (OpenRouter): max ~20MB\n\nต้องการลองส่งหรือไม่?`);
+      if (!proceed) return;
     }
 
     setAiParsing(true);
@@ -469,9 +480,9 @@ export default function AdminGrantsPage() {
                   อัปโหลดเอกสารข้อเสนอโครงการ หรือสัญญารับทุน → AI จะกรอกข้อมูลให้อัตโนมัติ + สร้าง Milestones / แผน S-Curve
                 </p>
                 <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  ⚠️ ขนาดไฟล์สูงสุด <strong>4MB</strong> (Vercel limit) — ถ้าใหญ่กว่า ให้ compress ก่อนที่{' '}
-                  <a href="https://smallpdf.com/compress-pdf" target="_blank" rel="noopener noreferrer" className="underline">smallpdf.com</a> หรือ{' '}
-                  <a href="https://ilovepdf.com/compress_pdf" target="_blank" rel="noopener noreferrer" className="underline">ilovepdf.com</a>
+                  ⚠️ ขนาดไฟล์: ≤<strong>5MB</strong> ดีที่สุด (AI ทุกตัวรองรับ) · ≤<strong>25MB</strong> สูงสุด (Vercel Pro) ·
+                  ถ้าใหญ่กว่า compress ที่{' '}
+                  <a href="https://smallpdf.com/compress-pdf" target="_blank" rel="noopener noreferrer" className="underline">smallpdf.com</a>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-2">
@@ -479,9 +490,15 @@ export default function AdminGrantsPage() {
                       onChange={(e) => setAiFile(e.target.files?.[0] || null)}
                       className="w-full border border-purple-200 bg-white rounded-lg p-2 text-sm" />
                     {aiFile && (
-                      <p className={`text-[10px] mt-1 ${aiFile.size > 4 * 1024 * 1024 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                      <p className={`text-[10px] mt-1 ${
+                        aiFile.size > 25 * 1024 * 1024 ? 'text-red-600 font-semibold' :
+                        aiFile.size > 5 * 1024 * 1024 ? 'text-amber-600' :
+                        'text-emerald-600'
+                      }`}>
                         📄 {aiFile.name} · {(aiFile.size / 1024 / 1024).toFixed(2)} MB
-                        {aiFile.size > 4 * 1024 * 1024 && ' ⚠️ ใหญ่เกินไป!'}
+                        {aiFile.size > 25 * 1024 * 1024 ? ' ⚠️ ใหญ่เกินไป!' :
+                          aiFile.size > 5 * 1024 * 1024 ? ' ⚠️ อาจเกิน limit AI' :
+                          ' ✅ OK'}
                       </p>
                     )}
                   </div>
