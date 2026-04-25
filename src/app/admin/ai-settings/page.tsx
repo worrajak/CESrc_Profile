@@ -125,6 +125,9 @@ export default function AISettingsPage() {
   const [editEndpoints, setEditEndpoints] = useState<Record<string, string>>({});
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
+  // Show legacy providers (Claude/Gemini/OpenAI/Local direct)
+  const [showLegacy, setShowLegacy] = useState(false);
+
   // OpenRouter models browser
   const [showOrModels, setShowOrModels] = useState(false);
   const [orModels, setOrModels] = useState<{ free: any[]; paid: any[]; total: number; free_count: number; paid_count: number } | null>(null);
@@ -326,19 +329,22 @@ export default function AISettingsPage() {
       </div>
 
       {/* Info Box */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8">
-        <h3 className="font-medium text-amber-800 text-sm mb-1">คำแนะนำ</h3>
-        <ul className="text-xs text-amber-700 space-y-1">
-          <li>- ต้องเปิดใช้อย่างน้อย 1 provider เพื่อให้ระบบ AI ทำงาน</li>
-          <li>- Provider ที่ตั้งเป็น &quot;ค่าเริ่มต้น&quot; จะถูกใช้เมื่อผู้ใช้ไม่ได้เลือก</li>
-          <li>- API Key ถูกเก็บในฐานข้อมูล (แนะนำใช้ RLS ป้องกันการเข้าถึง)</li>
-          <li>- Local AI (Ollama) ไม่ต้องใช้ API Key แต่ต้องรัน Ollama บนเครื่อง</li>
+      <div className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-xl p-4 mb-8">
+        <h3 className="font-medium text-orange-900 text-sm mb-2 flex items-center gap-2">
+          <span>🌐</span>
+          <span>ระบบใช้ OpenRouter เป็น Gateway ไปยัง AI ทุกตัว</span>
+        </h3>
+        <ul className="text-xs text-orange-800 space-y-1">
+          <li>✨ <strong>1 API Key</strong> ใช้ได้ทั้ง Claude, GPT, Gemini, Llama, DeepSeek, Qwen, Mistral ฯลฯ</li>
+          <li>🆓 มีรุ่น <strong>ฟรี</strong> ให้ใช้ + รุ่นเสียเงินราคาถูก (เริ่มต้น $0.10 per M tokens)</li>
+          <li>🔄 Auto-fallback หาก provider หลักล่ม</li>
+          <li>🎯 เลือก model ได้ผ่านปุ่ม &quot;🔄 ดู Models ทั้งหมด&quot;</li>
         </ul>
       </div>
 
-      {/* Provider Cards */}
+      {/* Provider Cards — แสดงเฉพาะ OpenRouter (ใช้เป็น gateway สำหรับ AI ทุกตัว) */}
       <div className="space-y-6">
-        {configs.map((config) => {
+        {configs.filter((c) => showLegacy || c.provider === 'openrouter').map((config) => {
           const info = PROVIDER_INFO[config.provider] || PROVIDER_INFO.local;
           const isEditing = !!editKeys[config.provider];
           const result = testResult[config.provider];
@@ -595,10 +601,26 @@ export default function AISettingsPage() {
         })}
       </div>
 
+      {/* Toggle legacy providers */}
+      <div className="mt-6 text-center">
+        <button
+          onClick={() => setShowLegacy(!showLegacy)}
+          className="text-xs text-gray-500 hover:text-gray-700 underline"
+        >
+          {showLegacy
+            ? '🔼 ซ่อน Legacy providers (Claude/Gemini/OpenAI/Local direct)'
+            : '⚙️ แสดง Legacy providers (สำหรับใช้ API key ตรงโดยไม่ผ่าน OpenRouter)'}
+        </button>
+      </div>
+
       {/* Summary Footer */}
-      <div className="mt-8 bg-gray-50 rounded-xl border p-4 text-center">
+      <div className="mt-4 bg-gray-50 rounded-xl border p-4 text-center">
         <p className="text-sm text-gray-500">
-          เปิดใช้งาน: {configs.filter(c => c.is_active).length}/{configs.length} providers
+          {showLegacy ? (
+            <>เปิดใช้งาน: {configs.filter(c => c.is_active).length}/{configs.length} providers</>
+          ) : (
+            <>OpenRouter: {configs.find(c => c.provider === 'openrouter')?.is_active ? '🟢 Active' : '🔴 Inactive'}</>
+          )}
           {configs.find(c => c.is_default) && (
             <> · ค่าเริ่มต้น: <span className="font-bold text-indigo-600">{configs.find(c => c.is_default)?.display_name}</span></>
           )}
