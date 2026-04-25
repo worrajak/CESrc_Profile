@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 /**
  * AI Config API — CRUD ตั้งค่า AI Provider + API Key ผ่านหน้า Admin
- * GET  → ดึง config ทั้งหมด (ซ่อน API Key บางส่วน)
+ * GET  → ดึง config ทั้งหมด (auto-seed if empty)
  * POST → บันทึก/อัพเดท config
  */
 
@@ -14,15 +14,109 @@ function maskApiKey(key: string | null): string {
   return key.substring(0, 6) + '****' + key.substring(key.length - 4);
 }
 
+// Default providers — auto-inserted if table is empty
+const DEFAULT_PROVIDERS = [
+  {
+    provider: 'claude',
+    model_name: 'claude-sonnet-4-5-20250929',
+    display_name: 'Anthropic Claude',
+    is_active: false,
+    is_default: false,
+    capabilities: ['document_parse', 'course_parse', 'evaluation', 'grant_parse', 'vision'],
+    models: [
+      'claude-sonnet-4-7-20251015',
+      'claude-sonnet-4-6-20250812',
+      'claude-sonnet-4-5-20250929',
+      'claude-opus-4-1-20250805',
+      'claude-opus-4-20250514',
+      'claude-haiku-4-5-20251029',
+      'claude-haiku-3-5-20241022',
+    ],
+    api_endpoint: 'https://api.anthropic.com',
+  },
+  {
+    provider: 'gemini',
+    model_name: 'gemini-2.5-flash',
+    display_name: 'Google Gemini',
+    is_active: false,
+    is_default: false,
+    capabilities: ['document_parse', 'course_parse', 'grant_parse', 'vision', 'free_tier'],
+    models: [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-pro',
+      'gemini-1.5-flash',
+    ],
+    api_endpoint: 'https://generativelanguage.googleapis.com',
+  },
+  {
+    provider: 'openai',
+    model_name: 'gpt-4.1',
+    display_name: 'OpenAI GPT',
+    is_active: false,
+    is_default: false,
+    capabilities: ['document_parse', 'course_parse', 'evaluation', 'grant_parse', 'vision'],
+    models: ['gpt-5', 'gpt-5-mini', 'gpt-4.5', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o', 'o3', 'o4-mini', 'o3-mini'],
+    api_endpoint: 'https://api.openai.com',
+  },
+  {
+    provider: 'local',
+    model_name: 'llama3.3:70b',
+    display_name: 'Local AI (Ollama)',
+    is_active: false,
+    is_default: false,
+    capabilities: ['document_parse', 'course_parse', 'grant_parse', 'free_local'],
+    models: ['llama3.3:70b', 'llama3.2:3b', 'llama3.1:8b', 'qwen2.5:14b', 'qwen2.5-coder:14b', 'deepseek-r1:32b', 'deepseek-v3:67b', 'gemma2:9b', 'mistral:7b', 'mixtral:8x7b'],
+    api_endpoint: 'http://localhost:11434',
+  },
+];
+
+async function autoSeedIfEmpty(): Promise<{ seeded: boolean; error?: string }> {
+  // Try to insert defaults — ON CONFLICT DO NOTHING means safe to call multiple times
+  const { error } = await supabase
+    .from('ai_config')
+    .upsert(DEFAULT_PROVIDERS, { onConflict: 'provider', ignoreDuplicates: true });
+
+  if (error) {
+    return { seeded: false, error: error.message };
+  }
+  return { seeded: true };
+}
+
 export async function GET() {
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('ai_config')
       .select('*')
       .order('provider');
 
     if (error) {
+      // Table might not exist
+      if (error.message?.toLowerCase().includes('does not exist') || error.code === '42P01') {
+        return NextResponse.json({
+          error: 'ตาราง ai_config ยังไม่ถูกสร้าง — กรุณารัน SQL: CREATE TABLE ai_config (...)',
+          missing_table: true,
+        }, { status: 500 });
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Auto-seed if empty
+    if (!data || data.length === 0) {
+      const seedResult = await autoSeedIfEmpty();
+      if (seedResult.error) {
+        return NextResponse.json({
+          error: 'Auto-seed failed: ' + seedResult.error,
+          configs: [],
+          hint: 'ตรวจสอบ RLS policies ของ ai_config — admin/anon ต้องมีสิทธิ์ INSERT',
+        }, { status: 500 });
+      }
+      // Re-fetch after seeding
+      const { data: refetched } = await supabase.from('ai_config').select('*').order('provider');
+      data = refetched || [];
     }
 
     // Mask API keys for security
@@ -30,12 +124,12 @@ export async function GET() {
       ...c,
       api_key_masked: maskApiKey(c.api_key),
       has_api_key: !!c.api_key,
-      api_key: undefined, // ไม่ส่ง key จริงกลับ
+      api_key: undefined,
     }));
 
     return NextResponse.json({ configs });
-  } catch (err) {
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }
 
