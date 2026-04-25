@@ -93,6 +93,15 @@ export default function AdminGrantsPage() {
 
   const handleAIParse = async () => {
     if (!aiFile) return;
+
+    // Client-side size validation (Vercel limit ~4.5MB)
+    const MAX_SIZE = 4 * 1024 * 1024; // 4MB safe limit
+    if (aiFile.size > MAX_SIZE) {
+      const sizeMB = (aiFile.size / 1024 / 1024).toFixed(1);
+      setAiError(`ไฟล์ใหญ่เกินไป (${sizeMB}MB) — Vercel จำกัด 4.5MB\n\n💡 วิธีแก้:\n1. Compress PDF ที่ https://smallpdf.com/compress-pdf หรือ ilovepdf.com\n2. แยกหน้าที่สำคัญ (ปกหน้า + เนื้อหา) เหลือ ≤4MB\n3. ส่งออกเป็น PDF แบบ "ลดขนาด" จาก Word/Excel`);
+      return;
+    }
+
     setAiParsing(true);
     setAiError('');
     setAiResult(null);
@@ -104,7 +113,25 @@ export default function AdminGrantsPage() {
 
     try {
       const res = await fetch('/api/grants/parse-contract', { method: 'POST', body: formData });
-      const data = await res.json();
+
+      // Defensive parsing: handle non-JSON responses (e.g., 413 Request Entity Too Large)
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Server returned non-JSON (HTML error page)
+        if (res.status === 413 || text.includes('Request Entity') || text.includes('Payload Too Large')) {
+          setAiError(`ไฟล์ใหญ่เกินไป (${(aiFile.size / 1024 / 1024).toFixed(1)}MB) — server reject\n💡 ลด PDF ให้ ≤4MB ก่อน upload`);
+        } else if (res.status >= 500) {
+          setAiError(`Server error ${res.status}: ${text.substring(0, 200)}`);
+        } else {
+          setAiError(`Response ไม่ใช่ JSON (status ${res.status}): ${text.substring(0, 150)}`);
+        }
+        setAiParsing(false);
+        return;
+      }
+
       if (data.error) {
         setAiError(data.error);
       } else {
@@ -441,11 +468,22 @@ export default function AdminGrantsPage() {
                 <p className="text-xs text-purple-600">
                   อัปโหลดเอกสารข้อเสนอโครงการ หรือสัญญารับทุน → AI จะกรอกข้อมูลให้อัตโนมัติ + สร้าง Milestones / แผน S-Curve
                 </p>
+                <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  ⚠️ ขนาดไฟล์สูงสุด <strong>4MB</strong> (Vercel limit) — ถ้าใหญ่กว่า ให้ compress ก่อนที่{' '}
+                  <a href="https://smallpdf.com/compress-pdf" target="_blank" rel="noopener noreferrer" className="underline">smallpdf.com</a> หรือ{' '}
+                  <a href="https://ilovepdf.com/compress_pdf" target="_blank" rel="noopener noreferrer" className="underline">ilovepdf.com</a>
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-2">
                     <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
                       onChange={(e) => setAiFile(e.target.files?.[0] || null)}
                       className="w-full border border-purple-200 bg-white rounded-lg p-2 text-sm" />
+                    {aiFile && (
+                      <p className={`text-[10px] mt-1 ${aiFile.size > 4 * 1024 * 1024 ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                        📄 {aiFile.name} · {(aiFile.size / 1024 / 1024).toFixed(2)} MB
+                        {aiFile.size > 4 * 1024 * 1024 && ' ⚠️ ใหญ่เกินไป!'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <select className="flex-1 border border-purple-200 bg-white rounded-lg p-2 text-xs"
@@ -470,7 +508,7 @@ export default function AdminGrantsPage() {
                 </button>
 
                 {aiError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">{aiError}</div>
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm whitespace-pre-line break-words">{aiError}</div>
                 )}
 
                 {aiResult?.data && (
