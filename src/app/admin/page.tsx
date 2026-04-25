@@ -112,6 +112,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัย</p>
         </Link>
         <Link
+          href="/admin/researchers"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-700 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">จัดการนักวิจัย</h3>
+          <p className="text-sm text-gray-500">เพิ่ม/แก้ไขโปรไฟล์ บทบาท ORCID</p>
+        </Link>
+        <Link
           href="/admin/students"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-indigo-500 block"
         >
