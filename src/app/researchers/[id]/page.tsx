@@ -89,21 +89,27 @@ async function getResearcher(id: string) {
     .eq('advisor_id', id);
 
   // Fetch PhD advisor (if researcher is pursuing PhD)
-  let phdAdvisor = null;
-  if (researcher.phd_advisor_id) {
-    const { data } = await supabase
-      .from('researchers')
-      .select('id, title_th, first_name_th, last_name_th')
-      .eq('id', researcher.phd_advisor_id)
-      .single();
-    phdAdvisor = data;
-  }
+  // Wrap in try/catch — gracefully degrade if migration 040 not yet run
+  let phdAdvisor: any = null;
+  let phdAdvisees: any[] = [];
+  try {
+    if (researcher.phd_advisor_id) {
+      const { data, error } = await supabase
+        .from('researchers')
+        .select('id, title_th, first_name_th, last_name_th')
+        .eq('id', researcher.phd_advisor_id)
+        .single();
+      if (!error) phdAdvisor = data;
+    }
 
-  // Fetch PhD students that this researcher advises
-  const { data: phdAdvisees } = await supabase
-    .from('researchers')
-    .select('id, title_th, first_name_th, last_name_th, unit_role, phd_program, phd_start_year')
-    .eq('phd_advisor_id', id);
+    const { data: advisees, error: adviseesError } = await supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th, unit_role')
+      .eq('phd_advisor_id', id);
+    if (!adviseesError) phdAdvisees = advisees || [];
+  } catch {
+    // Column doesn't exist yet (migration 040 not run) — silently skip
+  }
 
   return {
     researcher,
@@ -112,7 +118,7 @@ async function getResearcher(id: string) {
     thesisStudents: thesisStudents || [],
     projectTopics: projectTopics || [],
     phdAdvisor,
-    phdAdvisees: phdAdvisees || [],
+    phdAdvisees,
   };
 }
 
