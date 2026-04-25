@@ -48,11 +48,14 @@ export async function POST(request: NextRequest) {
       case 'openai':
         testResult = await testOpenAI(apiKey, config.model_name);
         break;
+      case 'openrouter':
+        testResult = await testOpenRouter(apiKey, config.model_name);
+        break;
       case 'local':
         testResult = await testLocal(config.api_endpoint || 'http://localhost:11434', config.model_name);
         break;
       default:
-        testResult = { success: false, message: 'Unknown provider' };
+        testResult = { success: false, message: `Unknown provider: ${provider}` };
     }
 
     testResult.latency = Date.now() - startTime;
@@ -68,6 +71,7 @@ function getEnvKey(provider: string): string {
     claude: 'CLAUDE_API_KEY',
     gemini: 'GEMINI_API_KEY',
     openai: 'OPENAI_API_KEY',
+    openrouter: 'OPENROUTER_API_KEY',
     local: 'LOCAL_AI_ENDPOINT',
   };
   return process.env[envMap[provider] || ''] || '';
@@ -149,6 +153,43 @@ async function testOpenAI(apiKey: string, model: string) {
 
     const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
     return { success: false, message: `OpenAI Error: ${err.error?.message || res.statusText}` };
+  } catch (e: any) {
+    return { success: false, message: `Connection failed: ${e.message}` };
+  }
+}
+
+async function testOpenRouter(apiKey: string, model: string) {
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://ce-src-profile.vercel.app',
+        'X-Title': 'CESRU Researcher Profile',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 32,
+        messages: [{ role: 'user', content: 'Reply with just "OK"' }],
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content || 'OK';
+      return { success: true, message: `เชื่อมต่อ OpenRouter (${model}) สำเร็จ — ${text}` };
+    }
+
+    const errBody = await res.text();
+    let errMsg = res.statusText;
+    try {
+      const parsed = JSON.parse(errBody);
+      errMsg = parsed.error?.message || parsed.message || errBody.substring(0, 200);
+    } catch {
+      errMsg = errBody.substring(0, 200);
+    }
+    return { success: false, message: `OpenRouter Error (${res.status}): ${errMsg}` };
   } catch (e: any) {
     return { success: false, message: `Connection failed: ${e.message}` };
   }

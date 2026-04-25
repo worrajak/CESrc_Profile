@@ -486,7 +486,7 @@ export default function AISettingsPage() {
                   }`}>
                     <div className="flex items-center gap-2">
                       <span>{result.success ? '✅' : '❌'}</span>
-                      <span>{result.message}</span>
+                      <span className="break-all">{result.message || (result as any).error || 'ไม่มีรายละเอียดข้อผิดพลาด'}</span>
                     </div>
                     {result.latency && (
                       <p className="text-[10px] mt-1 opacity-60">Latency: {result.latency}ms</p>
