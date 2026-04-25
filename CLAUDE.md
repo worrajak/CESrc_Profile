@@ -152,12 +152,34 @@ user_id UUID nullable
 
 ## Pattern สำคัญ
 
+### 🤖 AI Document Parsing (reusable!)
+**ใช้** `src/lib/ai-document-parser.ts` แทนการเขียน AI prompt ซ้ำๆ:
+
+```typescript
+import { parseDocument, TEMPLATES, parseNewsTags, parseCourse, parseGrant } from '@/lib/ai-document-parser';
+
+// Pre-built template
+const result = await parseNewsTags(articleText);
+if (result.success) console.log(result.data.tags, result.data.sdg_goals);
+
+// Custom template
+await parseDocument({
+  template: { name: 'invoice', description: '...', schema: { ... } },
+  input: { file: pdfFile },
+});
+```
+
+มี templates: news_tags, publication_metadata, publication_classify, course_curriculum, grant_contract, travel_approval, generic_classification, generic_extract
+
+ดู `docs/AI_DOCUMENT_PARSING.md` + `.claude/skills/ai-document-parsing.md`
+
 ### Adding a new feature
 1. Create SQL migration in `supabase/NNN_feature_name.sql`
 2. Create API route in `src/app/api/.../route.ts`
-3. Create UI in `src/app/(...)/page.tsx`
-4. Add entry to admin dashboard if applicable
-5. Update CLAUDE.md + docs
+3. **ถ้าต้องใช้ AI**: import จาก `ai-document-parser` (ไม่ต้องเขียน prompt เอง)
+4. Create UI in `src/app/(...)/page.tsx`
+5. Add entry to admin dashboard if applicable
+6. Update CLAUDE.md + docs
 
 ### RLS Pattern
 - Most tables have RLS enabled
