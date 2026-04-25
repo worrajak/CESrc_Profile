@@ -125,6 +125,59 @@ export default function AISettingsPage() {
   const [editEndpoints, setEditEndpoints] = useState<Record<string, string>>({});
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
+  // OpenRouter models browser
+  const [showOrModels, setShowOrModels] = useState(false);
+  const [orModels, setOrModels] = useState<{ free: any[]; paid: any[]; total: number; free_count: number; paid_count: number } | null>(null);
+  const [orLoading, setOrLoading] = useState(false);
+  const [orFilter, setOrFilter] = useState<'all' | 'free' | 'paid'>('free');
+  const [orSearch, setOrSearch] = useState('');
+  const [orSelected, setOrSelected] = useState<Set<string>>(new Set());
+
+  const fetchOpenRouterModels = async () => {
+    setOrLoading(true);
+    try {
+      const res = await fetch('/api/admin/openrouter-models');
+      if (res.ok) {
+        const data = await res.json();
+        setOrModels(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setOrLoading(false);
+  };
+
+  const handleOpenOrModels = async () => {
+    setShowOrModels(true);
+    if (!orModels) await fetchOpenRouterModels();
+  };
+
+  const handleSaveOrModels = async () => {
+    if (orSelected.size === 0) return;
+    try {
+      const res = await fetch('/api/admin/openrouter-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models: Array.from(orSelected), replace: true }),
+      });
+      if (res.ok) {
+        setShowOrModels(false);
+        setOrSelected(new Set());
+        fetchConfigs();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleOrModel = (id: string) => {
+    setOrSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   useEffect(() => {
     fetchConfigs();
   }, []);
@@ -413,6 +466,18 @@ export default function AISettingsPage() {
                       className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500"
                     />
 
+                    {/* OpenRouter: special button to browse all models */}
+                    {config.provider === 'openrouter' && (
+                      <button
+                        type="button"
+                        onClick={handleOpenOrModels}
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:opacity-90 transition shadow-sm"
+                      >
+                        <span>🔄</span>
+                        <span>ดู Models ทั้งหมดจาก OpenRouter (Live)</span>
+                      </button>
+                    )}
+
                     {/* Quick pick: Latest models from PROVIDER_INFO */}
                     {info.latestModels && info.latestModels.length > 0 && (
                       <div>
@@ -539,6 +604,136 @@ export default function AISettingsPage() {
           )}
         </p>
       </div>
+
+      {/* OpenRouter Models Modal */}
+      {showOrModels && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowOrModels(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-5 py-4 text-white flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-lg flex items-center gap-2">
+                    <span>🌐</span>
+                    <span>OpenRouter Models</span>
+                  </h2>
+                  {orModels && (
+                    <p className="text-xs text-white/80 mt-0.5">
+                      ทั้งหมด {orModels.total} โมเดล · ฟรี {orModels.free_count} · เสียเงิน {orModels.paid_count}
+                    </p>
+                  )}
+                </div>
+                <button onClick={() => setShowOrModels(false)} className="text-white/80 hover:text-white text-2xl">✕</button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2 flex-wrap flex-shrink-0">
+              <button onClick={() => setOrFilter('free')}
+                className={`px-3 py-1 rounded-full text-sm ${orFilter === 'free' ? 'bg-emerald-600 text-white' : 'bg-white border border-gray-300'}`}>
+                ✨ ฟรี ({orModels?.free_count || 0})
+              </button>
+              <button onClick={() => setOrFilter('paid')}
+                className={`px-3 py-1 rounded-full text-sm ${orFilter === 'paid' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>
+                💰 Premium ({orModels?.paid_count || 0})
+              </button>
+              <button onClick={() => setOrFilter('all')}
+                className={`px-3 py-1 rounded-full text-sm ${orFilter === 'all' ? 'bg-gray-600 text-white' : 'bg-white border border-gray-300'}`}>
+                ทั้งหมด ({orModels?.total || 0})
+              </button>
+              <input type="text" value={orSearch} onChange={(e) => setOrSearch(e.target.value)}
+                placeholder="🔍 ค้นหา model..."
+                className="flex-1 px-3 py-1 border rounded-lg text-sm min-w-[200px]" />
+              <button onClick={fetchOpenRouterModels}
+                disabled={orLoading}
+                className="px-3 py-1 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+                {orLoading ? '⏳' : '🔄'} Refresh
+              </button>
+            </div>
+
+            {/* Models list */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {orLoading ? (
+                <div className="text-center py-12 text-gray-400">กำลังโหลด...</div>
+              ) : !orModels ? (
+                <div className="text-center py-12 text-gray-400">ไม่มีข้อมูล</div>
+              ) : (
+                <div className="space-y-1">
+                  {(orFilter === 'free' ? orModels.free :
+                    orFilter === 'paid' ? orModels.paid :
+                    [...orModels.free, ...orModels.paid])
+                    .filter((m) => !orSearch || m.id.toLowerCase().includes(orSearch.toLowerCase()) || m.name?.toLowerCase().includes(orSearch.toLowerCase()))
+                    .map((m) => {
+                      const selected = orSelected.has(m.id);
+                      return (
+                        <label key={m.id}
+                          className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition ${
+                            selected ? 'bg-indigo-50 border border-indigo-300' : 'hover:bg-gray-50 border border-transparent'
+                          }`}>
+                          <input type="checkbox" checked={selected}
+                            onChange={() => toggleOrModel(m.id)}
+                            className="mt-1" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-xs font-semibold">{m.id}</span>
+                              {m.is_free && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">FREE</span>
+                              )}
+                              {m.has_vision && (
+                                <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">📷 Vision</span>
+                              )}
+                              {!m.is_free && (
+                                <span className="text-[10px] text-gray-500">{m.price}</span>
+                              )}
+                            </div>
+                            {m.name && m.name !== m.id && (
+                              <p className="text-xs text-gray-500 mt-0.5">{m.name}</p>
+                            )}
+                            <div className="text-[10px] text-gray-400 mt-0.5">
+                              Provider: <strong>{m.provider}</strong>
+                              {m.context_length > 0 && <> · Context: {(m.context_length / 1000).toFixed(0)}k tokens</>}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setEditModels(prev => ({ ...prev, openrouter: m.id }));
+                              setShowOrModels(false);
+                            }}
+                            className="text-[10px] px-2 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex-shrink-0"
+                          >
+                            ใช้ตอนนี้
+                          </button>
+                        </label>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t bg-gray-50 flex items-center justify-between gap-3 flex-shrink-0">
+              <p className="text-xs text-gray-500">
+                เลือกแล้ว: <span className="font-bold text-indigo-600">{orSelected.size}</span> โมเดล
+                {' '}<span className="text-gray-400">(จะถูกบันทึกไว้ใน DB เพื่อใช้ใน dropdown)</span>
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setOrSelected(new Set())}
+                  className="px-3 py-1.5 text-xs border rounded-lg hover:bg-gray-50">
+                  Clear
+                </button>
+                <button onClick={handleSaveOrModels}
+                  disabled={orSelected.size === 0}
+                  className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50">
+                  💾 บันทึก {orSelected.size > 0 && `(${orSelected.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
