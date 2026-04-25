@@ -37,13 +37,44 @@ const statusColor: Record<string, string> = {
 };
 
 async function getStudentsData() {
-  // Fetch students
+  // Fetch students from students table
   const { data: students } = await supabase
     .from('students')
     .select('*')
     .order('degree_level', { ascending: true })
     .order('status', { ascending: true })
     .order('enrollment_year', { ascending: false });
+
+  // Also fetch researchers who are PhD students (unit_role='phd_student' OR is_pursuing_phd=true)
+  // These are CESRU members who pursue PhD within the research unit
+  let phdResearchers: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, avatar_url, unit_role, position_th, expertise, phd_advisor_id, phd_program, phd_university, phd_start_year, is_pursuing_phd, orcid_id, openalex_id, cited_by_count, h_index')
+      .eq('is_active', true)
+      .or('unit_role.eq.phd_student,is_pursuing_phd.eq.true');
+    if (!error) phdResearchers = data || [];
+  } catch {
+    // Migration 040 not yet run, columns missing
+    const { data } = await supabase
+      .from('researchers')
+      .select('id, title_th, first_name_th, last_name_th, title_en, first_name_en, last_name_en, email, avatar_url, unit_role, position_th, expertise, orcid_id, openalex_id, cited_by_count, h_index')
+      .eq('is_active', true)
+      .eq('unit_role', 'phd_student');
+    phdResearchers = data || [];
+  }
+
+  // Fetch advisor names for PhD researchers
+  const advisorIds = phdResearchers.map((r: any) => r.phd_advisor_id).filter(Boolean);
+  const { data: advisors } = advisorIds.length > 0
+    ? await supabase
+        .from('researchers')
+        .select('id, title_th, first_name_th, last_name_th')
+        .in('id', advisorIds)
+    : { data: [] };
+  const advisorMap: Record<string, any> = {};
+  (advisors || []).forEach((a: any) => { advisorMap[a.id] = a; });
 
   // Fetch thesis info with advisor
   const { data: theses } = await supabase
@@ -72,13 +103,15 @@ async function getStudentsData() {
 
   return {
     students: students || [],
+    phdResearchers,
+    advisorMap,
     theses: theses || [],
     projectMembers: projectMembers || [],
   };
 }
 
 export default async function StudentsPage() {
-  const { students, theses, projectMembers } = await getStudentsData();
+  const { students, phdResearchers, advisorMap, theses, projectMembers } = await getStudentsData();
 
   // Build thesis map: student_id -> thesis info
   const thesisMap: Record<string, any> = {};
@@ -125,6 +158,8 @@ export default async function StudentsPage() {
 
   const totalActive = students.filter((s: any) => s.status === 'active').length;
   const totalGraduated = students.filter((s: any) => s.status === 'graduated').length;
+  const totalPhdResearchers = phdResearchers.length;
+  const totalAll = students.length + totalPhdResearchers;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
@@ -151,13 +186,101 @@ export default async function StudentsPage() {
             <span className="text-sm text-gray-600 ml-2">สำเร็จการศึกษา</span>
           </div>
           <div className="bg-blue-50 px-4 py-2 rounded-lg">
-            <span className="text-2xl font-bold text-blue-700">{students.length}</span>
+            <span className="text-2xl font-bold text-blue-700">{totalAll}</span>
             <span className="text-sm text-blue-600 ml-2">ทั้งหมด</span>
           </div>
+          {totalPhdResearchers > 0 && (
+            <div className="bg-pink-50 px-4 py-2 rounded-lg">
+              <span className="text-2xl font-bold text-pink-700">{totalPhdResearchers}</span>
+              <span className="text-sm text-pink-600 ml-2">นักวิจัย-นศ.ป.เอก</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Student Groups */}
+      {/* PhD Researchers Section (from researchers table with phd_student role or is_pursuing_phd) */}
+      {phdResearchers.length > 0 && (
+        <section className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4 pb-3 border-b-2 border-pink-500 flex items-center gap-2">
+            <span>🎓</span>
+            นักศึกษาปริญญาเอก ในกลุ่มวิจัย
+            <span className="text-sm font-normal text-gray-400">({phdResearchers.length})</span>
+          </h2>
+          <div className="space-y-4">
+            {phdResearchers.map((r: any) => {
+              const advisor = r.phd_advisor_id ? advisorMap[r.phd_advisor_id] : null;
+              const isResearcherPhd = r.unit_role !== 'phd_student';  // member ที่กำลังเรียน ป.เอก
+              return (
+                <div key={r.id} className="border-l-4 border-pink-300 pl-4 py-2 hover:border-pink-500 transition">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                    <div className="flex items-center gap-3 flex-1">
+                      {r.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                          {r.first_name_th.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/researchers/${r.id}`} className="font-semibold text-gray-900 hover:text-pink-700">
+                          {r.title_th}{r.first_name_th} {r.last_name_th}
+                        </Link>
+                        {r.first_name_en && (
+                          <p className="text-xs text-gray-500">
+                            {r.title_en || ''} {r.first_name_en} {r.last_name_en || ''}
+                          </p>
+                        )}
+                        {advisor && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            <span className="text-gray-400">ที่ปรึกษา:</span>{' '}
+                            <Link href={`/researchers/${advisor.id}`} className="text-pink-600 hover:underline">
+                              {advisor.title_th}{advisor.first_name_th} {advisor.last_name_th}
+                            </Link>
+                          </p>
+                        )}
+                        {(r.phd_program || r.phd_university) && (
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {r.phd_program && <>{r.phd_program}</>}
+                            {r.phd_university && <> · {r.phd_university}</>}
+                            {r.phd_start_year && <> · เริ่มศึกษา {r.phd_start_year + 543}</>}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 items-start shrink-0">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
+                        🎓 ป.เอก
+                      </span>
+                      {isResearcherPhd && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                          + นักวิจัย
+                        </span>
+                      )}
+                      {r.cited_by_count > 0 && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">
+                          ⭐ {r.cited_by_count} cited
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {r.expertise && r.expertise.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2 ml-13">
+                      {r.expertise.slice(0, 3).map((exp: string, i: number) => (
+                        <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                          {exp}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Student Groups (from students table) */}
       <div className="space-y-8">
         {degreeOrder.map(({ key, label, icon, border }) => {
           const items = groups[key] || [];
@@ -258,7 +381,7 @@ export default async function StudentsPage() {
         })}
       </div>
 
-      {students.length === 0 && (
+      {students.length === 0 && phdResearchers.length === 0 && (
         <div className="text-center py-16 text-gray-500">
           <p className="text-5xl mb-4">👨‍🎓</p>
           <p className="text-lg">ยังไม่มีข้อมูลนักศึกษา</p>
