@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import SyncClassificationButton from '@/components/SyncClassificationButton';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -23,8 +24,14 @@ export default async function ResearchAreasPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">สาขาวิจัย</h1>
-      <p className="text-gray-500 mb-8">สาขาวิจัยของหน่วยวิจัยระบบพลังงานสะอาด CESRU</p>
+      <div className="flex items-start justify-between mb-2 gap-3 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">สาขาวิจัย</h1>
+          <p className="text-gray-500 mt-1">สาขาวิจัยของหน่วยวิจัยระบบพลังงานสะอาด CESRU</p>
+        </div>
+        <SyncClassificationButton />
+      </div>
+      <div className="mb-6"></div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {areas.map((area: { id: string; name_th: string; name_en: string; icon: string | null; description_th: string | null; sdg_goals: string[] | null }) => (

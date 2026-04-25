@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { callAIText } from '@/lib/ai-provider';
 
 const SDG_KEYWORDS: Record<string, string[]> = {
   'SDG 7': ['energy', 'solar', 'pv', 'photovoltaic', 'battery', 'storage', 'renewable', 'wind', 'biomass', 'electricity', 'power', 'grid', 'hydrogen', 'fuel cell', 'microgrid', 'inverter', 'mppt', 'charger', 'ev', 'electric vehicle', 'wireless power', 'พลังงาน', 'แบตเตอรี่', 'พลังงานสะอาด', 'พลังงานทดแทน'],
@@ -53,6 +54,39 @@ function classifyText(text: string) {
   return { tags: Array.from(tags), sdgs: Array.from(sdgs) };
 }
 
+// AI-powered classification fallback for ambiguous publications
+async function aiClassify(title: string, journal: string, abstract: string): Promise<{ tags: string[]; sdgs: string[] }> {
+  const prompt = `วิเคราะห์ผลงานวิจัยต่อไปนี้และระบุ:
+1. สาขาวิจัย (research areas) - เลือกได้ 1-3 จากรายการ:
+   Solar Energy, Battery Storage, Electric Vehicle, Wireless Power Transfer,
+   Smart Grid, Power Electronics, Renewable Energy, IoT Systems, Energy Audit, Microgrid
+
+2. SDG goals - เลือกได้ 1-3 จากรายการ:
+   SDG 4 (Quality Education), SDG 7 (Affordable Clean Energy), SDG 9 (Industry Innovation),
+   SDG 11 (Sustainable Cities), SDG 12 (Responsible Consumption), SDG 13 (Climate Action)
+
+ผลงาน:
+Title: ${title}
+Journal: ${journal || 'N/A'}
+Abstract: ${(abstract || '').substring(0, 500)}
+
+ตอบในรูปแบบ JSON เท่านั้น:
+{"tags": ["..."], "sdgs": ["SDG 7"]}`;
+
+  try {
+    const result = await callAIText(prompt);
+    if (result.data) {
+      return {
+        tags: Array.isArray(result.data.tags) ? result.data.tags : [],
+        sdgs: Array.isArray(result.data.sdgs) ? result.data.sdgs : [],
+      };
+    }
+  } catch {
+    // AI failed — return empty
+  }
+  return { tags: [], sdgs: [] };
+}
+
 async function fetchOpenAlexConcepts(openalexId: string): Promise<string[]> {
   if (!openalexId) return [];
   try {
@@ -85,6 +119,7 @@ export async function POST(request: NextRequest) {
     }
 
     const source = body.source || 'all';
+    const useAI = body.use_ai === true;
 
     // Fetch publications that need classification
     let query = supabase
@@ -124,7 +159,16 @@ export async function POST(request: NextRequest) {
           Array.from(keywords).join(' '),
         ].join(' ');
 
-        const { tags, sdgs } = classifyText(fullText);
+        let { tags, sdgs } = classifyText(fullText);
+
+        // If AI mode AND no tags found via keyword matching → fallback to AI
+        if (useAI && tags.length === 0) {
+          const aiResult = await aiClassify(pub.title, pub.journal_name || '', pub.abstract || '');
+          tags = Array.from(new Set([...tags, ...aiResult.tags]));
+          sdgs = Array.from(new Set([...sdgs, ...aiResult.sdgs]));
+          // Throttle AI calls
+          await new Promise((r) => setTimeout(r, 500));
+        }
 
         // Add discovered tags as keywords
         tags.forEach((t) => keywords.add(t));
