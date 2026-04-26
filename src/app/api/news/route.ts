@@ -86,14 +86,50 @@ export async function POST(request: NextRequest) {
     insertData.travel_activity_type = travel_activity_type || null;
   }
 
-  // Insert news
-  const { data: news, error: newsError } = await supabase
+  // Insert news — with retry if travel columns don't exist (migration 036 not run)
+  let { data: news, error: newsError } = await supabase
     .from('news')
     .insert(insertData)
     .select()
     .single();
 
   if (newsError) {
+    // If error mentions a travel column doesn't exist → retry without travel fields
+    const msg = newsError.message || '';
+    if (msg.includes('is_official_travel') || msg.includes('travel_') || msg.includes('schema cache')) {
+      // Strip all travel fields and retry
+      const baseData: any = {
+        title: insertData.title,
+        content: insertData.content,
+        category: insertData.category,
+        cover_image_url: insertData.cover_image_url,
+        tags: insertData.tags,
+        sdg_goals: insertData.sdg_goals,
+        is_published: insertData.is_published,
+        published_at: insertData.published_at,
+      };
+      if (insertData.author_id) baseData.author_id = insertData.author_id;
+
+      const retry = await supabase
+        .from('news')
+        .insert(baseData)
+        .select()
+        .single();
+
+      if (retry.error) {
+        return NextResponse.json({
+          error: retry.error.message,
+          hint: 'อาจต้องรัน migration 036_news_travel_workload.sql ใน Supabase',
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        news: retry.data,
+        warning: is_official_travel
+          ? 'ข่าวถูกบันทึก แต่ข้อมูลการเดินทางไม่ถูกบันทึก — ต้องรัน migration 036 ใน Supabase ก่อน'
+          : undefined,
+      });
+    }
     return NextResponse.json({ error: newsError.message }, { status: 500 });
   }
 
