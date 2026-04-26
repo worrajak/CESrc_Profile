@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Comments from '@/components/Comments';
+import TravelSensitiveInfo from '@/components/TravelSensitiveInfo';
 
 export const dynamic = 'force-dynamic';
 
@@ -233,31 +234,10 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
                 </div>
               )}
 
-              {news.travel_approval_number && (
-                <div className="bg-white/60 rounded-lg p-2.5">
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📋 เลขที่อนุมัติ</p>
-                  <p className="text-gray-800 font-medium text-xs font-mono">{news.travel_approval_number}</p>
-                </div>
-              )}
+              {/* เลขที่อนุมัติ ย้ายไปใน restricted section (sensitive) */}
             </div>
 
-            {/* Budget & Funding */}
-            {(news.travel_budget || news.travel_funding_source) && (
-              <div className="flex flex-wrap gap-2">
-                {news.travel_budget && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-medium">
-                    💰 งบประมาณ {Number(news.travel_budget).toLocaleString()} บาท
-                  </span>
-                )}
-                {news.travel_funding_source && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-violet-100 text-violet-800 px-3 py-1 rounded-full">
-                    แหล่งทุน: {news.travel_funding_source}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Participants */}
+            {/* Participants — public ดูได้ */}
             {travelParticipants.length > 0 && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold mb-1">
@@ -274,25 +254,8 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
               </div>
             )}
 
-            {/* Approval Document */}
-            {(news.travel_approval_doc_url || news.travel_approval_link) && (
-              <div className="flex flex-wrap gap-2 pt-2 border-t border-emerald-200">
-                {news.travel_approval_doc_url && (
-                  <a href={news.travel_approval_doc_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition font-medium">
-                    <span>📄</span>
-                    <span>ดูเอกสารอนุมัติ (PDF)</span>
-                  </a>
-                )}
-                {news.travel_approval_link && (
-                  <a href={news.travel_approval_link} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-xs bg-white border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition font-medium">
-                    <span>🔗</span>
-                    <span>ลิงก์เอกสาร</span>
-                  </a>
-                )}
-              </div>
-            )}
+            {/* Sensitive: เลขที่อนุมัติ + งบประมาณ + แหล่งงบ + เอกสารแนบ — เฉพาะนักวิจัยในหน่วย */}
+            <TravelSensitiveInfo newsId={news.id} />
           </div>
         </div>
       )}
