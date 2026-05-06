@@ -1,32 +1,25 @@
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import { getServerLocale, st } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export const metadata: Metadata = {
-  title: 'นักศึกษา | CESRU - RMUTL',
-  description: 'รายชื่อนักศึกษาในกลุ่มวิจัย CESRU ทุกระดับ ป.ตรี ป.โท ป.เอก',
-};
-
-const degreeLabel: Record<string, string> = {
-  bachelor: 'ป.ตรี',
-  master: 'ป.โท',
-  doctoral: 'ป.เอก',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getServerLocale();
+  return {
+    title: locale === 'en' ? 'Students | CESRU - RMUTL' : 'นักศึกษา | CESRU - RMUTL',
+    description: locale === 'en'
+      ? 'Students in CESRU research group — Bachelor, Master, and PhD'
+      : 'รายชื่อนักศึกษาในกลุ่มวิจัย CESRU ทุกระดับ ป.ตรี ป.โท ป.เอก',
+  };
+}
 
 const degreeColor: Record<string, string> = {
   bachelor: 'bg-blue-100 text-blue-800',
   master: 'bg-purple-100 text-purple-800',
   doctoral: 'bg-red-100 text-red-800',
-};
-
-const statusLabel: Record<string, string> = {
-  active: 'กำลังศึกษา',
-  graduated: 'สำเร็จการศึกษา',
-  withdrawn: 'พ้นสภาพ',
-  on_leave: 'ลาพักการศึกษา',
 };
 
 const statusColor: Record<string, string> = {
@@ -150,10 +143,11 @@ export default async function StudentsPage() {
     }
   });
 
+  const locale = getServerLocale();
   const degreeOrder = [
-    { key: 'doctoral', label: 'ระดับปริญญาเอก (Doctoral)', icon: '🎓', border: 'border-red-500' },
-    { key: 'master', label: 'ระดับปริญญาโท (Master)', icon: '📘', border: 'border-purple-500' },
-    { key: 'bachelor', label: 'ระดับปริญญาตรี (Bachelor)', icon: '📗', border: 'border-blue-500' },
+    { key: 'doctoral', label: st('students.section.doctoral', locale), icon: '🎓', border: 'border-red-500' },
+    { key: 'master', label: st('students.section.master', locale), icon: '📘', border: 'border-purple-500' },
+    { key: 'bachelor', label: st('students.section.bachelor', locale), icon: '📗', border: 'border-blue-500' },
   ];
 
   const totalActive = students.filter((s: any) => s.status === 'active').length;
@@ -165,34 +159,32 @@ export default async function StudentsPage() {
     <div className="max-w-6xl mx-auto px-4 py-12">
       {/* Breadcrumb */}
       <nav className="text-sm text-gray-500 mb-6">
-        <Link href="/" className="hover:text-blue-600">หน้าแรก</Link>
+        <Link href="/" className="hover:text-blue-600">{st('nav.home', locale)}</Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-800">นักศึกษา</span>
+        <span className="text-gray-800">{st('nav.students', locale)}</span>
       </nav>
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">นักศึกษาในกลุ่มวิจัย</h1>
-        <p className="text-gray-600 mt-2">
-          รายชื่อนักศึกษาที่ทำโครงงาน/วิทยานิพนธ์กับนักวิจัย CESRU
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900">{st('students.page_title', locale)}</h1>
+        <p className="text-gray-600 mt-2">{st('students.page_subtitle', locale)}</p>
         <div className="flex gap-4 mt-4">
           <div className="bg-green-50 px-4 py-2 rounded-lg">
             <span className="text-2xl font-bold text-green-700">{totalActive}</span>
-            <span className="text-sm text-green-600 ml-2">กำลังศึกษา</span>
+            <span className="text-sm text-green-600 ml-2">{st('students.total_active', locale)}</span>
           </div>
           <div className="bg-gray-50 px-4 py-2 rounded-lg">
             <span className="text-2xl font-bold text-gray-700">{totalGraduated}</span>
-            <span className="text-sm text-gray-600 ml-2">สำเร็จการศึกษา</span>
+            <span className="text-sm text-gray-600 ml-2">{st('students.total_graduated', locale)}</span>
           </div>
           <div className="bg-blue-50 px-4 py-2 rounded-lg">
             <span className="text-2xl font-bold text-blue-700">{totalAll}</span>
-            <span className="text-sm text-blue-600 ml-2">ทั้งหมด</span>
+            <span className="text-sm text-blue-600 ml-2">{st('students.total_all', locale)}</span>
           </div>
           {totalPhdResearchers > 0 && (
             <div className="bg-pink-50 px-4 py-2 rounded-lg">
               <span className="text-2xl font-bold text-pink-700">{totalPhdResearchers}</span>
-              <span className="text-sm text-pink-600 ml-2">นักวิจัย-นศ.ป.เอก</span>
+              <span className="text-sm text-pink-600 ml-2">{locale === 'en' ? 'Researchers (PhD)' : 'นักวิจัย-นศ.ป.เอก'}</span>
             </div>
           )}
         </div>
@@ -203,7 +195,7 @@ export default async function StudentsPage() {
         <section className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <h2 className="text-xl font-bold text-gray-800 mb-4 pb-3 border-b-2 border-pink-500 flex items-center gap-2">
             <span>🎓</span>
-            นักศึกษาปริญญาเอก ในกลุ่มวิจัย
+            {st('students.section.phd_in_unit', locale)}
             <span className="text-sm font-normal text-gray-400">({phdResearchers.length})</span>
           </h2>
           <div className="space-y-4">
@@ -233,7 +225,7 @@ export default async function StudentsPage() {
                         )}
                         {advisor && (
                           <p className="text-xs text-gray-600 mt-1">
-                            <span className="text-gray-400">ที่ปรึกษา:</span>{' '}
+                            <span className="text-gray-400">{st('students.advisor', locale)}:</span>{' '}
                             <Link href={`/researchers/${advisor.id}`} className="text-pink-600 hover:underline">
                               {advisor.title_th}{advisor.first_name_th} {advisor.last_name_th}
                             </Link>
@@ -243,23 +235,23 @@ export default async function StudentsPage() {
                           <p className="text-[10px] text-gray-400 mt-0.5">
                             {r.phd_program && <>{r.phd_program}</>}
                             {r.phd_university && <> · {r.phd_university}</>}
-                            {r.phd_start_year && <> · เริ่มศึกษา {r.phd_start_year + 543}</>}
+                            {r.phd_start_year && <> · {locale === 'en' ? `Started ${r.phd_start_year}` : `เริ่มศึกษา ${r.phd_start_year + 543}`}</>}
                           </p>
                         )}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 items-start shrink-0">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
-                        🎓 ป.เอก
+                        🎓 {st('students.degree.doctoral', locale)}
                       </span>
                       {isResearcherPhd && (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                          + นักวิจัย
+                          {locale === 'en' ? '+ Researcher' : '+ นักวิจัย'}
                         </span>
                       )}
                       {r.cited_by_count > 0 && (
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">
-                          ⭐ {r.cited_by_count} cited
+                          ⭐ {r.cited_by_count} {st('researcher.cited', locale)}
                         </span>
                       )}
                     </div>
@@ -326,19 +318,19 @@ export default async function StudentsPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${degreeColor[s.degree_level]}`}>
-                            {degreeLabel[s.degree_level]}
+                            {st(`students.degree.${s.degree_level}`, locale)}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor[s.status]}`}>
-                            {statusLabel[s.status]}
+                            {st(`students.status.${s.status}`, locale)}
                           </span>
                           {s.enrollment_year && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                              เข้าศึกษา {s.enrollment_year}
+                              {st('students.enrollment_year', locale)} {s.enrollment_year}
                             </span>
                           )}
                           {s.graduation_year && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                              จบ {s.graduation_year}
+                              {st('students.graduation_year', locale)} {s.graduation_year}
                             </span>
                           )}
                         </div>
@@ -349,18 +341,18 @@ export default async function StudentsPage() {
                         <div className="mt-2 ml-13 text-sm text-gray-600">
                           <p>
                             <span className="font-medium">
-                              {s.degree_level === 'bachelor' ? 'โครงงาน: ' : 'วิทยานิพนธ์: '}
+                              {s.degree_level === 'bachelor' ? `${st('students.project', locale)}: ` : `${st('students.thesis', locale)}: `}
                             </span>
                             {workInfo.title}
                           </p>
                           {workInfo.advisor && (
                             <p className="text-xs text-gray-500">
-                              อาจารย์ที่ปรึกษา: {workInfo.advisor}
+                              {st('students.advisor', locale)}: {workInfo.advisor}
                             </p>
                           )}
                           {workInfo.grade && (
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                              เกรด: {workInfo.grade}
+                              {locale === 'en' ? 'Grade' : 'เกรด'}: {workInfo.grade}
                             </span>
                           )}
                         </div>
@@ -369,7 +361,7 @@ export default async function StudentsPage() {
                       {/* Program */}
                       {s.program_th && (
                         <p className="text-xs text-gray-400 mt-1 ml-13">
-                          หลักสูตร: {s.program_th}
+                          {locale === 'en' ? 'Program' : 'หลักสูตร'}: {locale === 'en' && s.program_en ? s.program_en : s.program_th}
                         </p>
                       )}
                     </div>
@@ -384,8 +376,7 @@ export default async function StudentsPage() {
       {students.length === 0 && phdResearchers.length === 0 && (
         <div className="text-center py-16 text-gray-500">
           <p className="text-5xl mb-4">👨‍🎓</p>
-          <p className="text-lg">ยังไม่มีข้อมูลนักศึกษา</p>
-          <p className="text-sm mt-2">เพิ่มข้อมูลได้ที่หน้า <Link href="/admin/students" className="text-blue-600 hover:underline">Admin</Link></p>
+          <p className="text-lg">{st('students.empty', locale)}</p>
         </div>
       )}
     </div>

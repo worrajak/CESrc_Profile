@@ -1,13 +1,20 @@
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { getServerLocale, st } from '@/lib/i18n-server';
+import { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export const metadata = {
-  title: 'ทุนวิจัย | CESRU - RMUTL',
-  description: 'ทุนวิจัยและโครงการวิจัยของหน่วยวิจัยระบบพลังงานสะอาด มทร.ล้านนา',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getServerLocale();
+  return {
+    title: locale === 'en' ? 'Research Grants | CESRU - RMUTL' : 'ทุนวิจัย | CESRU - RMUTL',
+    description: locale === 'en'
+      ? 'Research grants and projects of CESRU, RMUTL'
+      : 'ทุนวิจัยและโครงการวิจัยของหน่วยวิจัยระบบพลังงานสะอาด มทร.ล้านนา',
+  };
+}
 
 export default async function GrantsPage() {
   const { data: grants } = await supabase
@@ -73,54 +80,59 @@ export default async function GrantsPage() {
   const otherGrants = allGrants.filter((g: any) => g.status !== 'active' && g.status !== 'completed');
   const totalBudget = allGrants.reduce((sum: number, g: any) => sum + (Number(g.budget) || 0), 0);
 
-  const grantRoleLabels: Record<string, string> = {
-    pi: 'หัวหน้าโครงการ',
-    co_pi: 'ผู้ร่วมโครงการ',
-    researcher: 'นักวิจัย',
-    consultant: 'ที่ปรึกษา',
-  };
+  const locale = getServerLocale();
 
-  const statusConfig: Record<string, { label: string; color: string; borderColor: string }> = {
-    active: { label: 'กำลังดำเนินการ', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-400' },
-    completed: { label: 'เสร็จสิ้น', color: 'bg-green-100 text-green-700', borderColor: 'border-green-400' },
-    pending: { label: 'รอดำเนินการ', color: 'bg-yellow-100 text-yellow-700', borderColor: 'border-yellow-400' },
-    cancelled: { label: 'ยกเลิก', color: 'bg-red-100 text-red-700', borderColor: 'border-red-400' },
+  const statusBorderColor: Record<string, string> = {
+    active: 'border-blue-400',
+    completed: 'border-green-400',
+    pending: 'border-yellow-400',
+    cancelled: 'border-red-400',
+  };
+  const statusBgColor: Record<string, string> = {
+    active: 'bg-blue-100 text-blue-700',
+    completed: 'bg-green-100 text-green-700',
+    pending: 'bg-yellow-100 text-yellow-700',
+    cancelled: 'bg-red-100 text-red-700',
   };
 
   const renderGrantCard = (g: any) => {
-    const st = statusConfig[g.status] || statusConfig.active;
     const tracking = trackingMap[g.id];
+    const statusLabel = st(`grants.status.${g.status}`, locale);
+    const borderColor = statusBorderColor[g.status] || statusBorderColor.active;
+    const bgColor = statusBgColor[g.status] || statusBgColor.active;
+    const primaryTitle = locale === 'en' && g.title_en ? g.title_en : g.title_th;
+    const secondaryTitle = locale === 'en' && g.title_en ? g.title_th : g.title_en;
 
     return (
       <Link key={g.id} href={`/grants/${g.id}`} className="block group">
-        <div className={`bg-white rounded-xl shadow-sm border-l-4 ${st.borderColor} p-5 hover:shadow-lg transition-all`}>
+        <div className={`bg-white rounded-xl shadow-sm border-l-4 ${borderColor} p-5 hover:shadow-lg transition-all`}>
           <div className="flex items-start justify-between gap-3 mb-3">
-            <h3 className="font-semibold text-gray-900 group-hover:text-blue-700 transition line-clamp-2">{g.title_th}</h3>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${st.color}`}>{st.label}</span>
+            <h3 className="font-semibold text-gray-900 group-hover:text-blue-700 transition line-clamp-2">{primaryTitle}</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${bgColor}`}>{statusLabel}</span>
           </div>
 
-          {g.title_en && <p className="text-xs text-gray-400 mb-3 line-clamp-1">{g.title_en}</p>}
+          {secondaryTitle && <p className="text-xs text-gray-400 mb-3 line-clamp-1">{secondaryTitle}</p>}
 
           <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
             <div>
-              <span className="text-gray-400">แหล่งทุน</span>
+              <span className="text-gray-400">{st('grants.funding_agency', locale)}</span>
               <div className="font-medium text-gray-800">{g.funding_agency}</div>
             </div>
             {g.budget && (
               <div>
-                <span className="text-gray-400">งบประมาณ</span>
-                <div className="font-semibold text-green-700">{Number(g.budget).toLocaleString()} บาท</div>
+                <span className="text-gray-400">{st('grants.budget', locale)}</span>
+                <div className="font-semibold text-green-700">{Number(g.budget).toLocaleString()} {locale === 'en' ? 'THB' : 'บาท'}</div>
               </div>
             )}
             {g.fiscal_year && (
               <div>
-                <span className="text-gray-400">ปีงบประมาณ</span>
-                <div className="font-medium">พ.ศ. {g.fiscal_year}</div>
+                <span className="text-gray-400">{st('grants.fiscal_year', locale)}</span>
+                <div className="font-medium">{locale === 'en' ? `BE ${g.fiscal_year}` : `พ.ศ. ${g.fiscal_year}`}</div>
               </div>
             )}
             {(g.start_date || g.end_date) && (
               <div>
-                <span className="text-gray-400">ระยะเวลา</span>
+                <span className="text-gray-400">{st('grants.duration', locale)}</span>
                 <div className="font-medium">{g.start_date || '?'} — {g.end_date || '?'}</div>
               </div>
             )}
@@ -130,7 +142,7 @@ export default async function GrantsPage() {
           {tracking && tracking.total > 0 && (
             <div className="mb-3 pt-3 border-t">
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-gray-500">ความก้าวหน้า</span>
+                <span className="text-gray-500">{locale === 'en' ? 'Progress' : 'ความก้าวหน้า'}</span>
                 <span className="font-bold text-blue-700">{tracking.avgPct}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -141,7 +153,7 @@ export default async function GrantsPage() {
               </div>
               <div className="flex gap-3 mt-1.5 text-[10px] text-gray-400">
                 <span>Milestones: {tracking.completed}/{tracking.total}</span>
-                {tracking.delayed > 0 && <span className="text-red-500">ล่าช้า: {tracking.delayed}</span>}
+                {tracking.delayed > 0 && <span className="text-red-500">{locale === 'en' ? `Delayed: ${tracking.delayed}` : `ล่าช้า: ${tracking.delayed}`}</span>}
               </div>
             </div>
           )}
@@ -193,9 +205,9 @@ export default async function GrantsPage() {
     <div className="max-w-7xl mx-auto px-4 py-12">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">ทุนวิจัย / โครงการวิจัย</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">{st('grants.page_title', locale)}</h1>
         <p className="text-gray-500">
-          โครงการวิจัยที่ได้รับทุนสนับสนุน ({allGrants.length} โครงการ)
+          {st('grants.page_subtitle', locale)} ({allGrants.length})
         </p>
       </div>
 
@@ -203,20 +215,22 @@ export default async function GrantsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-4 border">
           <div className="text-3xl font-bold text-gray-800">{allGrants.length}</div>
-          <div className="text-sm text-gray-500">โครงการทั้งหมด</div>
+          <div className="text-sm text-gray-500">{locale === 'en' ? 'Total Grants' : 'โครงการทั้งหมด'}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border">
           <div className="text-3xl font-bold text-blue-600">{activeGrants.length}</div>
-          <div className="text-sm text-gray-500">กำลังดำเนินการ</div>
+          <div className="text-sm text-gray-500">{st('grants.section.active', locale)}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 border">
           <div className="text-3xl font-bold text-green-600">{completedGrants.length}</div>
-          <div className="text-sm text-gray-500">เสร็จสิ้น</div>
+          <div className="text-sm text-gray-500">{st('grants.section.completed', locale)}</div>
         </div>
         {totalBudget > 0 && (
           <div className="bg-white rounded-xl shadow-sm p-4 border">
             <div className="text-2xl font-bold text-green-700">{(totalBudget / 1000000).toFixed(1)}M</div>
-            <div className="text-sm text-gray-500">งบรวม ({totalBudget.toLocaleString()} บาท)</div>
+            <div className="text-sm text-gray-500">
+              {locale === 'en' ? `Total Budget (${totalBudget.toLocaleString()} THB)` : `งบรวม (${totalBudget.toLocaleString()} บาท)`}
+            </div>
           </div>
         )}
       </div>
@@ -226,7 +240,7 @@ export default async function GrantsPage() {
         <div className="mb-10">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
-            กำลังดำเนินการ ({activeGrants.length})
+            {st('grants.section.active', locale)} ({activeGrants.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeGrants.map(renderGrantCard)}
@@ -239,7 +253,7 @@ export default async function GrantsPage() {
         <div className="mb-10">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-green-500 rounded-full" />
-            เสร็จสิ้น ({completedGrants.length})
+            {st('grants.section.completed', locale)} ({completedGrants.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {completedGrants.map(renderGrantCard)}
@@ -250,7 +264,7 @@ export default async function GrantsPage() {
       {/* Other Grants */}
       {otherGrants.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">อื่นๆ ({otherGrants.length})</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">{st('grants.section.other', locale)} ({otherGrants.length})</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {otherGrants.map(renderGrantCard)}
           </div>

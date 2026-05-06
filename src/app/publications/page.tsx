@@ -1,19 +1,26 @@
 import { supabase } from '@/lib/supabase';
+import { getServerLocale, st } from '@/lib/i18n-server';
+import { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export const metadata = {
-  title: 'ผลงานตีพิมพ์ | CESRU - RMUTL',
-  description: 'ผลงานตีพิมพ์ของหน่วยวิจัยระบบพลังงานสะอาด มทร.ล้านนา',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getServerLocale();
+  return {
+    title: locale === 'en' ? 'Publications | CESRU - RMUTL' : 'ผลงานตีพิมพ์ | CESRU - RMUTL',
+    description: locale === 'en'
+      ? 'Publications of CESRU, RMUTL'
+      : 'ผลงานตีพิมพ์ของหน่วยวิจัยระบบพลังงานสะอาด มทร.ล้านนา',
+  };
+}
 
 const pubTypeGroups = [
-  { types: ['journal_international'], label: 'วารสารนานาชาติ (International Journal)', color: 'border-blue-500', icon: 'bg-blue-600', badge: 'bg-blue-50 text-blue-700' },
-  { types: ['journal_national'], label: 'วารสารในประเทศ (National Journal)', color: 'border-green-500', icon: 'bg-green-600', badge: 'bg-green-50 text-green-700' },
-  { types: ['conference_international'], label: 'การประชุมนานาชาติ (International Conference)', color: 'border-purple-500', icon: 'bg-purple-600', badge: 'bg-purple-50 text-purple-700' },
-  { types: ['conference_national'], label: 'การประชุมในประเทศ (National Conference)', color: 'border-orange-500', icon: 'bg-orange-600', badge: 'bg-orange-50 text-orange-700' },
-  { types: ['book_chapter', 'book', 'technical_report', 'thesis', 'patent', 'petty_patent'], label: 'อื่นๆ (Others)', color: 'border-gray-500', icon: 'bg-gray-600', badge: 'bg-gray-50 text-gray-700' },
+  { types: ['journal_international'], labelKey: 'publications.type.journal_international', color: 'border-blue-500', icon: 'bg-blue-600' },
+  { types: ['journal_national'], labelKey: 'publications.type.journal_national', color: 'border-green-500', icon: 'bg-green-600' },
+  { types: ['conference_international'], labelKey: 'publications.type.conference_international', color: 'border-purple-500', icon: 'bg-purple-600' },
+  { types: ['conference_national'], labelKey: 'publications.type.conference_national', color: 'border-orange-500', icon: 'bg-orange-600' },
+  { types: ['book_chapter', 'book', 'technical_report', 'thesis', 'patent', 'petty_patent'], labelKey: 'publications.type.book', color: 'border-gray-500', icon: 'bg-gray-600' },
 ];
 
 export default async function PublicationsPage() {
@@ -23,12 +30,15 @@ export default async function PublicationsPage() {
     .order('year', { ascending: false });
 
   const pubs = publications || [];
+  const locale = getServerLocale();
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">ผลงานตีพิมพ์</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-2">{st('publications.page_title', locale)}</h1>
       <p className="text-gray-500 mb-8">
-        ผลงานวิจัยที่ผ่านการยืนยันจากฐานข้อมูล Scopus, Web of Science และ DOI ({pubs.length} รายการ)
+        {locale === 'en'
+          ? `Verified publications from Scopus, Web of Science, and DOI databases (${pubs.length} items)`
+          : `ผลงานวิจัยที่ผ่านการยืนยันจากฐานข้อมูล Scopus, Web of Science และ DOI (${pubs.length} รายการ)`}
       </p>
 
       {pubTypeGroups.map((group) => {
@@ -47,10 +57,10 @@ export default async function PublicationsPage() {
         const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
 
         return (
-          <section key={group.label} className="mb-10">
+          <section key={group.labelKey} className="mb-10">
             <h2 className={`text-xl font-bold text-gray-800 mb-4 pb-2 border-b-2 ${group.color} flex items-center gap-2`}>
               <span className={`w-2.5 h-2.5 rounded-full ${group.icon}`}></span>
-              {group.label}
+              {st(group.labelKey, locale)}
               <span className="text-sm font-normal text-gray-400">({items.length})</span>
             </h2>
 
