@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useI18n } from '@/lib/I18nContext';
 import { supabase } from '@/lib/supabase';
 
 interface SensitiveData {
@@ -18,6 +19,7 @@ interface Props {
 
 export default function TravelSensitiveInfo({ newsId }: Props) {
   const { user, profile, signInWithGoogle, loading: authLoading } = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useState<SensitiveData | null>(null);
   const [viewer, setViewer] = useState<'admin' | 'researcher' | 'public' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +67,8 @@ export default function TravelSensitiveInfo({ newsId }: Props) {
         <div className="flex items-start gap-2">
           <span className="text-2xl flex-shrink-0">🔒</span>
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-900">ข้อมูลเพิ่มเติม (เฉพาะนักวิจัยในหน่วย)</p>
-            <p className="text-xs text-amber-700 mt-1">
-              งบประมาณ, เลขที่หนังสืออนุมัติ, และเอกสารแนบ — แสดงเฉพาะนักวิจัย CESRU ที่ login ด้วย email หน่วยงาน
-            </p>
+            <p className="text-sm font-medium text-amber-900">{t('news.travel.restricted_title')}</p>
+            <p className="text-xs text-amber-700 mt-1">{t('news.travel.restricted_msg')}</p>
             <button onClick={signInWithGoogle}
               className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-xs font-medium shadow-sm">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
@@ -89,7 +89,7 @@ export default function TravelSensitiveInfo({ newsId }: Props) {
   if (loading || authLoading) {
     return (
       <div className="mt-3 pt-3 border-t border-emerald-200 text-center text-xs text-gray-400">
-        กำลังตรวจสอบสิทธิ์...
+        {t('news.travel.checking_permission')}
       </div>
     );
   }
@@ -101,11 +101,11 @@ export default function TravelSensitiveInfo({ newsId }: Props) {
         <div className="flex items-start gap-2">
           <span className="text-xl flex-shrink-0">🚫</span>
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-900">ไม่มีสิทธิ์เข้าถึงข้อมูลนี้</p>
+            <p className="text-sm font-medium text-red-900">{t('news.travel.no_access_title')}</p>
             <p className="text-xs text-red-700 mt-1">
-              ข้อมูลงบประมาณและเอกสารอนุมัติเปิดให้เฉพาะนักวิจัยในหน่วย CESRU เท่านั้น
+              {t('news.travel.no_access_msg')}
               {profile && (
-                <> · บัญชีของท่าน ({profile.email}) ไม่ได้ลงทะเบียนเป็นนักวิจัย</>
+                <> · {t('news.travel.no_access_account_note').replace('{email}', profile.email)}</>
               )}
             </p>
           </div>
@@ -126,33 +126,33 @@ export default function TravelSensitiveInfo({ newsId }: Props) {
     <div className="mt-3 pt-3 border-t border-emerald-200">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-          🔓 เฉพาะนักวิจัย CESRU
+          {t('news.travel.unlocked_badge')}
         </span>
         {viewer === 'admin' && (
-          <span className="text-[10px] text-gray-500">(viewing as admin)</span>
+          <span className="text-[10px] text-gray-500">{t('news.travel.viewing_admin')}</span>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
         {data.travel_approval_number && (
           <div className="bg-white/60 rounded-lg p-2.5">
-            <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📋 เลขที่หนังสืออนุมัติ</p>
+            <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">{t('news.travel.approval_number')}</p>
             <p className="text-gray-800 font-medium font-mono text-xs">{data.travel_approval_number}</p>
           </div>
         )}
 
         {data.travel_budget && (
           <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-200">
-            <p className="text-[10px] uppercase tracking-wider text-amber-700 font-semibold">💰 งบประมาณ</p>
+            <p className="text-[10px] uppercase tracking-wider text-amber-700 font-semibold">{t('news.travel.budget')}</p>
             <p className="text-amber-900 font-bold">
-              {Number(data.travel_budget).toLocaleString()} บาท
+              {Number(data.travel_budget).toLocaleString()} {t('news.travel.budget_unit')}
             </p>
           </div>
         )}
 
         {data.travel_funding_source && (
           <div className="bg-violet-50 rounded-lg p-2.5 border border-violet-200 md:col-span-2">
-            <p className="text-[10px] uppercase tracking-wider text-violet-700 font-semibold">🏦 แหล่งงบประมาณ</p>
+            <p className="text-[10px] uppercase tracking-wider text-violet-700 font-semibold">{t('news.travel.funding_source')}</p>
             <p className="text-violet-900">{data.travel_funding_source}</p>
           </div>
         )}
@@ -164,14 +164,14 @@ export default function TravelSensitiveInfo({ newsId }: Props) {
             <a href={data.travel_approval_doc_url} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition font-medium">
               <span>📄</span>
-              <span>ดูเอกสารอนุมัติ (PDF)</span>
+              <span>{t('news.travel.view_pdf')}</span>
             </a>
           )}
           {data.travel_approval_link && (
             <a href={data.travel_approval_link} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xs bg-white border border-emerald-300 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition font-medium">
               <span>🔗</span>
-              <span>ลิงก์เอกสาร</span>
+              <span>{t('news.travel.view_link')}</span>
             </a>
           )}
         </div>

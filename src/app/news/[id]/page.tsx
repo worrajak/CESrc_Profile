@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Comments from '@/components/Comments';
 import TravelSensitiveInfo from '@/components/TravelSensitiveInfo';
+import { getServerLocale, st } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,17 +34,6 @@ interface NewsDetail {
   travel_activity_type?: string | null;
 }
 
-const TRAVEL_TYPE_LABELS: Record<string, string> = {
-  conference: '🎤 ประชุมวิชาการ',
-  seminar: '💼 สัมมนา',
-  training: '📚 อบรม',
-  field_work: '🔬 ภาคสนาม',
-  meeting: '🗣️ ประชุม',
-  inspection: '🔍 ตรวจสอบ',
-  exhibition: '🎪 นิทรรศการ',
-  consulting: '💡 ที่ปรึกษา',
-  other: '📌 อื่นๆ',
-};
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const { data } = await supabase
@@ -58,11 +48,11 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   };
 }
 
-const categoryLabels: Record<string, { label: string; color: string }> = {
-  team_activity: { label: 'กิจกรรมทีม', color: 'bg-blue-100 text-blue-700' },
-  energy_news: { label: 'ข่าวพลังงาน', color: 'bg-green-100 text-green-700' },
-  academic: { label: 'วิชาการ', color: 'bg-purple-100 text-purple-700' },
-  announcement: { label: 'ประกาศ', color: 'bg-yellow-100 text-yellow-700' },
+const categoryColors: Record<string, string> = {
+  team_activity: 'bg-blue-100 text-blue-700',
+  energy_news: 'bg-green-100 text-green-700',
+  academic: 'bg-purple-100 text-purple-700',
+  announcement: 'bg-yellow-100 text-yellow-700',
 };
 
 const SDG_COLORS: Record<string, string> = {
@@ -110,8 +100,10 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
 
   if (!news) return notFound();
 
-  const cat = categoryLabels[news.category] || categoryLabels.announcement;
-  const date = new Date(news.published_at).toLocaleDateString('th-TH', {
+  const locale = getServerLocale();
+  const catColor = categoryColors[news.category] || categoryColors.announcement;
+  const catLabel = st(`news.category.${news.category}`, locale);
+  const date = new Date(news.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -144,7 +136,7 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Back */}
       <Link href="/news" className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block">
-        ← กลับไปหน้าข่าวสาร
+        {st('news.back_to_list', locale)}
       </Link>
 
       {/* Cover Image */}
@@ -157,13 +149,13 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cat.color}`}>{cat.label}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{catLabel}</span>
           <span className="text-sm text-gray-400">{date}</span>
         </div>
         <h1 className="text-3xl font-bold text-gray-800 mb-2">{news.title}</h1>
         {news.researchers && (
           <p className="text-sm text-gray-500">
-            โดย {news.researchers.title_th}{news.researchers.first_name_th} {news.researchers.last_name_th}
+            {st('news.author_label', locale)} {news.researchers.title_th}{news.researchers.first_name_th} {news.researchers.last_name_th}
           </p>
         )}
       </div>
@@ -192,13 +184,13 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
             <div className="flex items-center gap-2">
               <span className="text-2xl">✈️</span>
               <div>
-                <h3 className="font-bold text-sm md:text-base">การเดินทางไปราชการ</h3>
-                <p className="text-[11px] text-white/80">Official Duty Travel Record</p>
+                <h3 className="font-bold text-sm md:text-base">{st('news.travel.title', locale)}</h3>
+                <p className="text-[11px] text-white/80">{st('news.travel.subtitle', locale)}</p>
               </div>
             </div>
             {news.travel_activity_type && (
               <span className="text-xs bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full">
-                {TRAVEL_TYPE_LABELS[news.travel_activity_type] || news.travel_activity_type}
+                {st(`activity.${news.travel_activity_type}`, locale)}
               </span>
             )}
           </div>
@@ -206,7 +198,7 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
           <div className="p-5 space-y-3">
             {news.travel_purpose && (
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">วัตถุประสงค์</p>
+                <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">{st('news.travel.purpose', locale)}</p>
                 <p className="text-sm text-gray-800">{news.travel_purpose}</p>
               </div>
             )}
@@ -214,22 +206,22 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               {news.travel_location && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📍 สถานที่</p>
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📍 {st('news.travel.location', locale)}</p>
                   <p className="text-gray-800 font-medium">{news.travel_location}</p>
                 </div>
               )}
 
               {(news.travel_start_date || news.travel_end_date) && (
                 <div className="bg-white/60 rounded-lg p-2.5">
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📅 ระยะเวลา</p>
+                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">📅 {st('news.travel.duration', locale)}</p>
                   <p className="text-gray-800 font-medium text-xs">
-                    {news.travel_start_date && new Date(news.travel_start_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {news.travel_start_date && new Date(news.travel_start_date).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
                     {news.travel_end_date && news.travel_end_date !== news.travel_start_date && (
-                      <> — {new Date(news.travel_end_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                      <> — {new Date(news.travel_end_date).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</>
                     )}
                   </p>
                   {travelDays > 0 && (
-                    <p className="text-[10px] text-emerald-600 mt-0.5">รวม {travelDays} วัน</p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5">{st('news.travel.days_total', locale)} {travelDays} {st('news.travel.days_unit', locale)}</p>
                   )}
                 </div>
               )}
@@ -241,7 +233,7 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
             {travelParticipants.length > 0 && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold mb-1">
-                  👥 ผู้ร่วมเดินทาง ({travelParticipants.length} คน)
+                  👥 {st('news.travel.participants', locale)} ({travelParticipants.length})
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {travelParticipants.map((p: any) => (
@@ -270,7 +262,7 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
       {/* Image Gallery */}
       {sortedImages.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">รูปภาพประกอบ</h2>
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">{st('news.image_gallery', locale)}</h2>
           <div className={`grid gap-4 ${sortedImages.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {sortedImages.map((img) => (
               <div key={img.id} className="rounded-lg overflow-hidden bg-gray-100">
@@ -285,7 +277,7 @@ export default async function NewsDetailPage({ params }: { params: { id: string 
       {/* Related Publications */}
       {relatedPubs.length > 0 && (
         <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100">
-          <h2 className="text-lg font-semibold text-indigo-800 mb-3">งานวิจัยที่เกี่ยวข้อง</h2>
+          <h2 className="text-lg font-semibold text-indigo-800 mb-3">{st('news.related_publications', locale)}</h2>
           <div className="space-y-3">
             {relatedPubs.map((pub: any) => (
               <div key={pub.id} className="bg-white rounded-lg p-3 border">

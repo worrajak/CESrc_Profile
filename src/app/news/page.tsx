@@ -2,14 +2,20 @@ import { supabase } from '@/lib/supabase';
 import NewsCard from '@/components/NewsCard';
 import ScholarNews from '@/components/ScholarNews';
 import { Metadata } from 'next';
+import { getServerLocale, st } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export const metadata: Metadata = {
-  title: 'ข่าวสารและกิจกรรม | CESRU',
-  description: 'ข่าวสารกิจกรรมทีมวิจัย CESRU และข่าวด้านพลังงานสะอาด',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getServerLocale();
+  return {
+    title: locale === 'en' ? 'News & Activities | CESRU' : 'ข่าวสารและกิจกรรม | CESRU',
+    description: locale === 'en'
+      ? 'CESRU team activities and clean energy news'
+      : 'ข่าวสารกิจกรรมทีมวิจัย CESRU และข่าวด้านพลังงานสะอาด',
+  };
+}
 
 async function getNews() {
   const { data } = await supabase
@@ -28,18 +34,19 @@ async function getNews() {
 
 export default async function NewsPage() {
   const news = await getNews();
+  const locale = getServerLocale();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">ข่าวสารและกิจกรรม</h1>
-      <p className="text-gray-500 mb-8">ข่าวสารกิจกรรมทีม CESrc และข่าวด้านพลังงานจากแหล่งวิชาการ</p>
+      <h1 className="text-3xl font-bold text-gray-800 mb-2">{st('news.list_title', locale)}</h1>
+      <p className="text-gray-500 mb-8">{st('news.list_subtitle', locale)}</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* News from CESrc */}
         <div className="lg:col-span-2">
           <h2 className="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">
             <span className="w-1 h-6 bg-blue-600 rounded-full"></span>
-            ข่าวสารกิจกรรม CESrc
+            {st('news.list_title', locale)}
           </h2>
 
           {news.length > 0 ? (
@@ -50,10 +57,7 @@ export default async function NewsPage() {
             </div>
           ) : (
             <div className="bg-white rounded-xl p-8 text-center border">
-              <p className="text-gray-400">ยังไม่มีข่าวสาร</p>
-              <p className="text-sm text-gray-400 mt-1">
-                ข่าวจะถูกเพิ่มโดยทีม Admin
-              </p>
+              <p className="text-gray-400">{st('news.empty', locale)}</p>
             </div>
           )}
         </div>
@@ -62,11 +66,13 @@ export default async function NewsPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">
             <span className="w-1 h-6 bg-green-600 rounded-full"></span>
-            IEEE Spectrum News
+            {st('home.spectrum.title', locale)}
           </h2>
           <div className="bg-gradient-to-b from-green-50 to-white rounded-xl p-4 border border-green-100">
             <p className="text-xs text-gray-500 mb-3">
-              จาก IEEE Spectrum - Technology, Engineering & Science News
+              {locale === 'en'
+                ? 'From IEEE Spectrum — Technology, Engineering & Science News'
+                : 'จาก IEEE Spectrum - Technology, Engineering & Science News'}
             </p>
             <ScholarNews />
           </div>

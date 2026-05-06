@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useI18n } from '@/lib/I18nContext';
 
 export default function ConsentBanner() {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -35,27 +37,24 @@ export default function ConsentBanner() {
       <div className="flex items-start gap-3 mb-3">
         <div className="text-2xl">🍪</div>
         <div>
-          <h3 className="font-bold text-gray-800 text-sm">คุกกี้และความเป็นส่วนตัว</h3>
-          <p className="text-xs text-gray-600 mt-1">
-            เว็บไซต์นี้ใช้ cookies ที่จำเป็นเพื่อให้บริการ
-            และสถิติการใช้งานแบบ<strong>ไม่ระบุตัวตน</strong> เพื่อปรับปรุงเว็บ
-          </p>
+          <h3 className="font-bold text-gray-800 text-sm">{t('consent.title')}</h3>
+          <p className="text-xs text-gray-600 mt-1">{t('consent.subtitle')}</p>
         </div>
       </div>
 
       <div className="flex gap-2">
         <button onClick={accept}
           className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-medium rounded-lg hover:opacity-90">
-          ยอมรับทั้งหมด
+          {t('consent.accept_all')}
         </button>
         <button onClick={rejectOptional}
           className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50">
-          เฉพาะที่จำเป็น
+          {t('consent.essential_only')}
         </button>
       </div>
 
       <p className="text-[10px] text-gray-400 mt-2 text-center">
-        รายละเอียด: <Link href="/privacy-policy" className="text-blue-600 underline">นโยบายความเป็นส่วนตัว</Link>
+        {t('consent.details')} <Link href="/privacy-policy" className="text-blue-600 underline">{t('footer.privacy')}</Link>
       </p>
     </div>
   );

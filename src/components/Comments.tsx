@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
+import { useI18n } from '@/lib/I18nContext';
 import { supabase } from '@/lib/supabase';
 
 interface Comment {
@@ -25,14 +26,15 @@ interface CommentsProps {
   targetId: string;
 }
 
-const USER_TYPE_BADGE: Record<string, { label: string; color: string }> = {
-  student: { label: '🎓 นักศึกษา', color: 'bg-blue-100 text-blue-700' },
-  researcher: { label: '🔬 นักวิจัย', color: 'bg-violet-100 text-violet-700' },
-  general: { label: '👤 ผู้เยี่ยมชม', color: 'bg-slate-100 text-slate-700' },
+const USER_TYPE_BADGE_COLOR: Record<string, string> = {
+  student: 'bg-blue-100 text-blue-700',
+  researcher: 'bg-violet-100 text-violet-700',
+  general: 'bg-slate-100 text-slate-700',
 };
 
 export default function Comments({ targetType, targetId }: CommentsProps) {
   const { user, profile, signInWithGoogle } = useAuth();
+  const { t, locale } = useI18n();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newContent, setNewContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,7 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
     <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6 mt-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-          💬 <span>ความคิดเห็น</span>
+          💬 <span>{t('comments.title')}</span>
           <span className="text-sm font-normal text-gray-400">({comments.length})</span>
         </h2>
       </div>
@@ -138,13 +140,13 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
                 onChange={(e) => setNewContent(e.target.value)}
                 maxLength={2000}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 text-sm resize-none min-h-[80px]"
-                placeholder={`เขียนความคิดเห็นในฐานะ ${profile.display_name}...`}
+                placeholder={`${t('comments.placeholder')} ${profile.display_name}...`}
               />
               <div className="flex items-center justify-between mt-2">
                 <span className="text-[10px] text-gray-400">{newContent.length}/2000</span>
                 <button type="submit" disabled={submitting || !newContent.trim()}
                   className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm hover:opacity-90 disabled:opacity-40 transition">
-                  {submitting ? 'กำลังส่ง...' : 'ส่งความคิดเห็น'}
+                  {submitting ? t('comments.sending') : t('comments.send')}
                 </button>
               </div>
             </div>
@@ -155,7 +157,7 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
           <div className="flex items-center gap-2">
             <span className="text-xl">💬</span>
             <p className="text-sm text-emerald-900">
-              <strong>Login ด้วย Google</strong> เพื่อแสดงความคิดเห็น — ปลอดภัย PDPA
+              <strong>{t('comments.signin_prompt')}</strong>
             </p>
           </div>
           <button onClick={signInWithGoogle}
@@ -173,16 +175,17 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
 
       {/* Comments List */}
       {loading ? (
-        <div className="text-center py-6 text-gray-400 text-sm">กำลังโหลด...</div>
+        <div className="text-center py-6 text-gray-400 text-sm">{t('common.loading')}</div>
       ) : comments.length === 0 ? (
         <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed rounded-xl">
-          ยังไม่มีความคิดเห็น — เป็นคนแรกกันเลย!
+          {t('comments.empty')}
         </div>
       ) : (
         <div className="space-y-3">
           {comments.map((c) => {
             const gu = c.guest_user;
-            const badge = gu ? USER_TYPE_BADGE[gu.user_type] || USER_TYPE_BADGE.general : null;
+            const badgeColor = gu ? USER_TYPE_BADGE_COLOR[gu.user_type] || USER_TYPE_BADGE_COLOR.general : null;
+            const badgeLabel = gu ? t(`nav.user_type.${gu.user_type}`) : null;
             const isOwner = user?.id === c.user_id;
             const date = new Date(c.created_at);
             return (
@@ -192,17 +195,17 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-medium text-sm text-gray-800">{gu?.display_name || 'ผู้ใช้'}</span>
-                    {badge && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${badge.color}`}>
-                        {badge.label}
+                    <span className="font-medium text-sm text-gray-800">{gu?.display_name || '-'}</span>
+                    {badgeColor && badgeLabel && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${badgeColor}`}>
+                        {badgeLabel}
                       </span>
                     )}
                     {gu?.institution && (
                       <span className="text-[10px] text-gray-500">· {gu.institution}</span>
                     )}
                     <span className="text-[10px] text-gray-400">
-                      {date.toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {date.toLocaleString(locale === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{c.content}</p>
@@ -210,7 +213,7 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
                 {isOwner && (
                   <button onClick={() => handleDelete(c.id)}
                     className="text-[10px] text-red-500 hover:text-red-700 flex-shrink-0">
-                    ลบ
+                    {t('comments.delete')}
                   </button>
                 )}
               </div>
@@ -220,12 +223,12 @@ export default function Comments({ targetType, targetId }: CommentsProps) {
       )}
 
       <p className="text-[10px] text-gray-400 mt-4 pt-3 border-t">
-        Comments ของท่านเป็นไปตาม{' '}
-        <Link href="/terms" className="text-blue-600 hover:underline">ข้อกำหนดการใช้งาน</Link>
+        {locale === 'en' ? 'Your comments are subject to ' : 'Comments ของท่านเป็นไปตาม '}
+        <Link href="/terms" className="text-blue-600 hover:underline">{t('footer.terms')}</Link>
         {' · '}
-        <Link href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</Link>
+        <Link href="/privacy-policy" className="text-blue-600 hover:underline">{t('footer.privacy')}</Link>
         {' · '}
-        Admin สามารถลบ comment ที่ไม่เหมาะสมได้
+        {locale === 'en' ? 'Admin may remove inappropriate content' : 'Admin สามารถลบ comment ที่ไม่เหมาะสมได้'}
       </p>
     </section>
   );

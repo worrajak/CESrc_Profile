@@ -2,14 +2,20 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Metadata } from 'next';
 import SyncClassificationButton from '@/components/SyncClassificationButton';
+import { getServerLocale, st } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-export const metadata: Metadata = {
-  title: 'สาขาวิจัย | CESRU',
-  description: 'สาขาวิจัยของหน่วยวิจัยระบบพลังงานสะอาด CESRU',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = getServerLocale();
+  return {
+    title: locale === 'en' ? 'Research Areas | CESRU' : 'สาขาวิจัย | CESRU',
+    description: locale === 'en'
+      ? 'Research areas of CESRU'
+      : 'สาขาวิจัยของหน่วยวิจัยระบบพลังงานสะอาด CESRU',
+  };
+}
 
 async function getAreas() {
   const { data: areas } = await supabase
@@ -47,16 +53,17 @@ async function getAreas() {
 
 export default async function ResearchAreasPage() {
   const { areas, areaMatches, totalPublications } = await getAreas();
+  const locale = getServerLocale();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-start justify-between mb-2 gap-3 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">สาขาวิจัย</h1>
+          <h1 className="text-3xl font-bold text-gray-800">{st('research_areas.page_title', locale)}</h1>
           <p className="text-gray-500 mt-1">
-            สาขาวิจัยของหน่วยวิจัยระบบพลังงานสะอาด CESRU
+            {st('research_areas.page_subtitle', locale)}
             <span className="ml-2 text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
-              📚 {totalPublications} ผลงาน · {areas.length} สาขา
+              📚 {totalPublications} {st('research_areas.publications_count', locale)} · {areas.length} {st('research_areas.areas_label', locale)}
             </span>
           </p>
         </div>
@@ -66,16 +73,20 @@ export default async function ResearchAreasPage() {
       {areas.length === 0 ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center mt-6">
           <p className="text-3xl mb-2">⚠️</p>
-          <p className="text-amber-800 font-semibold">ยังไม่มีข้อมูลสาขาวิจัย</p>
+          <p className="text-amber-800 font-semibold">{st('research_areas.no_data_title', locale)}</p>
           <p className="text-sm text-amber-700 mt-2">
-            กรุณารัน <code className="bg-amber-100 px-2 py-0.5 rounded">002_seed_data.sql</code> และ{' '}
-            <code className="bg-amber-100 px-2 py-0.5 rounded">005_sdg_research_areas.sql</code> ใน Supabase Dashboard
+            {locale === 'en' ? 'Please run' : 'กรุณารัน'}{' '}
+            <code className="bg-amber-100 px-2 py-0.5 rounded">002_seed_data.sql</code> {locale === 'en' ? 'and' : 'และ'}{' '}
+            <code className="bg-amber-100 px-2 py-0.5 rounded">005_sdg_research_areas.sql</code> {locale === 'en' ? 'in Supabase Dashboard' : 'ใน Supabase Dashboard'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
-          {areas.map((area: { id: string; name_th: string; name_en: string; icon: string | null; description_th: string | null; sdg_goals: string[] | null }) => {
+          {areas.map((area: { id: string; name_th: string; name_en: string; icon: string | null; description_th: string | null; description_en?: string | null; sdg_goals: string[] | null }) => {
             const count = areaMatches[area.id] || 0;
+            const primaryName = locale === 'en' && area.name_en ? area.name_en : area.name_th;
+            const secondaryName = locale === 'en' && area.name_en ? area.name_th : area.name_en;
+            const description = locale === 'en' && area.description_en ? area.description_en : area.description_th;
             return (
               <Link
                 key={area.id}
@@ -90,15 +101,15 @@ export default async function ResearchAreasPage() {
                 )}
                 {area.icon && <div className="text-4xl mb-2">{area.icon}</div>}
                 <p className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                  {area.name_th}
+                  {primaryName}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">{area.name_en}</p>
-                {area.description_th && (
-                  <p className="text-xs text-gray-400 mt-2 line-clamp-2">{area.description_th}</p>
+                {secondaryName && <p className="text-xs text-gray-500 mt-1">{secondaryName}</p>}
+                {description && (
+                  <p className="text-xs text-gray-400 mt-2 line-clamp-2">{description}</p>
                 )}
                 {count > 0 && (
                   <p className="text-[10px] text-emerald-600 mt-2 font-medium">
-                    📄 {count} publication{count > 1 ? 's' : ''}
+                    📄 {count} {st('research_areas.publications_label', locale)}{count > 1 ? 's' : ''}
                   </p>
                 )}
                 {area.sdg_goals && area.sdg_goals.length > 0 && (

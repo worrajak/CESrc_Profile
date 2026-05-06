@@ -3,6 +3,8 @@ import ScholarNews from '@/components/ScholarNews';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ENERGY_TRENDS, CATEGORY_COLORS, CATEGORY_LABELS, TRENDING_LABELS } from '@/data/energy-trends';
+import { getServerLocale, st } from '@/lib/i18n-server';
+import { getLocalizedField } from '@/lib/translations';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -69,6 +71,7 @@ const NFT_LABELS: Record<string, { label: string; icon: string }> = {
 
 export default async function HomePage() {
   const { researchers, pubCount, grantCount, news, sessions } = await getHomeData();
+  const locale = getServerLocale();
   const totalCitations = researchers.reduce((sum: number, r: any) => sum + (r.cited_by_count || 0), 0);
   const avgHIndex = researchers.length
     ? (researchers.reduce((sum: number, r: any) => sum + (r.h_index || 0), 0) / researchers.length).toFixed(1)
@@ -109,25 +112,25 @@ export default async function HomePage() {
                 <div className="flex items-center gap-2 mb-1">
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-lime-400/20 text-lime-300 border border-lime-400/30">
                     <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse"></span>
-                    Research Unit • Est. 2022
+                    {st('home.hero.badge', locale)}
                   </span>
                 </div>
                 <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-white via-lime-100 to-emerald-200 bg-clip-text text-transparent leading-tight">
-                  Clean Energy System Research Unit
+                  {st('home.hero.title', locale)}
                 </h1>
                 <p className="text-slate-300 text-xs md:text-sm mt-0.5">
-                  หน่วยวิจัยระบบพลังงานสะอาด • คณะวิศวกรรมศาสตร์ มทร.ล้านนา
+                  {locale === 'en' ? st('home.hero.affiliation', locale) : `${st('home.hero.subtitle_th', locale)} • ${st('home.hero.affiliation', locale)}`}
                 </p>
               </div>
             </div>
 
             {/* Right: Glass Stats Cards */}
             <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3 w-full">
-              <StatCard value={researchers.length} label="นักวิจัย" color="from-emerald-400 to-teal-400" />
-              <StatCard value={pubCount} label="ผลงาน" color="from-cyan-400 to-blue-400" />
-              <StatCard value={totalCitations.toLocaleString()} label="Citations" color="from-amber-400 to-orange-400" />
-              <StatCard value={avgHIndex} label="Avg H-index" color="from-violet-400 to-fuchsia-400" />
-              <StatCard value={grantCount} label="ทุนวิจัย" color="from-lime-400 to-emerald-400" />
+              <StatCard value={researchers.length} label={st('home.stats.researchers', locale)} color="from-emerald-400 to-teal-400" />
+              <StatCard value={pubCount} label={st('home.stats.publications', locale)} color="from-cyan-400 to-blue-400" />
+              <StatCard value={totalCitations.toLocaleString()} label={st('home.stats.citations', locale)} color="from-amber-400 to-orange-400" />
+              <StatCard value={avgHIndex} label={st('home.stats.h_index', locale)} color="from-violet-400 to-fuchsia-400" />
+              <StatCard value={grantCount} label={st('home.stats.grants', locale)} color="from-lime-400 to-emerald-400" />
             </div>
           </div>
         </div>
@@ -139,14 +142,14 @@ export default async function HomePage() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
-                🌍 Global
+                🌍 {st('home.energy_trends.global', locale)}
               </span>
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider">Updated April 2026</span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">{st('home.energy_trends.updated', locale)}</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-800 via-emerald-700 to-teal-700 bg-clip-text text-transparent">
-              Energy Trends & Innovation 2026
+              {st('home.energy_trends.title', locale)}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">ข่าวสารและเทรนด์พลังงานสะอาดระดับโลก — Curated weekly</p>
+            <p className="text-sm text-gray-500 mt-1">{st('home.energy_trends.subtitle', locale)}</p>
           </div>
         </div>
 
@@ -179,7 +182,7 @@ export default async function HomePage() {
                   </div>
 
                   <h3 className="font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-snug mb-2 line-clamp-2">
-                    {trend.title_th}
+                    {locale === 'en' ? trend.title_en : trend.title_th}
                   </h3>
 
                   <p className="text-xs text-gray-600 line-clamp-3 mb-3 leading-relaxed">
@@ -190,7 +193,7 @@ export default async function HomePage() {
                   <div className="flex items-end justify-between pt-3 border-t border-slate-100">
                     <div>
                       <div className={`text-lg font-bold ${catColor.text}`}>{trend.highlight}</div>
-                      <div className="text-[10px] text-gray-400">Key metric</div>
+                      <div className="text-[10px] text-gray-400">{locale === 'en' ? 'Key metric' : 'ตัวชี้วัดหลัก'}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] font-semibold text-gray-500">{trend.source}</div>
@@ -212,15 +215,15 @@ export default async function HomePage() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
-                    📅 Training
+                    📅 {st('home.training.badge', locale)}
                   </span>
                 </div>
                 <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-700 to-fuchsia-700 bg-clip-text text-transparent">
-                  หลักสูตรอบรมเร็วๆ นี้
+                  {st('home.training.title', locale)}
                 </h2>
               </div>
               <Link href="/services/training" className="text-violet-600 hover:text-violet-800 text-sm font-medium inline-flex items-center gap-1">
-                ดูทั้งหมด
+                {st('common.view_all', locale)}
                 <span>→</span>
               </Link>
             </div>
@@ -244,15 +247,15 @@ export default async function HomePage() {
                           <span className="text-2xl">{DOMAIN_ICONS[course.skill_domain] || '📚'}</span>
                           {isOpen ? (
                             <span className="text-[10px] bg-lime-400 text-lime-950 px-2 py-0.5 rounded-full font-bold animate-pulse">
-                              เปิดรับสมัคร
+                              {st('home.training.open_for_registration', locale)}
                             </span>
                           ) : (
                             <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full backdrop-blur-sm">
-                              เร็วๆ นี้
+                              {st('home.training.coming_soon', locale)}
                             </span>
                           )}
                         </div>
-                        <h3 className="font-bold text-sm mt-1 leading-tight line-clamp-2">{course.title_th}</h3>
+                        <h3 className="font-bold text-sm mt-1 leading-tight line-clamp-2">{getLocalizedField(course, 'title', locale)}</h3>
                       </div>
                     </div>
 
@@ -260,14 +263,14 @@ export default async function HomePage() {
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <span>📅</span>
                         <span>
-                          {startDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                          {startDate.toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short' })}
                           {session.start_date !== session.end_date && (
-                            <> — {endDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</>
+                            <> — {endDate.toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short' })}</>
                           )}
                         </span>
                         {daysUntil > 0 && daysUntil <= 30 && (
                           <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
-                            อีก {daysUntil} วัน
+                            {locale === 'en' ? `in ${daysUntil} days` : `อีก ${daysUntil} วัน`}
                           </span>
                         )}
                       </div>
@@ -282,7 +285,7 @@ export default async function HomePage() {
                       <div className="flex flex-wrap gap-1">
                         {course.duration_days && (
                           <span className="text-[10px] bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded">
-                            {course.duration_days} วัน ({course.duration_hours} ชม.)
+                            {course.duration_days} {locale === 'en' ? `day${course.duration_days > 1 ? 's' : ''}` : 'วัน'} ({course.duration_hours} {locale === 'en' ? 'hrs' : 'ชม.'})
                           </span>
                         )}
                         <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
@@ -290,7 +293,7 @@ export default async function HomePage() {
                         </span>
                         {session.batch_number && (
                           <span className="text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded">
-                            รุ่น {session.batch_number}
+                            {locale === 'en' ? `Batch ${session.batch_number}` : `รุ่น ${session.batch_number}`}
                           </span>
                         )}
                       </div>
@@ -299,7 +302,7 @@ export default async function HomePage() {
                         <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg px-2 py-1.5 border border-amber-200">
                           <span className="text-sm">{nft.icon}</span>
                           <div>
-                            <div className="text-[10px] font-bold text-amber-700">ได้ {nft.label}</div>
+                            <div className="text-[10px] font-bold text-amber-700">{locale === 'en' ? `Earn ${nft.label}` : `ได้ ${nft.label}`}</div>
                             <div className="text-[9px] text-amber-600">Blockchain Certificate</div>
                           </div>
                         </div>
@@ -308,10 +311,10 @@ export default async function HomePage() {
                       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                         <div>
                           <div className="text-sm font-bold text-gray-800">
-                            {course.fee_external > 0 ? `${Number(course.fee_external).toLocaleString()} ฿` : 'ฟรี'}
+                            {course.fee_external > 0 ? `${Number(course.fee_external).toLocaleString()} ฿` : st('home.training.free', locale)}
                           </div>
                           {course.fee_student > 0 && course.fee_student !== course.fee_external && (
-                            <div className="text-[10px] text-gray-400">นศ. {Number(course.fee_student).toLocaleString()} ฿</div>
+                            <div className="text-[10px] text-gray-400">{locale === 'en' ? `Student ${Number(course.fee_student).toLocaleString()} ฿` : `นศ. ${Number(course.fee_student).toLocaleString()} ฿`}</div>
                           )}
                         </div>
                         <Link
@@ -322,7 +325,7 @@ export default async function HomePage() {
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                           }`}
                         >
-                          {isOpen ? 'สมัครเลย' : 'ดูรายละเอียด'}
+                          {isOpen ? st('home.training.register_now', locale) : st('common.see_details', locale)}
                         </Link>
                       </div>
                     </div>
@@ -346,11 +349,11 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-700 to-blue-700 bg-clip-text text-transparent">
-                  ข่าวสารและกิจกรรม
+                  {st('home.news.title', locale)}
                 </h2>
               </div>
               <Link href="/news" className="text-cyan-600 hover:text-cyan-800 text-sm font-medium inline-flex items-center gap-1">
-                ดูทั้งหมด →
+                {st('common.view_all', locale)} →
               </Link>
             </div>
 
@@ -375,7 +378,7 @@ export default async function HomePage() {
                           {item.content.replace(/[#*_`]/g, '').substring(0, 100)}
                         </p>
                         <span className="text-[10px] text-gray-400 mt-1 block">
-                          {new Date(item.published_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {new Date(item.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </span>
                       </div>
                     </div>
@@ -384,7 +387,7 @@ export default async function HomePage() {
               </div>
             ) : (
               <div className="bg-white rounded-xl p-6 text-center border border-slate-200">
-                <p className="text-gray-400 text-sm">ยังไม่มีข่าวสาร</p>
+                <p className="text-gray-400 text-sm">{st('home.news.empty', locale)}</p>
               </div>
             )}
           </div>
@@ -392,11 +395,11 @@ export default async function HomePage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                🌐 Global
+                🌐 {st('home.energy_trends.global', locale)}
               </span>
             </div>
             <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-700 to-lime-700 bg-clip-text text-transparent mb-4">
-              IEEE Spectrum
+              {st('home.spectrum.title', locale)}
             </h2>
             <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 rounded-2xl p-4 border border-emerald-200 shadow-sm">
               <ScholarNews />
