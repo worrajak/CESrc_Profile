@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { CURRENT_CONSENT_VERSION } from '@/lib/AuthContext';
+import { useI18n } from '@/lib/I18nContext';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const [status, setStatus] = useState<'loading' | 'consent' | 'error'>('loading');
   const [user, setUser] = useState<any>(null);
   const [displayName, setDisplayName] = useState('');
@@ -112,7 +114,7 @@ export default function AuthCallbackPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">กำลังเข้าสู่ระบบ...</p>
+          <p className="text-gray-500">{t('auth.callback.signing_in')}</p>
         </div>
       </div>
     );
@@ -123,10 +125,10 @@ export default function AuthCallbackPage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
           <div className="text-4xl mb-3">⚠️</div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">เกิดข้อผิดพลาด</h1>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">{t('error.generic')}</h1>
           <p className="text-sm text-gray-600 mb-4">{errorMsg}</p>
           <Link href="/" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg">
-            กลับหน้าหลัก
+            {locale === 'en' ? 'Back to home' : 'กลับหน้าหลัก'}
           </Link>
         </div>
       </div>
@@ -138,16 +140,14 @@ export default function AuthCallbackPage() {
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-5 text-white">
-          <h1 className="text-2xl font-bold">ยินดีต้อนรับสู่ CESRU! 🎉</h1>
-          <p className="text-sm text-emerald-100 mt-1">
-            เพิ่มข้อมูลเล็กน้อยเพื่อให้การใช้งานสมบูรณ์
-          </p>
+          <h1 className="text-2xl font-bold">{t('auth.callback.welcome')} 🎉</h1>
+          <p className="text-sm text-emerald-100 mt-1">{t('auth.callback.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Email (readonly) */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Email (จาก Google)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t('auth.callback.email_label')}</label>
             <input type="email" value={user?.email || ''} readOnly
               className="w-full px-4 py-2 border rounded-lg bg-gray-50 text-gray-600 text-sm" />
           </div>
@@ -155,22 +155,22 @@ export default function AuthCallbackPage() {
           {/* Display Name */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              ชื่อที่แสดง <span className="text-red-500">*</span>
+              {t('auth.callback.name_label')} <span className="text-red-500">*</span>
             </label>
             <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
-              placeholder="เช่น ปัตร ใจดี" required />
-            <p className="text-xs text-gray-500 mt-1">ชื่อนี้จะแสดงกับ comment ของท่าน — แก้ไขภายหลังได้</p>
+              placeholder={locale === 'en' ? 'e.g. John Doe' : 'เช่น ปัตร ใจดี'} required />
+            <p className="text-xs text-gray-500 mt-1">{t('auth.callback.name_help')}</p>
           </div>
 
           {/* User Type */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">ท่านเป็น</label>
+            <label className="block text-xs font-medium text-gray-700 mb-2">{t('auth.callback.user_type_label')}</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { v: 'student', l: '🎓 นักศึกษา' },
-                { v: 'researcher', l: '🔬 นักวิจัย' },
-                { v: 'general', l: '👤 บุคคลทั่วไป' },
+                { v: 'student', l: t('nav.user_type.student') },
+                { v: 'researcher', l: t('nav.user_type.researcher') },
+                { v: 'general', l: t('nav.user_type.general') },
               ].map((opt) => (
                 <button key={opt.v} type="button"
                   onClick={() => setUserType(opt.v as any)}
@@ -187,12 +187,10 @@ export default function AuthCallbackPage() {
 
           {/* Institution (optional) */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              สถาบัน / มหาวิทยาลัย (ไม่บังคับ)
-            </label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t('auth.callback.institution_label')}</label>
             <input type="text" value={institution} onChange={(e) => setInstitution(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 text-sm"
-              placeholder="เช่น มทร.ล้านนา" />
+              placeholder={locale === 'en' ? 'e.g. RMUTL' : 'เช่น มทร.ล้านนา'} />
           </div>
 
           {/* Consents */}
@@ -202,9 +200,9 @@ export default function AuthCallbackPage() {
                 onChange={(e) => setConsentPrivacy(e.target.checked)}
                 className="mt-1 w-4 h-4" required />
               <span className="text-sm text-gray-700">
-                ฉันได้อ่านและยอมรับ{' '}
+                {t('auth.callback.consent_privacy')}{' '}
                 <Link href="/privacy-policy" target="_blank" className="text-blue-600 underline">
-                  นโยบายความเป็นส่วนตัว (Privacy Policy)
+                  {t('footer.privacy')}
                 </Link>
                 {' '}<span className="text-red-500">*</span>
               </span>
@@ -215,9 +213,9 @@ export default function AuthCallbackPage() {
                 onChange={(e) => setConsentTerms(e.target.checked)}
                 className="mt-1 w-4 h-4" required />
               <span className="text-sm text-gray-700">
-                ฉันยอมรับ{' '}
+                {t('auth.callback.consent_terms')}{' '}
                 <Link href="/terms" target="_blank" className="text-blue-600 underline">
-                  ข้อกำหนดการใช้งาน (Terms of Service)
+                  {t('footer.terms')}
                 </Link>
                 {' '}<span className="text-red-500">*</span>
               </span>
@@ -227,9 +225,7 @@ export default function AuthCallbackPage() {
               <input type="checkbox" checked={marketingOptIn}
                 onChange={(e) => setMarketingOptIn(e.target.checked)}
                 className="mt-1 w-4 h-4" />
-              <span className="text-sm text-gray-700">
-                <strong>(ไม่บังคับ)</strong> ฉันยินยอมรับข่าวสารและข้อมูลกิจกรรม CESRU ทาง email
-              </span>
+              <span className="text-sm text-gray-700">{t('auth.callback.consent_marketing')}</span>
             </label>
           </div>
 
@@ -242,16 +238,18 @@ export default function AuthCallbackPage() {
           <div className="flex gap-3">
             <button type="submit" disabled={submitting || !consentPrivacy || !consentTerms}
               className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 font-medium transition">
-              {submitting ? 'กำลังสมัคร...' : 'ยืนยันและเริ่มต้นใช้งาน'}
+              {submitting ? t('auth.callback.submitting') : t('auth.callback.submit')}
             </button>
             <button type="button" onClick={() => supabase.auth.signOut().then(() => window.location.href = '/')}
               className="px-4 py-2.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm">
-              ยกเลิก
+              {t('auth.callback.cancel')}
             </button>
           </div>
 
           <p className="text-[10px] text-gray-400 text-center">
-            PDPA compliant · ลบบัญชีได้ทุกเมื่อจากหน้า &quot;บัญชีของฉัน&quot;
+            {locale === 'en'
+              ? 'PDPA compliant · You can delete your account anytime from "My Account"'
+              : 'PDPA compliant · ลบบัญชีได้ทุกเมื่อจากหน้า "บัญชีของฉัน"'}
           </p>
         </form>
       </div>
