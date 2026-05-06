@@ -2,52 +2,62 @@
 
 import Link from 'next/link';
 import { Researcher } from '@/lib/supabase';
+import { useI18n } from '@/lib/I18nContext';
 
-const roleBadge: Record<string, { label: string; color: string }> = {
-  advisor: { label: 'ที่ปรึกษา', color: 'bg-purple-100 text-purple-800' },
-  head: { label: 'หัวหน้าหน่วยฯ', color: 'bg-yellow-100 text-yellow-800' },
-  member: { label: 'สมาชิก', color: 'bg-blue-100 text-blue-800' },
-  phd_student: { label: 'นศ. ปริญญาเอก', color: 'bg-pink-100 text-pink-800' },
+const roleBadgeColor: Record<string, string> = {
+  advisor: 'bg-purple-100 text-purple-800',
+  head: 'bg-yellow-100 text-yellow-800',
+  member: 'bg-blue-100 text-blue-800',
+  phd_student: 'bg-pink-100 text-pink-800',
 };
 
 export default function ResearcherCard({ researcher }: { researcher: Researcher }) {
   const r = researcher;
-  const badge = roleBadge[r.unit_role] || roleBadge.member;
+  const { t, locale } = useI18n();
+  const badgeColor = roleBadgeColor[r.unit_role] || roleBadgeColor.member;
+  const badgeLabel = t(`researcher.role.${r.unit_role}`);
+
   const fullNameTh = `${r.title_th}${r.first_name_th} ${r.last_name_th}`;
   const fullNameEn = r.first_name_en
     ? `${r.title_en || ''} ${r.first_name_en} ${r.last_name_en || ''}`
     : '';
+
+  // Choose primary/secondary names based on locale
+  const primaryName = locale === 'en' && fullNameEn ? fullNameEn.trim() : fullNameTh;
+  const secondaryName = locale === 'en' && fullNameEn ? fullNameTh : (fullNameEn ? fullNameEn.trim() : '');
 
   return (
     <Link href={`/researchers/${r.id}`} className="block">
       <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-300 h-full">
         <div className="flex items-start justify-between mb-3">
           {r.avatar_url ? (
-            <img src={r.avatar_url} alt={fullNameTh} className="w-14 h-14 rounded-full object-cover" />
+            <img src={r.avatar_url} alt={primaryName} className="w-14 h-14 rounded-full object-cover" />
           ) : (
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-xl font-bold">
               {r.first_name_th.charAt(0)}
             </div>
           )}
           <div className="flex flex-col gap-1 items-end">
-            <span className={`text-xs px-2 py-1 rounded-full font-medium ${badge.color}`}>
-              {badge.label}
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor}`}>
+              {badgeLabel}
             </span>
             {r.is_pursuing_phd && r.unit_role !== 'phd_student' && (
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-pink-100 text-pink-700">
-                + นศ.ป.เอก
+                {t('researcher.role.researcher_phd')}
               </span>
             )}
           </div>
         </div>
 
-        <h3 className="font-semibold text-gray-900 text-lg">{fullNameTh}</h3>
-        {fullNameEn && (
-          <p className="text-sm text-gray-500 mt-0.5">{fullNameEn.trim()}</p>
+        <h3 className="font-semibold text-gray-900 text-lg">{primaryName}</h3>
+        {secondaryName && (
+          <p className="text-sm text-gray-500 mt-0.5">{secondaryName}</p>
         )}
 
-        {r.position_th && (
-          <p className="text-sm text-blue-600 mt-2">{r.position_th}</p>
+        {(locale === 'en' && r.position_en ? r.position_en : r.position_th) && (
+          <p className="text-sm text-blue-600 mt-2">
+            {locale === 'en' && r.position_en ? r.position_en : r.position_th}
+          </p>
         )}
 
         {/* Identifiers Row: ORCID + OpenAlex */}
@@ -85,7 +95,7 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
                 <span className="text-xs font-semibold text-orange-600">{r.cited_by_count.toLocaleString()}</span>
-                <span className="text-xs text-gray-400">cited</span>
+                <span className="text-xs text-gray-400">{t('researcher.cited')}</span>
               </div>
             )}
             {r.h_index > 0 && (

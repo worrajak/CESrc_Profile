@@ -5,8 +5,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { AuthProvider } from "@/lib/AuthContext";
+import { I18nProvider } from "@/lib/I18nContext";
 import ConsentBanner from "@/components/ConsentBanner";
 import EngagementTracker from "@/components/EngagementTracker";
+import { getServerLocale } from "@/lib/i18n-server";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -25,19 +27,22 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = getServerLocale();
   return (
-    <html lang="th">
+    <html lang={locale}>
       <head>
         <GoogleAnalytics />
       </head>
       <body className={`${geistSans.variable} antialiased bg-gray-50 min-h-screen flex flex-col`}>
-        <AuthProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <EngagementTracker />
-          <ConsentBanner />
-        </AuthProvider>
+        <I18nProvider initialLocale={locale}>
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <EngagementTracker />
+            <ConsentBanner />
+          </AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );

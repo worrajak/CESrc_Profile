@@ -4,9 +4,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useI18n } from '@/lib/I18nContext';
+import LangSwitcher from '@/components/LangSwitcher';
 
 export default function Navbar() {
   const { user, profile, signInWithGoogle, signOut } = useAuth();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -41,13 +44,13 @@ export default function Navbar() {
 
           {/* Desktop */}
           <div className="hidden lg:flex items-center space-x-5 text-sm">
-            <Link href="/" className="hover:text-yellow-300 transition">หน้าแรก</Link>
-            <Link href="/news" className="hover:text-yellow-300 transition">ข่าวสาร</Link>
-            <Link href="/researchers" className="hover:text-yellow-300 transition">นักวิจัย</Link>
-            <Link href="/research-areas" className="hover:text-yellow-300 transition">สาขาวิจัย</Link>
-            <Link href="/publications" className="hover:text-yellow-300 transition">ผลงานตีพิมพ์</Link>
-            <Link href="/grants" className="hover:text-yellow-300 transition">ทุนวิจัย</Link>
-            <Link href="/students" className="hover:text-yellow-300 transition">นักศึกษา</Link>
+            <Link href="/" className="hover:text-yellow-300 transition">{t('nav.home')}</Link>
+            <Link href="/news" className="hover:text-yellow-300 transition">{t('nav.news')}</Link>
+            <Link href="/researchers" className="hover:text-yellow-300 transition">{t('nav.researchers')}</Link>
+            <Link href="/research-areas" className="hover:text-yellow-300 transition">{t('nav.research_areas')}</Link>
+            <Link href="/publications" className="hover:text-yellow-300 transition">{t('nav.publications')}</Link>
+            <Link href="/grants" className="hover:text-yellow-300 transition">{t('nav.grants')}</Link>
+            <Link href="/students" className="hover:text-yellow-300 transition">{t('nav.students')}</Link>
 
             {/* Services Dropdown */}
             <div ref={serviceRef} className="relative">
@@ -55,7 +58,7 @@ export default function Navbar() {
                 onClick={() => setServiceOpen(!serviceOpen)}
                 className="hover:text-yellow-300 transition flex items-center gap-1"
               >
-                บริการวิชาการ
+                {t('nav.services')}
                 <svg className={`w-3 h-3 transition-transform ${serviceOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -64,8 +67,8 @@ export default function Navbar() {
                 <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border py-2 z-50">
                   <Link href="/services" onClick={() => setServiceOpen(false)}
                     className="block px-4 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                    <div className="font-medium text-sm">ผลงานบริการวิชาการ</div>
-                    <div className="text-[10px] text-gray-400">Site References</div>
+                    <div className="font-medium text-sm">{t('nav.services.references')}</div>
+                    <div className="text-[10px] text-gray-400">{t('nav.services.references_subtitle')}</div>
                   </Link>
                   <div className="border-t my-1" />
                   <Link href="/services/training" onClick={() => setServiceOpen(false)}
@@ -73,8 +76,8 @@ export default function Navbar() {
                     <div className="flex items-center gap-2">
                       <span>🎓</span>
                       <div>
-                        <div className="font-medium text-sm">หลักสูตรอบรม</div>
-                        <div className="text-[10px] text-gray-400">Training & NFT Certificate</div>
+                        <div className="font-medium text-sm">{t('nav.services.training')}</div>
+                        <div className="text-[10px] text-gray-400">{t('nav.services.training_subtitle')}</div>
                       </div>
                     </div>
                   </Link>
@@ -83,8 +86,8 @@ export default function Navbar() {
                     <div className="flex items-center gap-2">
                       <span>💡</span>
                       <div>
-                        <div className="font-medium text-sm">ที่ปรึกษา & ออกแบบ</div>
-                        <div className="text-[10px] text-gray-400">Consulting & Design</div>
+                        <div className="font-medium text-sm">{t('nav.services.consulting')}</div>
+                        <div className="text-[10px] text-gray-400">{t('nav.services.consulting_subtitle')}</div>
                       </div>
                     </div>
                   </Link>
@@ -94,8 +97,8 @@ export default function Navbar() {
                     <div className="flex items-center gap-2">
                       <span>📝</span>
                       <div>
-                        <div className="font-medium text-sm">ส่งคำขอบริการ</div>
-                        <div className="text-[10px] text-gray-400">Service Request</div>
+                        <div className="font-medium text-sm">{t('nav.services.request')}</div>
+                        <div className="text-[10px] text-gray-400">{t('nav.services.request_subtitle')}</div>
                       </div>
                     </div>
                   </Link>
@@ -103,7 +106,10 @@ export default function Navbar() {
               )}
             </div>
 
-            <Link href="/equipment" className="hover:text-yellow-300 transition">ครุภัณฑ์</Link>
+            <Link href="/equipment" className="hover:text-yellow-300 transition">{t('nav.equipment')}</Link>
+
+            {/* Language Switcher */}
+            <LangSwitcher />
 
             {/* User menu */}
             <div ref={userMenuRef} className="relative ml-2">
@@ -137,17 +143,17 @@ export default function Navbar() {
                     <p className="text-sm font-semibold text-gray-800">{profile.display_name}</p>
                     <p className="text-[10px] text-gray-500 truncate">{profile.email}</p>
                     <p className="text-[10px] text-emerald-600 mt-0.5">
-                      {profile.user_type === 'student' ? '🎓 นักศึกษา' :
-                        profile.user_type === 'researcher' ? '🔬 นักวิจัย' : '👤 บุคคลทั่วไป'}
+                      {profile.user_type === 'student' ? t('nav.user_type.student') :
+                        profile.user_type === 'researcher' ? t('nav.user_type.researcher') : t('nav.user_type.general')}
                     </p>
                   </div>
                   <Link href="/account" onClick={() => setUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    ⚙️ บัญชีของฉัน
+                    ⚙️ {t('nav.account')}
                   </Link>
                   <button onClick={() => { setUserMenuOpen(false); signOut(); }}
                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                    🚪 ออกจากระบบ
+                    🚪 {t('nav.signout')}
                   </button>
                 </div>
               )}
@@ -170,33 +176,34 @@ export default function Navbar() {
       {/* Mobile menu */}
       {open && (
         <div className="lg:hidden px-4 pb-4 space-y-1">
-          <Link href="/" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>หน้าแรก</Link>
-          <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ข่าวสาร</Link>
-          <Link href="/researchers" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>นักวิจัย</Link>
-          <Link href="/research-areas" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>สาขาวิจัย</Link>
-          <Link href="/publications" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ผลงานตีพิมพ์</Link>
-          <Link href="/grants" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ทุนวิจัย</Link>
-          <Link href="/students" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>นักศึกษา</Link>
+          <Link href="/" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.home')}</Link>
+          <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.news')}</Link>
+          <Link href="/researchers" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.researchers')}</Link>
+          <Link href="/research-areas" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.research_areas')}</Link>
+          <Link href="/publications" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.publications')}</Link>
+          <Link href="/grants" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.grants')}</Link>
+          <Link href="/students" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.students')}</Link>
 
           {/* Services sub-menu (mobile) */}
           <div className="border-t border-blue-600 pt-2 mt-2">
-            <p className="text-blue-300 text-xs font-medium uppercase tracking-wider mb-1">บริการวิชาการ</p>
+            <p className="text-blue-300 text-xs font-medium uppercase tracking-wider mb-1">{t('nav.services')}</p>
             <Link href="/services" className="block py-2 pl-4 hover:text-yellow-300 text-sm" onClick={() => setOpen(false)}>
-              📋 ผลงานบริการวิชาการ
+              📋 {t('nav.services.references')}
             </Link>
             <Link href="/services/training" className="block py-2 pl-4 hover:text-yellow-300 text-sm" onClick={() => setOpen(false)}>
-              🎓 หลักสูตรอบรม
+              🎓 {t('nav.services.training')}
             </Link>
             <Link href="/services/consulting" className="block py-2 pl-4 hover:text-yellow-300 text-sm" onClick={() => setOpen(false)}>
-              💡 ที่ปรึกษา & ออกแบบ
+              💡 {t('nav.services.consulting')}
             </Link>
             <Link href="/services/request" className="block py-2 pl-4 hover:text-yellow-300 text-sm" onClick={() => setOpen(false)}>
-              📝 ส่งคำขอบริการ
+              📝 {t('nav.services.request')}
             </Link>
           </div>
 
-          <div className="border-t border-blue-600 pt-2">
-            <Link href="/equipment" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>ครุภัณฑ์</Link>
+          <div className="border-t border-blue-600 pt-2 flex items-center justify-between">
+            <Link href="/equipment" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.equipment')}</Link>
+            <LangSwitcher />
           </div>
         </div>
       )}
