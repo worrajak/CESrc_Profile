@@ -2,7 +2,6 @@ import { supabase } from '@/lib/supabase';
 import ScholarNews from '@/components/ScholarNews';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ENERGY_TRENDS, CATEGORY_COLORS, CATEGORY_LABELS, TRENDING_LABELS } from '@/data/energy-trends';
 import { getServerLocale, st } from '@/lib/i18n-server';
 import { getLocalizedField } from '@/lib/translations';
 
@@ -10,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
-  const [researchersRes, pubCountRes, grantCountRes, newsRes, sessionsRes] = await Promise.all([
+  const [researchersRes, pubCountRes, grantCountRes, newsRes, sessionsRes, topPubsRes, activeGrantsRes] = await Promise.all([
     supabase
       .from('researchers')
       .select('*')
@@ -41,6 +40,21 @@ async function getHomeData() {
       .in('status', ['open', 'planned'])
       .order('start_date', { ascending: true })
       .limit(4),
+    // Top featured publications: latest year + most-cited within recent 5 years
+    supabase
+      .from('publications')
+      .select('id, title, journal_name, year, doi, pub_type, cited_by_count, is_open_access, keywords')
+      .gte('year', new Date().getFullYear() - 4)
+      .order('cited_by_count', { ascending: false, nullsFirst: false })
+      .order('year', { ascending: false })
+      .limit(8),
+    // Active grants
+    supabase
+      .from('grants')
+      .select('id, title_th, title_en, funding_agency, budget, fiscal_year, start_date, end_date, status')
+      .eq('status', 'active')
+      .order('fiscal_year', { ascending: false })
+      .limit(4),
   ]);
 
   return {
@@ -49,6 +63,8 @@ async function getHomeData() {
     grantCount: grantCountRes.count || 0,
     news: newsRes.data || [],
     sessions: sessionsRes.data || [],
+    topPubs: topPubsRes.data || [],
+    activeGrants: activeGrantsRes.data || [],
   };
 }
 
@@ -69,8 +85,21 @@ const NFT_LABELS: Record<string, { label: string; icon: string }> = {
   LEVEL_5: { label: 'Diamond NFT', icon: '💎' },
 };
 
+const PUB_TYPE_BADGE: Record<string, { th: string; en: string; color: string }> = {
+  journal_international: { th: 'วารสาร Intl', en: 'Intl. Journal', color: 'bg-blue-100 text-blue-700' },
+  journal_national: { th: 'วารสาร', en: 'Journal', color: 'bg-green-100 text-green-700' },
+  conference_international: { th: 'Conference Intl', en: 'Intl. Conf.', color: 'bg-purple-100 text-purple-700' },
+  conference_national: { th: 'Conference', en: 'Conference', color: 'bg-orange-100 text-orange-700' },
+  journal: { th: 'วารสาร', en: 'Journal', color: 'bg-blue-100 text-blue-700' },
+  conference: { th: 'Conference', en: 'Conference', color: 'bg-purple-100 text-purple-700' },
+  book_chapter: { th: 'บทในหนังสือ', en: 'Book Chapter', color: 'bg-amber-100 text-amber-700' },
+  book: { th: 'หนังสือ', en: 'Book', color: 'bg-amber-100 text-amber-700' },
+  patent: { th: 'สิทธิบัตร', en: 'Patent', color: 'bg-rose-100 text-rose-700' },
+  petty_patent: { th: 'อนุสิทธิบัตร', en: 'Petty Patent', color: 'bg-rose-100 text-rose-700' },
+};
+
 export default async function HomePage() {
-  const { researchers, pubCount, grantCount, news, sessions } = await getHomeData();
+  const { researchers, pubCount, grantCount, news, sessions, topPubs, activeGrants } = await getHomeData();
   const locale = getServerLocale();
   const totalCitations = researchers.reduce((sum: number, r: any) => sum + (r.cited_by_count || 0), 0);
   const avgHIndex = researchers.length
@@ -136,76 +165,130 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Energy Trends 2026 — World News */}
-      <section className="relative max-w-7xl mx-auto px-4 py-10">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
-                🌍 {st('home.energy_trends.global', locale)}
-              </span>
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider">{st('home.energy_trends.updated', locale)}</span>
+      {/* Featured CESRU Publications — Compact cards */}
+      {topPubs.length > 0 && (
+        <section className="relative max-w-7xl mx-auto px-4 py-8">
+          <div className="flex items-end justify-between mb-5 gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+                  ⚡ {st('home.featured.badge', locale)}
+                </span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-800 via-emerald-700 to-teal-700 bg-clip-text text-transparent">
+                {st('home.featured.title', locale)}
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">{st('home.featured.subtitle', locale)}</p>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-800 via-emerald-700 to-teal-700 bg-clip-text text-transparent">
-              {st('home.energy_trends.title', locale)}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">{st('home.energy_trends.subtitle', locale)}</p>
+            <Link href="/publications" className="text-emerald-600 hover:text-emerald-800 text-xs font-medium inline-flex items-center gap-1">
+              {st('home.featured.see_all', locale)} →
+            </Link>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {ENERGY_TRENDS.slice(0, 9).map((trend) => {
-            const catColor = CATEGORY_COLORS[trend.category];
-            const trending = TRENDING_LABELS[trend.trending];
-            return (
-              <a
-                key={trend.id}
-                href={trend.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-xl transition-all duration-300"
-              >
-                {/* Gradient top bar */}
-                <div className={`h-1 bg-gradient-to-r ${trend.trending === 'hot' ? 'from-red-500 via-orange-500 to-amber-400' : trend.trending === 'rising' ? 'from-emerald-500 via-teal-500 to-cyan-500' : 'from-violet-500 via-fuchsia-500 to-pink-500'}`}></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {topPubs.slice(0, 8).map((pub: any) => {
+              const badge = PUB_TYPE_BADGE[pub.pub_type] || PUB_TYPE_BADGE.journal;
+              return (
+                <a
+                  key={pub.id}
+                  href={pub.doi ? `https://doi.org/${pub.doi}` : '/publications'}
+                  target={pub.doi ? '_blank' : undefined}
+                  rel={pub.doi ? 'noopener noreferrer' : undefined}
+                  className="group relative bg-white rounded-xl overflow-hidden border border-slate-200 hover:border-emerald-300 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="p-3.5">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${badge.color}`}>
+                        {locale === 'en' ? badge.en : badge.th}
+                      </span>
+                      {pub.cited_by_count > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-orange-600">
+                          ⭐ {pub.cited_by_count}
+                        </span>
+                      )}
+                    </div>
 
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="text-4xl group-hover:scale-110 transition-transform">{trend.icon}</div>
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${trending.color} flex items-center gap-1 shadow-sm`}>
-                      <span>{trending.icon}</span>
-                      <span>{trending.label}</span>
-                    </span>
+                    <h3 className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors text-sm leading-snug line-clamp-3 mb-2">
+                      {pub.title}
+                    </h3>
+
+                    {pub.journal_name && (
+                      <p className="text-[11px] text-gray-500 italic line-clamp-1 mb-1">{pub.journal_name}</p>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-medium text-gray-600">{pub.year}</span>
+                      <div className="flex items-center gap-1.5">
+                        {pub.is_open_access && (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">OA</span>
+                        )}
+                        {pub.doi && (
+                          <span className="text-[9px] text-emerald-600 group-hover:underline">DOI ↗</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
-                  <div className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded ${catColor.bg} ${catColor.text} ${catColor.border} border mb-2`}>
-                    {CATEGORY_LABELS[trend.category]}
-                  </div>
+      {/* Active Research Grants — Compact */}
+      {activeGrants.length > 0 && (
+        <section className="relative max-w-7xl mx-auto px-4 pb-8">
+          <div className="flex items-end justify-between mb-4 gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  💰 {st('grants.section.active', locale)}
+                </span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-800 via-amber-700 to-orange-700 bg-clip-text text-transparent">
+                {st('home.grants.title', locale)}
+              </h2>
+            </div>
+            <Link href="/grants" className="text-amber-700 hover:text-amber-900 text-xs font-medium inline-flex items-center gap-1">
+              {st('home.grants.see_all', locale)} →
+            </Link>
+          </div>
 
-                  <h3 className="font-bold text-gray-900 group-hover:text-emerald-700 transition-colors leading-snug mb-2 line-clamp-2">
-                    {locale === 'en' ? trend.title_en : trend.title_th}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {activeGrants.map((g: any) => {
+              const title = locale === 'en' && g.title_en ? g.title_en : g.title_th;
+              return (
+                <Link
+                  key={g.id}
+                  href={`/grants/${g.id}`}
+                  className="group bg-white rounded-xl border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition-all p-3.5"
+                >
+                  <h3 className="font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-sm leading-snug line-clamp-2 mb-2">
+                    {title}
                   </h3>
-
-                  <p className="text-xs text-gray-600 line-clamp-3 mb-3 leading-relaxed">
-                    {trend.summary}
-                  </p>
-
-                  {/* Highlight metric */}
-                  <div className="flex items-end justify-between pt-3 border-t border-slate-100">
-                    <div>
-                      <div className={`text-lg font-bold ${catColor.text}`}>{trend.highlight}</div>
-                      <div className="text-[10px] text-gray-400">{locale === 'en' ? 'Key metric' : 'ตัวชี้วัดหลัก'}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-semibold text-gray-500">{trend.source}</div>
-                      <div className="text-[10px] text-gray-400">{trend.date}</div>
-                    </div>
+                  <p className="text-[11px] text-gray-500 line-clamp-1 mb-2">{g.funding_agency}</p>
+                  <div className="flex items-end justify-between pt-2 border-t border-slate-100">
+                    {g.budget && (
+                      <div>
+                        <div className="text-sm font-bold text-amber-700">
+                          {(Number(g.budget) / 1_000_000).toFixed(1)}M
+                        </div>
+                        <div className="text-[9px] text-gray-400">{st('home.grants.budget', locale)}</div>
+                      </div>
+                    )}
+                    {g.fiscal_year && (
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-600">{g.fiscal_year}</div>
+                        <div className="text-[9px] text-gray-400">FY</div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      </section>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Upcoming Training */}
       {sessions.length > 0 && (

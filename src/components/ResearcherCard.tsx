@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Researcher } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
 
@@ -14,6 +14,7 @@ const roleBadgeColor: Record<string, string> = {
 export default function ResearcherCard({ researcher }: { researcher: Researcher }) {
   const r = researcher;
   const { t, locale } = useI18n();
+  const router = useRouter();
   const badgeColor = roleBadgeColor[r.unit_role] || roleBadgeColor.member;
   const badgeLabel = t(`researcher.role.${r.unit_role}`);
 
@@ -26,8 +27,21 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
   const primaryName = locale === 'en' && fullNameEn ? fullNameEn.trim() : fullNameTh;
   const secondaryName = locale === 'en' && fullNameEn ? fullNameTh : (fullNameEn ? fullNameEn.trim() : '');
 
+  const navigate = () => router.push(`/researchers/${r.id}`);
+
   return (
-    <Link href={`/researchers/${r.id}`} className="block">
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={navigate}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          navigate();
+        }
+      }}
+      className="block cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-xl"
+    >
       <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-300 h-full">
         <div className="flex items-start justify-between mb-3">
           {r.avatar_url ? (
@@ -126,6 +140,6 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
           </div>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

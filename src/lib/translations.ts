@@ -122,6 +122,20 @@ export const TRANSLATIONS = {
   },
   'home.energy_trends.global': { th: 'Global', en: 'Global' },
   'home.energy_trends.updated': { th: 'อัปเดต เมษายน 2569', en: 'Updated April 2026' },
+
+  // === Homepage: CESRU's own work ===
+  'home.featured.title': { th: 'ผลงานวิจัยเด่นของหน่วย', en: 'Featured Research from CESRU' },
+  'home.featured.subtitle': {
+    th: 'ผลงานตีพิมพ์ของนักวิจัย CESRU ที่ได้รับการอ้างอิงสูง (5 ปีล่าสุด)',
+    en: 'High-impact publications by CESRU researchers (last 5 years)',
+  },
+  'home.featured.badge': { th: 'CESRU', en: 'CESRU' },
+  'home.featured.see_all': { th: 'ดูผลงานทั้งหมด', en: 'See all publications' },
+  'home.featured.cited_label': { th: 'อ้างอิง', en: 'cited' },
+  'home.featured.year': { th: 'ปี', en: 'Year' },
+  'home.grants.title': { th: 'ทุนวิจัยที่กำลังดำเนินการ', en: 'Active Research Grants' },
+  'home.grants.see_all': { th: 'ดูทั้งหมด', en: 'See all grants' },
+  'home.grants.budget': { th: 'งบประมาณ', en: 'Budget' },
   'home.training.title': { th: 'หลักสูตรอบรมเร็วๆ นี้', en: 'Upcoming Training Courses' },
   'home.training.badge': { th: 'การอบรม', en: 'Training' },
   'home.training.open_for_registration': { th: 'เปิดรับสมัคร', en: 'Open for Registration' },
