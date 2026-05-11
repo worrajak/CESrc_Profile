@@ -421,6 +421,21 @@ export const TRANSLATIONS = {
   'rplan.proposal.outputs': { th: 'ผลผลิตที่คาดว่าจะได้', en: 'Expected outputs' },
   'rplan.proposal.outcomes': { th: 'ผลลัพธ์/Impact', en: 'Expected outcomes / Impact' },
   'rplan.proposal.keywords': { th: 'คำสำคัญ', en: 'Keywords' },
+
+  // === Phase 6: Timeline + Proposals tab + Action Plan ===
+  'rplan.tab.timeline': { th: 'ปฏิทินรายเดือน', en: 'Timeline' },
+  'rplan.tab.action_plan': { th: 'แผนการ AI', en: 'AI Action Plan' },
+  'rplan.timeline.range_3': { th: 'รายไตรมาส (3 เดือน)', en: 'Quarter (3 mo)' },
+  'rplan.timeline.range_6': { th: 'ครึ่งปี (6 เดือน)', en: 'Half year (6 mo)' },
+  'rplan.timeline.range_12': { th: 'รายปี (12 เดือน)', en: 'Year (12 mo)' },
+  'rplan.timeline.closing': { th: 'ปิดรับเดือนนี้', en: 'Closing this month' },
+  'rplan.timeline.results': { th: 'ประกาศผลเดือนนี้', en: 'Results this month' },
+  'rplan.timeline.open_window': { th: 'อยู่ในช่วงเปิดรับ', en: 'Open during this month' },
+  'rplan.proposals.empty': { th: 'ยังไม่มี proposal ในระบบ', en: 'No proposals yet' },
+  'rplan.proposals.empty_subtitle': { th: 'เปิดทุนที่ต้องการ แล้วกด "AI ร่าง concept"', en: 'Open a grant call, then click "AI draft concept"' },
+  'rplan.action_plan.title': { th: 'ให้ AI วางแผนการทำงาน 3/6/12 เดือน', en: 'AI plans your next 3 / 6 / 12 months' },
+  'rplan.action_plan.subtitle': { th: 'พิจารณาทั้งทุนที่เปิด, proposal ที่ร่างไว้, journal ที่จะส่ง, และเป้าตำแหน่งวิชาการ', en: 'Considers open grants, your draft proposals, journal pipeline, and career goals' },
+  'rplan.action_plan.generate': { th: '🪄 สร้างแผนด้วย AI', en: '🪄 Generate plan with AI' },
 } as const;
 
 export type TranslationKey = keyof typeof TRANSLATIONS;

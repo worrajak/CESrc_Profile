@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
 import { useAuth } from '@/lib/AuthContext';
 import IngestGrantModal from '@/components/research-plan/IngestGrantModal';
+import TimelineView from '@/components/research-plan/TimelineView';
+import ProposalsList from '@/components/research-plan/ProposalsList';
+import ActionPlanGenerator from '@/components/research-plan/ActionPlanGenerator';
 
 export type GrantCall = {
   id: string;
@@ -59,7 +62,7 @@ export default function ResearchPlanPage() {
   const { user } = useAuth();
   const [calls, setCalls] = useState<GrantCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'calendar' | 'proposals' | 'career'>('calendar');
+  const [tab, setTab] = useState<'calendar' | 'timeline' | 'proposals' | 'action_plan' | 'career'>('calendar');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [showIngest, setShowIngest] = useState(false);
@@ -139,12 +142,12 @@ export default function ResearchPlanPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 mt-6 bg-white/10 backdrop-blur p-1 rounded-xl w-fit">
-            {(['calendar', 'proposals', 'career'] as const).map((tk) => (
+          <div className="flex flex-wrap gap-1 mt-6 bg-white/10 backdrop-blur p-1 rounded-xl w-fit max-w-full">
+            {(['calendar', 'timeline', 'proposals', 'action_plan', 'career'] as const).map((tk) => (
               <button
                 key={tk}
                 onClick={() => setTab(tk)}
-                className={`px-4 py-1.5 text-sm rounded-lg transition ${
+                className={`px-3 md:px-4 py-1.5 text-xs md:text-sm rounded-lg transition whitespace-nowrap ${
                   tab === tk ? 'bg-white text-blue-700 font-medium' : 'text-blue-100 hover:bg-white/10'
                 }`}
               >
@@ -332,19 +335,11 @@ export default function ResearchPlanPage() {
           </>
         )}
 
-        {tab === 'proposals' && (
-          <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-            <div className="text-5xl mb-3">📝</div>
-            <h3 className="text-lg font-semibold text-gray-700">
-              {locale === 'en' ? 'Coming in Phase 2' : 'มาในเฟส 2'}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {locale === 'en'
-                ? 'AI will draft concept proposals matched to grant calls and your expertise.'
-                : 'AI จะร่าง concept proposal ที่ตรงกับแหล่งทุนและความเชี่ยวชาญของท่าน'}
-            </p>
-          </div>
-        )}
+        {tab === 'timeline' && <TimelineView calls={calls} />}
+
+        {tab === 'proposals' && <ProposalsList />}
+
+        {tab === 'action_plan' && <ActionPlanGenerator />}
 
         {tab === 'career' && (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
