@@ -37,26 +37,59 @@ export default function IngestGrantModal({
 }) {
   const { t, locale } = useI18n();
   const [step, setStep] = useState<'input' | 'review'>('input');
+  const [mode, setMode] = useState<'text' | 'image'>('text');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
+  const [imageBase64, setImageBase64] = useState<string>('');
+  const [imageMime, setImageMime] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [extracted, setExtracted] = useState<ExtractedGrant | null>(null);
   const [aiMeta, setAiMeta] = useState<{ source: string; model: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError(locale === 'en' ? 'Please upload an image (PNG/JPG)' : 'กรุณาอัปโหลดไฟล์รูป (PNG/JPG)');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError(locale === 'en' ? 'Image too large (max 8MB)' : 'ไฟล์ใหญ่เกิน 8MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const base64 = dataUrl.split(',')[1];
+      setImageBase64(base64);
+      setImageMime(file.type);
+      setImagePreview(dataUrl);
+      setError('');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleExtract = async () => {
-    if (!url.trim() && !text.trim()) {
-      setError(locale === 'en' ? 'Please provide URL or text' : 'กรุณาใส่ URL หรือข้อความ');
+    if (mode === 'image' && !imageBase64) {
+      setError(locale === 'en' ? 'Upload an image first' : 'กรุณาอัปโหลดรูปก่อน');
+      return;
+    }
+    if (mode === 'text' && !url.trim() && !text.trim()) {
+      setError(locale === 'en' ? 'Provide URL or paste text' : 'กรุณาใส่ URL หรือข้อความ');
       return;
     }
     setProcessing(true);
     setError('');
     try {
+      const body =
+        mode === 'image'
+          ? { image_base64: imageBase64, image_mime: imageMime }
+          : { url: url.trim() || undefined, text: text.trim() || undefined };
       const res = await fetch('/api/research-plan/ingest-grant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() || undefined, text: text.trim() || undefined }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Extraction failed');
@@ -137,41 +170,128 @@ export default function IngestGrantModal({
         <div className="p-6">
           {step === 'input' ? (
             <>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    {t('rplan.ingest.url_label')}
-                  </label>
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.rmutl.ac.th/..."
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    {locale === 'en'
-                      ? '(Currently URL fetch may be blocked by some sites — paste text below for best results)'
-                      : '(บางเว็บไม่ให้ดึงข้อมูล — แนะนำ paste ข้อความด้านล่างเพื่อความแม่นยำ)'}
-                  </p>
-                </div>
+              {/* Mode toggle */}
+              <div className="flex gap-1 mb-4 p-1 bg-gray-100 rounded-xl w-fit">
+                <button
+                  type="button"
+                  onClick={() => setMode('text')}
+                  className={`px-4 py-1.5 text-xs rounded-lg font-medium transition ${
+                    mode === 'text' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📝 {locale === 'en' ? 'URL / Text' : 'URL / ข้อความ'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('image')}
+                  className={`px-4 py-1.5 text-xs rounded-lg font-medium transition ${
+                    mode === 'image' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  📷 {locale === 'en' ? 'Image / Brochure' : 'รูป / โบรชัวร์'}
+                </button>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    {t('rplan.ingest.text_label')}
-                  </label>
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    rows={10}
-                    placeholder={
-                      locale === 'en'
-                        ? 'Paste the announcement text here (Thai or English)'
-                        : 'วางข้อความประกาศ (ไทยหรืออังกฤษ) ตรงนี้\n\nตัวอย่าง:\nประกาศ มทร.ล้านนา เรื่อง การเปิดรับข้อเสนอโครงการวิจัย FF71...\nกำหนดการ:\n- เปิดรับ: 1 ก.พ. 2569\n- ปิดรับ: 31 มี.ค. 2569\n...'
-                    }
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
-                </div>
+              <div className="space-y-4">
+                {mode === 'text' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        {t('rplan.ingest.url_label')}
+                      </label>
+                      <input
+                        type="url"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://www.rmutl.ac.th/..."
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {locale === 'en'
+                          ? '(Currently URL fetch may be blocked by some sites — paste text below for best results)'
+                          : '(บางเว็บไม่ให้ดึงข้อมูล — แนะนำ paste ข้อความด้านล่างเพื่อความแม่นยำ)'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        {t('rplan.ingest.text_label')}
+                      </label>
+                      <textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        rows={10}
+                        placeholder={
+                          locale === 'en'
+                            ? 'Paste the announcement text here (Thai or English)'
+                            : 'วางข้อความประกาศ (ไทยหรืออังกฤษ) ตรงนี้\n\nตัวอย่าง:\nประกาศ มทร.ล้านนา เรื่อง การเปิดรับข้อเสนอโครงการวิจัย FF71...\nกำหนดการ:\n- เปิดรับ: 1 ก.พ. 2569\n- ปิดรับ: 31 มี.ค. 2569\n...'
+                        }
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-2">
+                        {locale === 'en' ? 'Upload grant announcement / brochure image' : 'อัปโหลดรูปประกาศ / โบรชัวร์แหล่งทุน'}
+                      </label>
+
+                      {!imagePreview ? (
+                        <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+                          <div className="flex flex-col items-center justify-center py-6">
+                            <div className="text-4xl mb-2">📤</div>
+                            <p className="text-sm text-gray-600">
+                              <span className="font-semibold">
+                                {locale === 'en' ? 'Click to upload' : 'คลิกเพื่ออัปโหลด'}
+                              </span>{' '}
+                              {locale === 'en' ? 'or drag & drop' : 'หรือลากมาวาง'}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">PNG, JPG (max 8MB)</p>
+                            <p className="text-[10px] text-gray-400 mt-2 text-center max-w-sm leading-relaxed">
+                              {locale === 'en'
+                                ? 'AI will read dates, budget, conditions like FF71 was extracted'
+                                : 'AI จะอ่านวันสำคัญ งบประมาณ เงื่อนไข เหมือนที่สกัด FF71'}
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleFile(f);
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <div className="relative">
+                          <img
+                            src={imagePreview}
+                            alt="preview"
+                            className="w-full max-h-80 object-contain border rounded-lg bg-gray-50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImagePreview('');
+                              setImageBase64('');
+                              setImageMime('');
+                            }}
+                            className="absolute top-2 right-2 bg-white shadow rounded-full w-7 h-7 flex items-center justify-center hover:bg-gray-100 text-gray-600"
+                          >
+                            ×
+                          </button>
+                          <p className="text-[11px] text-gray-500 mt-2">
+                            {locale === 'en'
+                              ? 'AI will use vision to extract all fields from this image'
+                              : 'AI จะใช้ vision สกัดทุก field จากรูปนี้'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">

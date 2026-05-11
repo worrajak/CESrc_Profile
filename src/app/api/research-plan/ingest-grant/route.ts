@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callAIText } from '@/lib/ai-provider';
+import { callAIText, callAIWithVision } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `You are a Thai research grant intake assistant for CESRU (Clean Energy System Research Unit, RMUTL).
 
@@ -48,11 +49,28 @@ CRITICAL RULES:
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { url } = body as { url?: string };
+    const { url, image_base64, image_mime } = body as {
+      url?: string;
+      image_base64?: string;
+      image_mime?: string;
+    };
     let { text } = body as { text?: string };
 
+    // ────────────────────────────────────────────
+    // Path A: Image upload — use vision AI
+    // ────────────────────────────────────────────
+    if (image_base64) {
+      const mime = image_mime || 'image/png';
+      const visionPrompt = `${SYSTEM_PROMPT}\n\nThe image is a Thai grant announcement (โบรชัวร์/ประกาศ). Extract the JSON now.`;
+      const result = await callAIWithVision(image_base64, mime, visionPrompt);
+      if (result.error) {
+        return NextResponse.json({ error: result.error, source: result.source, model: result.model }, { status: 500 });
+      }
+      return NextResponse.json({ data: result.data || {}, source: result.source, model: result.model });
+    }
+
     if (!url && !text) {
-      return NextResponse.json({ error: 'Provide url or text' }, { status: 400 });
+      return NextResponse.json({ error: 'Provide url, text, or image' }, { status: 400 });
     }
 
     // If URL provided but no text, try to fetch text content

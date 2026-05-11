@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callAIText } from '@/lib/ai-provider';
+import { callAIText, callAIWithVision } from '@/lib/ai-provider';
 import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `You are an academic career advisor for Thai universities. The user wants the CURRENT (2025-2026) Thai ก.พ.อ. / OHEC criteria for promotion to:
 - ผู้ช่วยศาสตราจารย์ (Assistant Professor / asst_prof)
@@ -42,11 +43,31 @@ CRITICAL: Always include a "notes" field acknowledging the year of the criteria 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { user_prompt } = body as { user_prompt?: string };
+    const { user_prompt, image_base64, image_mime, source_url, source_text } = body as {
+      user_prompt?: string;
+      image_base64?: string;
+      image_mime?: string;
+      source_url?: string;
+      source_text?: string;
+    };
 
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${user_prompt ? `User context: ${user_prompt}\n\n` : ''}Return the JSON now.`;
+    let result;
 
-    const result = await callAIText(fullPrompt);
+    if (image_base64) {
+      // Vision path: user uploaded a criteria document image
+      const visionPrompt = `${SYSTEM_PROMPT}\n\nThe image is a Thai academic promotion criteria document (เอกสารเกณฑ์ ก.พ.อ. หรือเอกสารคล้ายกัน). Extract all positions present (asst_prof / assoc_prof / full_prof) into JSON.`;
+      result = await callAIWithVision(image_base64, image_mime || 'image/png', visionPrompt);
+    } else {
+      // Text path
+      const sourceBlock = source_text
+        ? `\n\nSOURCE TEXT FROM USER:\n${source_text.slice(0, 14000)}\n`
+        : source_url
+        ? `\n\nSOURCE URL provided by user: ${source_url} — base extraction on the latest version from this source if you can recognize it.`
+        : '';
+      const fullPrompt = `${SYSTEM_PROMPT}\n\n${user_prompt ? `User context: ${user_prompt}\n` : ''}${sourceBlock}\nReturn the JSON now.`;
+      result = await callAIText(fullPrompt);
+    }
+
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
 import { useAuth } from '@/lib/AuthContext';
+import CriteriaUploadModal from '@/components/research-plan/CriteriaUploadModal';
+import CareerGapModal from '@/components/research-plan/CareerGapModal';
 
 type Criteria = {
   id: string;
@@ -54,6 +56,8 @@ export default function CareerPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [showUpload, setShowUpload] = useState(false);
+  const [gapTarget, setGapTarget] = useState<{ researcherId: string; researcherName: string; position: 'asst_prof' | 'assoc_prof' | 'full_prof' } | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -148,19 +152,23 @@ export default function CareerPage() {
               </p>
             </div>
             {user && (
-              <button
-                onClick={refreshCriteria}
-                disabled={refreshing}
-                className="px-4 py-2 bg-white text-rose-700 hover:bg-rose-50 rounded-xl font-medium shadow-lg text-sm whitespace-nowrap disabled:opacity-50"
-              >
-                {refreshing
-                  ? locale === 'en'
-                    ? '🔄 Fetching…'
-                    : '🔄 กำลังดึง…'
-                  : locale === 'en'
-                  ? '🔄 Refresh criteria via AI'
-                  : '🔄 ดึงเกณฑ์ปัจจุบันด้วย AI'}
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowUpload(true)}
+                  className="px-4 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl font-medium text-sm whitespace-nowrap border border-white/30"
+                >
+                  {locale === 'en' ? '📥 Upload criteria doc' : '📥 อัปโหลดเอกสารเกณฑ์'}
+                </button>
+                <button
+                  onClick={refreshCriteria}
+                  disabled={refreshing}
+                  className="px-4 py-2 bg-white text-rose-700 hover:bg-rose-50 rounded-xl font-medium shadow-lg text-sm whitespace-nowrap disabled:opacity-50"
+                >
+                  {refreshing
+                    ? locale === 'en' ? '🔄 Fetching…' : '🔄 กำลังดึง…'
+                    : locale === 'en' ? '🔄 Refresh via AI' : '🔄 ดึงเกณฑ์ด้วย AI'}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -274,23 +282,40 @@ export default function CareerPage() {
                     </td>
                     <td className="text-center px-2 py-2.5">
                       {user ? (
-                        <div className="flex gap-1 justify-center">
-                          {(['asst_prof', 'assoc_prof', 'full_prof'] as const).map((pos) => {
-                            const active = goal?.target_position === pos;
-                            return (
-                              <button
-                                key={pos}
-                                onClick={() => setGoal(r.id, pos)}
-                                className={`text-[10px] px-2 py-1 rounded font-medium transition ${
-                                  active
-                                    ? 'bg-rose-600 text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-rose-100 hover:text-rose-700'
-                                }`}
-                              >
-                                {pos === 'asst_prof' ? 'ผศ.' : pos === 'assoc_prof' ? 'รศ.' : 'ศ.'}
-                              </button>
-                            );
-                          })}
+                        <div className="flex flex-col gap-1 items-center">
+                          <div className="flex gap-1 justify-center">
+                            {(['asst_prof', 'assoc_prof', 'full_prof'] as const).map((pos) => {
+                              const active = goal?.target_position === pos;
+                              return (
+                                <button
+                                  key={pos}
+                                  onClick={() => setGoal(r.id, pos)}
+                                  className={`text-[10px] px-2 py-1 rounded font-medium transition ${
+                                    active
+                                      ? 'bg-rose-600 text-white'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-rose-100 hover:text-rose-700'
+                                  }`}
+                                >
+                                  {pos === 'asst_prof' ? 'ผศ.' : pos === 'assoc_prof' ? 'รศ.' : 'ศ.'}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {goal && criteria.length > 0 && (
+                            <button
+                              onClick={() =>
+                                setGapTarget({
+                                  researcherId: r.id,
+                                  researcherName: name,
+                                  position: goal.target_position,
+                                })
+                              }
+                              className="text-[9px] px-2 py-0.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded font-medium transition whitespace-nowrap"
+                              title={locale === 'en' ? 'AI gap analysis' : 'AI วิเคราะห์ gap'}
+                            >
+                              🔍 {locale === 'en' ? 'Gap' : 'Gap'}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className="text-[10px] text-gray-400">
@@ -311,6 +336,25 @@ export default function CareerPage() {
           </table>
         </div>
       </div>
+
+      {showUpload && (
+        <CriteriaUploadModal
+          onClose={() => setShowUpload(false)}
+          onSaved={() => {
+            setShowUpload(false);
+            fetchAll();
+          }}
+        />
+      )}
+
+      {gapTarget && (
+        <CareerGapModal
+          researcherId={gapTarget.researcherId}
+          researcherName={gapTarget.researcherName}
+          targetPosition={gapTarget.position}
+          onClose={() => setGapTarget(null)}
+        />
+      )}
     </div>
   );
 }

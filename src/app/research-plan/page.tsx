@@ -123,10 +123,25 @@ export default function ResearchPlanPage() {
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur rounded-full text-xs mb-3">
-                <span>🎯</span>
-                <span>AI Co-Pilot</span>
-              </div>
+              {user ? (
+                <button
+                  onClick={() => setShowIngest(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 hover:bg-white/25 backdrop-blur rounded-full text-xs mb-3 transition cursor-pointer"
+                  title={locale === 'en' ? 'Click to ingest a grant with AI' : 'คลิกเพื่อสกัดทุนด้วย AI'}
+                >
+                  <span>🎯</span>
+                  <span>AI Co-Pilot</span>
+                  <span className="text-[10px] opacity-70">·</span>
+                  <span className="text-[10px] opacity-90">
+                    {locale === 'en' ? 'click to ingest a grant' : 'คลิกเพื่อสกัดทุน'}
+                  </span>
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur rounded-full text-xs mb-3">
+                  <span>🎯</span>
+                  <span>AI Co-Pilot</span>
+                </div>
+              )}
               <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('rplan.title')}</h1>
               <p className="text-blue-100 max-w-2xl text-sm">{t('rplan.subtitle')}</p>
             </div>
