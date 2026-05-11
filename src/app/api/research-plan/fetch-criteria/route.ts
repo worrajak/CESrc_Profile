@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callAIText, callAIWithVision } from '@/lib/ai-provider';
-import { supabase } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -72,44 +71,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
+    // NOTE: We don't save server-side because the anon Supabase client can't
+    // write (RLS requires authenticated). Return parsed criteria so the
+    // client (which carries the user JWT) can persist via supabase JS.
     const data = result.data || {};
-    const criteria = data.criteria || {};
-
-    // Save each position's criteria — mark old ones as not current
-    const positions: Array<'asst_prof' | 'assoc_prof' | 'full_prof'> = ['asst_prof', 'assoc_prof', 'full_prof'];
-    const saved: any[] = [];
-    for (const pos of positions) {
-      const c = criteria[pos];
-      if (!c) continue;
-      // Deactivate older versions
-      await supabase
-        .from('promotion_criteria')
-        .update({ is_current: false })
-        .eq('position_code', pos)
-        .eq('is_current', true);
-      // Insert new
-      const { data: inserted } = await supabase
-        .from('promotion_criteria')
-        .insert({
-          position_code: pos,
-          position_name_th: c.position_name_th || '',
-          position_name_en: c.position_name_en || null,
-          source: c.source || null,
-          source_url: c.source_url || null,
-          criteria: c.criteria || {},
-          notes: c.notes || null,
-          ai_extracted: true,
-          ai_provider: result.source,
-          ingested_at: new Date().toISOString(),
-          is_current: true,
-        })
-        .select('id, position_code')
-        .single();
-      if (inserted) saved.push(inserted);
-    }
 
     return NextResponse.json({
-      data: { saved, raw: data },
+      data: { raw: data },
       source: result.source,
       model: result.model,
     });

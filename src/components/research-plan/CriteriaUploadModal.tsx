@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useI18n } from '@/lib/I18nContext';
+import { supabase } from '@/lib/supabase';
 
 export default function CriteriaUploadModal({
   onClose,
@@ -66,8 +67,39 @@ export default function CriteriaUploadModal({
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'Failed');
-      const saved = json.data?.saved || [];
-      setSuccess({ count: saved.length, source: json.source });
+
+      // Client-side save (uses user's auth JWT through supabase JS)
+      const raw = json.data?.raw || {};
+      const criteriaMap = raw.criteria || {};
+      const positions: Array<'asst_prof' | 'assoc_prof' | 'full_prof'> = ['asst_prof', 'assoc_prof', 'full_prof'];
+      let savedCount = 0;
+      for (const pos of positions) {
+        const c = criteriaMap[pos];
+        if (!c) continue;
+        // Mark prior current rows as obsolete
+        await supabase
+          .from('promotion_criteria')
+          .update({ is_current: false })
+          .eq('position_code', pos)
+          .eq('is_current', true);
+        // Insert new row
+        const { error: insErr } = await supabase.from('promotion_criteria').insert({
+          position_code: pos,
+          position_name_th: c.position_name_th || '',
+          position_name_en: c.position_name_en || null,
+          source: c.source || null,
+          source_url: c.source_url || null,
+          criteria: c.criteria || {},
+          notes: c.notes || null,
+          ai_extracted: true,
+          ai_provider: json.source,
+          ingested_at: new Date().toISOString(),
+          is_current: true,
+        });
+        if (!insErr) savedCount++;
+      }
+
+      setSuccess({ count: savedCount, source: json.source });
       // Wait a moment before closing so user sees the success
       setTimeout(() => {
         onSaved();

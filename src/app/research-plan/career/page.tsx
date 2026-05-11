@@ -96,6 +96,34 @@ export default function CareerPage() {
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error);
+
+      // Client-side save (user JWT carries auth for RLS)
+      const raw = json.data?.raw || {};
+      const cmap = raw.criteria || {};
+      const positions: Array<'asst_prof' | 'assoc_prof' | 'full_prof'> = ['asst_prof', 'assoc_prof', 'full_prof'];
+      for (const pos of positions) {
+        const c = cmap[pos];
+        if (!c) continue;
+        await supabase
+          .from('promotion_criteria')
+          .update({ is_current: false })
+          .eq('position_code', pos)
+          .eq('is_current', true);
+        await supabase.from('promotion_criteria').insert({
+          position_code: pos,
+          position_name_th: c.position_name_th || '',
+          position_name_en: c.position_name_en || null,
+          source: c.source || null,
+          source_url: c.source_url || null,
+          criteria: c.criteria || {},
+          notes: c.notes || null,
+          ai_extracted: true,
+          ai_provider: json.source,
+          ingested_at: new Date().toISOString(),
+          is_current: true,
+        });
+      }
+
       await fetchAll();
     } catch (e: any) {
       setError(e.message || 'Error');
