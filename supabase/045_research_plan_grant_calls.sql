@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS grant_calls (
   required_outputs TEXT[],             -- ผลผลิตที่ต้องส่ง (e.g. "Q1 paper", "patent")
 
   -- Links
+  source_url TEXT,                     -- หน้า home page ของแหล่งทุน (NRCT, TSRI, ฯลฯ)
   announcement_url TEXT,               -- ลิงก์ประกาศต้นฉบับ
   regulations_url TEXT,                -- ระเบียบกองทุน
   template_url TEXT,                   -- template ข้อเสนอ
@@ -57,6 +58,12 @@ CREATE TABLE IF NOT EXISTS grant_calls (
 
   UNIQUE(agency_code, call_code)
 );
+
+-- Defensive: if table existed from a partial run before this fix, add the column
+ALTER TABLE grant_calls ADD COLUMN IF NOT EXISTS source_url TEXT;
+ALTER TABLE grant_calls ADD COLUMN IF NOT EXISTS announcement_url TEXT;
+ALTER TABLE grant_calls ADD COLUMN IF NOT EXISTS regulations_url TEXT;
+ALTER TABLE grant_calls ADD COLUMN IF NOT EXISTS template_url TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_grant_calls_status ON grant_calls(status, close_date);
 CREATE INDEX IF NOT EXISTS idx_grant_calls_close_date ON grant_calls(close_date) WHERE is_active = true;
