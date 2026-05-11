@@ -50,6 +50,9 @@ export default function Navbar() {
             <Link href="/research-areas" className="hover:text-yellow-300 transition">{t('nav.research_areas')}</Link>
             <Link href="/publications" className="hover:text-yellow-300 transition">{t('nav.publications')}</Link>
             <Link href="/grants" className="hover:text-yellow-300 transition">{t('nav.grants')}</Link>
+            <Link href="/research-plan" className="hover:text-yellow-300 transition flex items-center gap-1 whitespace-nowrap">
+              <span>🎯</span><span>{t('nav.research_plan')}</span>
+            </Link>
             <Link href="/students" className="hover:text-yellow-300 transition">{t('nav.students')}</Link>
 
             {/* Services Dropdown */}
@@ -182,6 +185,7 @@ export default function Navbar() {
           <Link href="/research-areas" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.research_areas')}</Link>
           <Link href="/publications" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.publications')}</Link>
           <Link href="/grants" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.grants')}</Link>
+          <Link href="/research-plan" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>🎯 {t('nav.research_plan')}</Link>
           <Link href="/students" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.students')}</Link>
 
           {/* Services sub-menu (mobile) */}
