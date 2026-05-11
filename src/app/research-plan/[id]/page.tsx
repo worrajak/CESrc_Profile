@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/I18nContext';
 import { useAuth } from '@/lib/AuthContext';
 import DraftProposalModal from '@/components/research-plan/DraftProposalModal';
 import TeamAllocator from '@/components/research-plan/TeamAllocator';
+import JournalTargetPicker from '@/components/research-plan/JournalTargetPicker';
 import type { GrantCall } from '../page';
 
 // FF71 tier defaults — derived from announcement
@@ -352,6 +353,13 @@ export default function GrantDetailPage() {
                               onChanged={fetchAll}
                             />
                           )}
+
+                          {/* Journal targets + APC budget feedback */}
+                          <JournalTargetPicker
+                            proposalId={p.id}
+                            currentBudget={p.budget_requested}
+                            onBudgetSuggested={() => fetchAll()}
+                          />
                         </div>
                       )}
                     </div>

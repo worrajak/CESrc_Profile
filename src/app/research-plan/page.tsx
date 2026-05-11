@@ -349,14 +349,20 @@ export default function ResearchPlanPage() {
         {tab === 'career' && (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-3">🎓</div>
-            <h3 className="text-lg font-semibold text-gray-700">
-              {locale === 'en' ? 'Coming in Phase 5' : 'มาในเฟส 5'}
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+              {locale === 'en' ? 'Academic Career Plan' : 'แผนตำแหน่งวิชาการ'}
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mb-5">
               {locale === 'en'
-                ? 'Track progress towards Asst. Prof, Assoc. Prof, Full Prof with current ก.พ.อ. criteria.'
-                : 'ติดตามความก้าวหน้าสู่ ผศ./รศ./ศ. พร้อมเกณฑ์ ก.พ.อ. ปัจจุบัน'}
+                ? 'Track progress towards Asst. Prof, Assoc. Prof, Full Prof with AI-fetched current ก.พ.อ. criteria.'
+                : 'ติดตามความก้าวหน้าสู่ ผศ./รศ./ศ. — AI ดึงเกณฑ์ ก.พ.อ. ปัจจุบันมาเก็บให้'}
             </p>
+            <Link
+              href="/research-plan/career"
+              className="inline-block px-5 py-2 bg-rose-600 text-white rounded-lg text-sm hover:bg-rose-700 font-medium transition"
+            >
+              {locale === 'en' ? 'Open career planner →' : 'เปิดหน้าวางแผนตำแหน่ง →'}
+            </Link>
           </div>
         )}
       </div>
