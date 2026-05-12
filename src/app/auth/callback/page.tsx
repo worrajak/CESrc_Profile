@@ -26,40 +26,52 @@ export default function AuthCallbackPage() {
     let timeoutId: any;
     let subscription: any;
 
+    const showConsentForm = (sessionUser: any) => {
+      if (cancelled) return;
+      setUser(sessionUser);
+      setDisplayName((sessionUser.user_metadata?.full_name as string) || sessionUser.email?.split('@')[0] || '');
+      setStatus('consent');
+    };
+
     const handleSession = async (sessionUser: any) => {
       if (cancelled) return;
       setUser(sessionUser);
 
-      // Check if profile exists (use maybeSingle to avoid PGRST116 error)
-      const { data: existing } = await supabase
+      // Race the profile lookup against a 2.5s timeout — if guest_users query
+      // hangs (RLS / network), we still show the consent form. The form's
+      // upsert handles existing rows gracefully.
+      const profilePromise = supabase
         .from('guest_users')
         .select('*')
         .eq('id', sessionUser.id)
-        .maybeSingle();
+        .maybeSingle()
+        .then((r) => ({ kind: 'data' as const, data: r.data }));
+      const timeoutPromise = new Promise<{ kind: 'timeout' }>((resolve) =>
+        setTimeout(() => resolve({ kind: 'timeout' }), 2500),
+      );
 
+      const result = await Promise.race([profilePromise, timeoutPromise]);
       if (cancelled) return;
 
-      if (existing) {
-        // Already registered — full reload to ensure AuthContext picks up the session
+      if (result.kind === 'data' && result.data) {
+        // Already registered — full reload to refresh AuthContext
         const returnUrl = sessionStorage.getItem('auth_return_url') || '/';
         sessionStorage.removeItem('auth_return_url');
         window.location.href = returnUrl;
       } else {
-        // New user — show consent form
-        setDisplayName((sessionUser.user_metadata?.full_name as string) || sessionUser.email?.split('@')[0] || '');
-        setStatus('consent');
+        // No profile OR query timed out — show consent form
+        showConsentForm(sessionUser);
       }
     };
 
-    // Safety: if anything hangs and we have a session anyway, force-show the
-    // consent form after 3.5 seconds so the user is never trapped.
+    // Safety net: if the page is still on the spinner after 3.5s but Supabase
+    // does have a session, force-show the consent form so the user is never
+    // trapped.
     const safetyId = setTimeout(async () => {
       if (cancelled) return;
       const { data: { session: latest } } = await supabase.auth.getSession();
       if (latest?.user && !user) {
-        setUser(latest.user);
-        setDisplayName((latest.user.user_metadata?.full_name as string) || latest.user.email?.split('@')[0] || '');
-        setStatus('consent');
+        showConsentForm(latest.user);
       }
     }, 3500);
 
