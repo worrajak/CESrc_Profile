@@ -129,6 +129,15 @@ export default function Navbar() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
+              ) : user ? (
+                <Link
+                  href="/auth/callback"
+                  className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm transition"
+                  title="กรอก profile ให้เสร็จเพื่อใช้งานเต็มรูปแบบ"
+                >
+                  <span>✅</span>
+                  กรอก profile
+                </Link>
               ) : (
                 <button onClick={() => setSignInOpen(true)}
                   className="flex items-center gap-1.5 bg-white text-gray-700 hover:bg-gray-100 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm transition">
@@ -213,6 +222,15 @@ export default function Navbar() {
             >
               🔓 Sign in
             </button>
+          )}
+          {user && !profile && (
+            <Link
+              href="/auth/callback"
+              onClick={() => setOpen(false)}
+              className="block w-full mt-2 py-2 bg-amber-100 text-amber-800 rounded-full text-sm font-medium text-center"
+            >
+              ✅ กรอก profile ให้เสร็จ
+            </Link>
           )}
         </div>
       )}

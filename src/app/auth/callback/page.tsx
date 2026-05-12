@@ -22,36 +22,67 @@ export default function AuthCallbackPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    (async () => {
-      // Wait for Supabase to process the OAuth hash
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setStatus('error');
-        setErrorMsg('ไม่พบข้อมูลการเข้าสู่ระบบ');
-        return;
-      }
+    let cancelled = false;
+    let timeoutId: any;
+    let subscription: any;
 
-      const u = session.user;
-      setUser(u);
+    const handleSession = async (sessionUser: any) => {
+      if (cancelled) return;
+      setUser(sessionUser);
 
-      // Check if profile exists
+      // Check if profile exists (use maybeSingle to avoid PGRST116 error)
       const { data: existing } = await supabase
         .from('guest_users')
         .select('*')
-        .eq('id', u.id)
-        .single();
+        .eq('id', sessionUser.id)
+        .maybeSingle();
+
+      if (cancelled) return;
 
       if (existing) {
-        // Already registered — redirect back
+        // Already registered — full reload to ensure AuthContext picks up the session
         const returnUrl = sessionStorage.getItem('auth_return_url') || '/';
         sessionStorage.removeItem('auth_return_url');
-        router.push(returnUrl);
+        window.location.href = returnUrl;
       } else {
         // New user — show consent form
-        setDisplayName((u.user_metadata?.full_name as string) || u.email?.split('@')[0] || '');
+        setDisplayName((sessionUser.user_metadata?.full_name as string) || sessionUser.email?.split('@')[0] || '');
         setStatus('consent');
       }
+    };
+
+    (async () => {
+      // 1) Try existing session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await handleSession(session.user);
+        return;
+      }
+
+      // 2) Subscribe to auth changes — Magic Link / OAuth hash takes a moment to process
+      const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
+        if (sess?.user) handleSession(sess.user);
+      });
+      subscription = sub.subscription;
+
+      // 3) Give up after 8 seconds — link probably expired or session creation failed
+      timeoutId = setTimeout(async () => {
+        if (cancelled) return;
+        const { data: { session: latest } } = await supabase.auth.getSession();
+        if (latest?.user) {
+          handleSession(latest.user);
+        } else {
+          setStatus('error');
+          setErrorMsg('ลิงก์อาจหมดอายุ หรือ session สร้างไม่สำเร็จ — ลองส่ง Magic Link ใหม่อีกครั้ง');
+        }
+      }, 8000);
     })();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (subscription) subscription.unsubscribe();
+    };
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
