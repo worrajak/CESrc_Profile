@@ -51,6 +51,18 @@ export default function AuthCallbackPage() {
       }
     };
 
+    // Safety: if anything hangs and we have a session anyway, force-show the
+    // consent form after 3.5 seconds so the user is never trapped.
+    const safetyId = setTimeout(async () => {
+      if (cancelled) return;
+      const { data: { session: latest } } = await supabase.auth.getSession();
+      if (latest?.user && !user) {
+        setUser(latest.user);
+        setDisplayName((latest.user.user_metadata?.full_name as string) || latest.user.email?.split('@')[0] || '');
+        setStatus('consent');
+      }
+    }, 3500);
+
     (async () => {
       // 1) Try existing session first
       const { data: { session } } = await supabase.auth.getSession();
@@ -80,6 +92,7 @@ export default function AuthCallbackPage() {
 
     return () => {
       cancelled = true;
+      if (safetyId) clearTimeout(safetyId);
       if (timeoutId) clearTimeout(timeoutId);
       if (subscription) subscription.unsubscribe();
     };
@@ -100,17 +113,20 @@ export default function AuthCallbackPage() {
     setErrorMsg('');
 
     try {
-      // Insert guest_users profile
-      const { error: profileError } = await supabase.from('guest_users').insert({
-        id: user.id,
-        email: user.email,
-        display_name: displayName.trim(),
-        user_type: userType,
-        institution: institution.trim() || null,
-        consent_version: CURRENT_CONSENT_VERSION,
-        consented_at: new Date().toISOString(),
-        marketing_opt_in: marketingOptIn,
-      });
+      // Upsert guest_users profile (safe even if row already exists)
+      const { error: profileError } = await supabase.from('guest_users').upsert(
+        {
+          id: user.id,
+          email: user.email,
+          display_name: displayName.trim(),
+          user_type: userType,
+          institution: institution.trim() || null,
+          consent_version: CURRENT_CONSENT_VERSION,
+          consented_at: new Date().toISOString(),
+          marketing_opt_in: marketingOptIn,
+        },
+        { onConflict: 'id' },
+      );
 
       if (profileError) throw profileError;
 
@@ -143,9 +159,32 @@ export default function AuthCallbackPage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-sm px-4">
           <div className="animate-spin h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-500">{t('auth.callback.signing_in')}</p>
+          <p className="text-xs text-gray-400 mt-6">
+            {locale === 'en' ? 'Taking too long?' : 'รอนานเกินไป?'}
+          </p>
+          <div className="flex gap-2 justify-center mt-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
+            >
+              🔄 {locale === 'en' ? 'Reload' : 'โหลดใหม่'}
+            </button>
+            <Link
+              href="/"
+              className="text-xs px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
+            >
+              ← {locale === 'en' ? 'Back to home' : 'กลับหน้าหลัก'}
+            </Link>
+            <button
+              onClick={() => supabase.auth.signOut().then(() => window.location.href = '/')}
+              className="text-xs px-3 py-1.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+            >
+              {locale === 'en' ? 'Sign out & retry' : 'ออก & ลองใหม่'}
+            </button>
+          </div>
         </div>
       </div>
     );
