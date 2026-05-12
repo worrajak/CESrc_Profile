@@ -47,7 +47,7 @@ export default function AdminEquipmentPage() {
   };
 
   const loadItems = async () => {
-    const q = supabase.from('equipment').select('*').order('category').order('name_th');
+    const q = supabase.from('cesru_equipment').select('*').order('category').order('name_th');
     const { data } = await q;
     setItems(data || []);
   };
@@ -63,9 +63,9 @@ export default function AdminEquipmentPage() {
     payload.quantity_available = parseInt(payload.quantity_available as any) || 1;
 
     if (editing) {
-      await supabase.from('equipment').update(payload).eq('id', editing.id);
+      await supabase.from('cesru_equipment').update(payload).eq('id', editing.id);
     } else {
-      await supabase.from('equipment').insert(payload);
+      await supabase.from('cesru_equipment').insert(payload);
     }
     setShowForm(false);
     setEditing(null);
@@ -77,7 +77,7 @@ export default function AdminEquipmentPage() {
   const handleDispose = async (item: any) => {
     const reason = prompt('เหตุผลในการตัดจำหน่าย:');
     if (!reason) return;
-    await supabase.from('equipment').update({
+    await supabase.from('cesru_equipment').update({
       status: 'disposed',
       disposed_date: new Date().toISOString().split('T')[0],
       disposed_reason: reason,
@@ -88,7 +88,7 @@ export default function AdminEquipmentPage() {
 
   const handleDelete = async (item: any) => {
     if (!confirm(`ลบ "${item.name_th}" ออกจากระบบ?`)) return;
-    await supabase.from('equipment').delete().eq('id', item.id);
+    await supabase.from('cesru_equipment').delete().eq('id', item.id);
     await loadItems();
   };
 

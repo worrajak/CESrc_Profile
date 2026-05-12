@@ -33,7 +33,7 @@ function BorrowForm() {
   });
 
   useEffect(() => {
-    supabase.from('equipment').select('id, name_th, name_en, quantity_available, status')
+    supabase.from('cesru_equipment').select('id, name_th, name_en, quantity_available, status')
       .eq('status', 'available').order('name_th')
       .then(({ data }) => setEquipmentList(data || []));
     supabase.from('researchers').select('id, title_th, first_name_th, last_name_th')
@@ -62,7 +62,7 @@ function BorrowForm() {
       if (adv) payload.advisor_name = `${adv.title_th}${adv.first_name_th} ${adv.last_name_th}`;
     }
 
-    const { error: err } = await supabase.from('borrow_requests').insert(payload);
+    const { error: err } = await supabase.from('cesru_borrow_requests').insert(payload);
     if (err) {
       setError(err.message);
     } else {

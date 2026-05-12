@@ -27,7 +27,7 @@ const statusBadge: Record<string, { label: string; cls: string }> = {
 
 export default async function EquipmentPage() {
   const { data: items } = await supabase
-    .from('equipment')
+    .from('cesru_equipment')
     .select('*')
     .neq('status', 'disposed')
     .order('category')

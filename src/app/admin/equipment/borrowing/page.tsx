@@ -46,7 +46,7 @@ export default function AdminBorrowingPage() {
 
   const loadRequests = async () => {
     const { data } = await supabase
-      .from('borrow_requests')
+      .from('cesru_borrow_requests')
       .select('*, equipment:equipment_id(name_th, name_en, asset_number)')
       .order('created_at', { ascending: false });
 
@@ -68,25 +68,25 @@ export default function AdminBorrowingPage() {
     let updateError: any = null;
     if (action === 'reject') {
       const reason = prompt('เหตุผลในการปฏิเสธ:');
-      const { error } = await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('cesru_borrow_requests').update({
         status: 'rejected', rejection_reason: reason, approved_by: approverName, approved_at: new Date().toISOString(),
       }).eq('id', req.id);
       updateError = error;
     } else if (action === 'advisor_approve') {
-      const { error } = await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('cesru_borrow_requests').update({
         status: 'advisor_approved', advisor_approved_by: approverName, advisor_approved_at: new Date().toISOString(),
       }).eq('id', req.id);
       updateError = error;
     } else {
-      const { error } = await supabase.from('borrow_requests').update({
+      const { error } = await supabase.from('cesru_borrow_requests').update({
         status: 'borrowed', approved_by: approverName, approved_at: new Date().toISOString(),
       }).eq('id', req.id);
       updateError = error;
       if (!error) {
         // Decrement available quantity
-        const { data: eq } = await supabase.from('equipment').select('quantity_available').eq('id', req.equipment_id).single();
+        const { data: eq } = await supabase.from('cesru_equipment').select('quantity_available').eq('id', req.equipment_id).single();
         if (eq) {
-          const { error: eqErr } = await supabase.from('equipment').update({
+          const { error: eqErr } = await supabase.from('cesru_equipment').update({
             quantity_available: Math.max(0, eq.quantity_available - req.quantity),
             status: eq.quantity_available - req.quantity <= 0 ? 'borrowed' : 'available',
           }).eq('id', req.equipment_id);
@@ -103,9 +103,9 @@ export default function AdminBorrowingPage() {
 
   const handleReturn = async () => {
     if (!returnModal) return;
-    const { data: eq } = await supabase.from('equipment').select('quantity_available, quantity_total').eq('id', returnModal.equipment_id).single();
+    const { data: eq } = await supabase.from('cesru_equipment').select('quantity_available, quantity_total').eq('id', returnModal.equipment_id).single();
 
-    const { error: returnErr } = await supabase.from('borrow_requests').update({
+    const { error: returnErr } = await supabase.from('cesru_borrow_requests').update({
       status: 'returned',
       actual_return_date: new Date().toISOString().split('T')[0],
       return_condition: returnForm.condition,
@@ -120,7 +120,7 @@ export default function AdminBorrowingPage() {
     // Increment available quantity
     if (eq) {
       const newQty = Math.min(eq.quantity_total, eq.quantity_available + returnModal.quantity);
-      const { error: eqErr } = await supabase.from('equipment').update({
+      const { error: eqErr } = await supabase.from('cesru_equipment').update({
         quantity_available: newQty,
         status: newQty > 0 ? 'available' : 'borrowed',
       }).eq('id', returnModal.equipment_id);
