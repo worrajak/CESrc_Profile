@@ -159,14 +159,24 @@ export default function AdminInnovationsPage() {
     });
   };
 
+  const getAdminPwd = () =>
+    (typeof window !== 'undefined' && sessionStorage.getItem('admin_pwd')) || '';
+
   const uploadImage = async (file: File, target: 'cover' | 'gallery') => {
     setUploading(true);
+    setMessage('');
     try {
+      const pwd = getAdminPwd();
+      if (!pwd) {
+        throw new Error('ไม่พบ admin password ใน session — โปรด sign in ที่ /admin ก่อน');
+      }
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('password', pwd);
+      fd.append('folder', 'innovations');
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!data.url) throw new Error('upload failed');
+      if (!res.ok || !data.url) throw new Error(data.error || 'upload failed');
       if (target === 'cover') {
         setEditing((p) => ({ ...p!, cover_image_url: data.url }));
       } else {
@@ -184,12 +194,20 @@ export default function AdminInnovationsPage() {
 
   const uploadDocument = async (file: File) => {
     setUploading(true);
+    setMessage('');
     try {
+      const pwd = getAdminPwd();
+      if (!pwd) {
+        throw new Error('ไม่พบ admin password ใน session — โปรด sign in ที่ /admin ก่อน');
+      }
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('password', pwd);
+      fd.append('folder', 'innovations');
+      fd.append('type', file.type === 'application/pdf' ? 'document' : '');
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!data.url) throw new Error('upload failed');
+      if (!res.ok || !data.url) throw new Error(data.error || 'upload failed');
       const ext = file.name.split('.').pop()?.toLowerCase();
       const type = ext === 'pdf' ? 'pdf' : ['jpg', 'jpeg', 'png'].includes(ext || '') ? 'image' : ext;
       setEditing((p) => ({
@@ -200,7 +218,7 @@ export default function AdminInnovationsPage() {
         ],
       }));
     } catch (e: any) {
-      setMessage('อัปโหลดเอกสารไม่สำเร็จ');
+      setMessage('อัปโหลดเอกสารไม่สำเร็จ: ' + (e.message || ''));
     } finally {
       setUploading(false);
     }
