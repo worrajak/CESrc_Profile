@@ -165,6 +165,77 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* News & IEEE Spectrum — moved above Featured Research so visitors see latest activity first */}
+      <section className="max-w-7xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">
+                    📰 CESRU News
+                  </span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-700 to-blue-700 bg-clip-text text-transparent">
+                  {st('home.news.title', locale)}
+                </h2>
+              </div>
+              <Link href="/news" className="text-cyan-600 hover:text-cyan-800 text-sm font-medium inline-flex items-center gap-1">
+                {st('common.view_all', locale)} →
+              </Link>
+            </div>
+
+            {news.length > 0 ? (
+              <div className="space-y-3">
+                {news.map((item: any) => (
+                  <Link key={item.id} href={`/news/${item.id}`} className="block group">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-cyan-300 transition-all duration-300 p-3 flex gap-4">
+                      {item.cover_image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.cover_image_url}
+                          alt={item.title}
+                          className="w-24 h-20 object-cover rounded-lg flex-shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-gray-800 group-hover:text-cyan-700 transition-colors text-sm line-clamp-2">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          {item.content.replace(/[#*_`]/g, '').substring(0, 100)}
+                        </p>
+                        <span className="text-[10px] text-gray-400 mt-1 block">
+                          {new Date(item.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl p-6 text-center border border-slate-200">
+                <p className="text-gray-400 text-sm">{st('home.news.empty', locale)}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                🌐 {st('home.energy_trends.global', locale)}
+              </span>
+            </div>
+            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-700 to-lime-700 bg-clip-text text-transparent mb-4">
+              {st('home.spectrum.title', locale)}
+            </h2>
+            <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 rounded-2xl p-4 border border-emerald-200 shadow-sm">
+              <ScholarNews />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Featured CESRU Publications — Compact cards */}
       {topPubs.length > 0 && (
         <section className="relative max-w-7xl mx-auto px-4 py-8">
@@ -420,76 +491,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* News & IEEE Spectrum */}
-      <section className="max-w-7xl mx-auto px-4 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">
-                    📰 CESRU News
-                  </span>
-                </div>
-                <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-700 to-blue-700 bg-clip-text text-transparent">
-                  {st('home.news.title', locale)}
-                </h2>
-              </div>
-              <Link href="/news" className="text-cyan-600 hover:text-cyan-800 text-sm font-medium inline-flex items-center gap-1">
-                {st('common.view_all', locale)} →
-              </Link>
-            </div>
-
-            {news.length > 0 ? (
-              <div className="space-y-3">
-                {news.map((item: any) => (
-                  <Link key={item.id} href={`/news/${item.id}`} className="block group">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg hover:border-cyan-300 transition-all duration-300 p-3 flex gap-4">
-                      {item.cover_image_url && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.cover_image_url}
-                          alt={item.title}
-                          className="w-24 h-20 object-cover rounded-lg flex-shrink-0"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-800 group-hover:text-cyan-700 transition-colors text-sm line-clamp-2">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {item.content.replace(/[#*_`]/g, '').substring(0, 100)}
-                        </p>
-                        <span className="text-[10px] text-gray-400 mt-1 block">
-                          {new Date(item.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl p-6 text-center border border-slate-200">
-                <p className="text-gray-400 text-sm">{st('home.news.empty', locale)}</p>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                🌐 {st('home.energy_trends.global', locale)}
-              </span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-700 to-lime-700 bg-clip-text text-transparent mb-4">
-              {st('home.spectrum.title', locale)}
-            </h2>
-            <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 rounded-2xl p-4 border border-emerald-200 shadow-sm">
-              <ScholarNews />
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
