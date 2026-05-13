@@ -64,6 +64,7 @@ export default function AdminNewsPage() {
 
   // Form
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('team_activity');
@@ -229,6 +230,7 @@ export default function AdminNewsPage() {
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setTitle(''); setContent(''); setCategory('team_activity');
     setCoverUrl(''); setImages([]); setTags([]); setSdgGoals([]);
     setIsOfficialTravel(false);
@@ -238,6 +240,52 @@ export default function AdminNewsPage() {
     setTravelApprovalNumber(''); setTravelApprovalDocUrl(''); setTravelApprovalLink('');
     setTravelBudget(''); setTravelFundingSource(''); setTravelParticipants([]);
     setAuthorId('');
+    setMessage('');
+  };
+
+  // Start editing an existing news item — fetch full record + populate form
+  const startEdit = async (id: string) => {
+    setMessage('');
+    try {
+      const res = await fetch(`/api/news/${id}`);
+      if (!res.ok) throw new Error('Failed to load news');
+      const { news: n } = await res.json();
+      if (!n) throw new Error('News not found');
+
+      setEditingId(id);
+      setTitle(n.title || '');
+      setContent(n.content || '');
+      setCategory(n.category || 'team_activity');
+      setCoverUrl(n.cover_image_url || '');
+      setTags(n.tags || []);
+      setSdgGoals(n.sdg_goals || []);
+      setAuthorId(n.author_id || '');
+      setImages(
+        (n.news_images || [])
+          .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+          .map((im: any) => ({ url: im.image_url, caption: im.caption || '' })),
+      );
+
+      // Travel fields
+      setIsOfficialTravel(!!n.is_official_travel);
+      setTravelPurpose(n.travel_purpose || '');
+      setTravelLocation(n.travel_location || '');
+      setTravelStartDate(n.travel_start_date || '');
+      setTravelEndDate(n.travel_end_date || '');
+      setTravelActivityType(n.travel_activity_type || 'conference');
+      setTravelApprovalNumber(n.travel_approval_number || '');
+      setTravelApprovalDocUrl(n.travel_approval_doc_url || '');
+      setTravelApprovalLink(n.travel_approval_link || '');
+      setTravelBudget(n.travel_budget != null ? String(n.travel_budget) : '');
+      setTravelFundingSource(n.travel_funding_source || '');
+      setTravelParticipants(n.travel_participants || []);
+
+      setShowForm(true);
+      // Scroll form into view smoothly
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+    } catch (e: any) {
+      setMessage('โหลดข่าวเพื่อแก้ไขไม่สำเร็จ: ' + (e.message || ''));
+    }
   };
 
   const toggleParticipant = (rid: string) => {
@@ -256,33 +304,36 @@ export default function AdminNewsPage() {
     setSaving(true);
     setMessage('');
     try {
-      const res = await fetch('/api/news', {
-        method: 'POST',
+      const payload = {
+        password: getPassword(),
+        title, content, category,
+        author_id: authorId || null,
+        cover_image_url: coverUrl || null,
+        images: images.filter((img) => img.url),
+        tags,
+        sdg_goals: sdgGoals,
+        is_official_travel: isOfficialTravel,
+        travel_purpose: isOfficialTravel ? travelPurpose : null,
+        travel_location: isOfficialTravel ? travelLocation : null,
+        travel_start_date: isOfficialTravel ? travelStartDate : null,
+        travel_end_date: isOfficialTravel ? travelEndDate : null,
+        travel_activity_type: isOfficialTravel ? travelActivityType : null,
+        travel_approval_number: isOfficialTravel ? travelApprovalNumber : null,
+        travel_approval_doc_url: isOfficialTravel ? travelApprovalDocUrl : null,
+        travel_approval_link: isOfficialTravel ? travelApprovalLink : null,
+        travel_budget: isOfficialTravel && travelBudget ? parseFloat(travelBudget) : null,
+        travel_funding_source: isOfficialTravel ? travelFundingSource : null,
+        travel_participants: isOfficialTravel ? travelParticipants : [],
+      };
+
+      const isEdit = !!editingId;
+      const res = await fetch(isEdit ? `/api/news/${editingId}` : '/api/news', {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password: getPassword(),
-          title, content, category,
-          author_id: authorId || null,
-          cover_image_url: coverUrl || null,
-          images: images.filter((img) => img.url),
-          tags,
-          sdg_goals: sdgGoals,
-          is_official_travel: isOfficialTravel,
-          travel_purpose: isOfficialTravel ? travelPurpose : null,
-          travel_location: isOfficialTravel ? travelLocation : null,
-          travel_start_date: isOfficialTravel ? travelStartDate : null,
-          travel_end_date: isOfficialTravel ? travelEndDate : null,
-          travel_activity_type: isOfficialTravel ? travelActivityType : null,
-          travel_approval_number: isOfficialTravel ? travelApprovalNumber : null,
-          travel_approval_doc_url: isOfficialTravel ? travelApprovalDocUrl : null,
-          travel_approval_link: isOfficialTravel ? travelApprovalLink : null,
-          travel_budget: isOfficialTravel && travelBudget ? parseFloat(travelBudget) : null,
-          travel_funding_source: isOfficialTravel ? travelFundingSource : null,
-          travel_participants: isOfficialTravel ? travelParticipants : [],
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        setMessage('บันทึกข่าวสำเร็จ!');
+        setMessage(isEdit ? '✓ แก้ไขข่าวสำเร็จ!' : 'บันทึกข่าวสำเร็จ!');
         resetForm();
         setShowForm(false);
         fetchNews();
@@ -345,7 +396,10 @@ export default function AdminNewsPage() {
             <Link href="/news" className="text-sm text-blue-600 hover:underline" target="_blank">ดูหน้าข่าวสาร →</Link>
           </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
+        <button onClick={() => {
+            if (showForm) { resetForm(); setShowForm(false); }
+            else setShowForm(true);
+          }}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
           {showForm ? 'ยกเลิก' : '+ เขียนข่าวใหม่'}
         </button>
@@ -354,7 +408,16 @@ export default function AdminNewsPage() {
       {/* Compose Form */}
       {showForm && (
         <form onSubmit={handleSave} className="bg-white rounded-xl shadow-md p-6 mb-8 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-700">เขียนข่าวใหม่</h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-lg font-semibold text-gray-700">
+              {editingId ? '✏️ แก้ไขข่าว' : 'เขียนข่าวใหม่'}
+            </h2>
+            {editingId && (
+              <span className="text-[10px] font-mono bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
+                ID: {editingId.slice(0, 8)}…
+              </span>
+            )}
+          </div>
 
           {/* Title */}
           <div>
@@ -656,10 +719,22 @@ export default function AdminNewsPage() {
           {message && (
             <p className={`text-sm ${message.includes('สำเร็จ') ? 'text-green-600' : 'text-red-500'}`}>{message}</p>
           )}
-          <button type="submit" disabled={saving}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'กำลังบันทึก...' : 'เผยแพร่ข่าว'}
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {saving
+                ? (editingId ? 'กำลังบันทึกการแก้ไข...' : 'กำลังบันทึก...')
+                : (editingId ? '💾 บันทึกการแก้ไข' : 'เผยแพร่ข่าว')}
+            </button>
+            {editingId && (
+              <button type="button"
+                onClick={() => { resetForm(); setShowForm(false); }}
+                disabled={saving}
+                className="px-4 py-2 border text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                ยกเลิก
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -710,6 +785,13 @@ export default function AdminNewsPage() {
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <Link href={`/news/${item.id}`} className="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100" target="_blank">ดู</Link>
+                    <button
+                      onClick={() => startEdit(item.id)}
+                      className="px-3 py-1 text-xs bg-amber-50 text-amber-700 rounded hover:bg-amber-100"
+                      title="แก้ไขข่าว เปลี่ยนรูป แก้ตัวสะกด"
+                    >
+                      ✏️ แก้ไข
+                    </button>
                     <button onClick={() => handleDelete(item.id)} className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100">ลบ</button>
                   </div>
                 </div>
