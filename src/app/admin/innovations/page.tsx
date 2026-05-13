@@ -270,13 +270,20 @@ export default function AdminInnovationsPage() {
           <Link href="/admin" className="text-sm text-blue-600 hover:underline">← Admin Dashboard</Link>
         </div>
         {!editing && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Link
+              href="/admin/innovations/draft-filing"
+              className="px-3 py-2 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 text-white text-sm rounded-lg hover:opacity-90 font-medium shadow-sm"
+              title="มีแค่ไอเดีย — ให้ AI ร่างเอกสารสำหรับยื่นจดสิทธิบัตร"
+            >
+              🪄 ร่างเอกสารยื่นจด
+            </Link>
             <button
               onClick={() => setShowAIIngest(true)}
               className="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm rounded-lg hover:opacity-90 font-medium shadow-sm"
               title="วาง URL/ข้อความ หรืออัปโหลดรูป แล้วให้ AI กรอกฟอร์มให้"
             >
-              ✨ AI สกัดเอกสาร
+              ✨ AI สกัดเอกสารที่มี
             </button>
             <button
               onClick={startNew}
