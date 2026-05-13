@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import IngestInnovationModal, { type ExtractedInnovation } from '@/components/admin/IngestInnovationModal';
 
 type Researcher = {
   id: string;
@@ -82,6 +83,40 @@ export default function AdminInnovationsPage() {
 
   // Fee calculator inputs
   const [feeInputs, setFeeInputs] = useState({ disclosure_fee: 0, vat_pct: 7 });
+
+  // AI ingest modal
+  const [showAIIngest, setShowAIIngest] = useState(false);
+
+  const applyAIExtract = (data: ExtractedInnovation, meta: { source: string; model: string }) => {
+    // Merge into editing — only set fields the AI provided (non-empty values)
+    const merged: any = { ...(editing || {}) };
+    const fields = [
+      'title_th', 'title_en', 'short_desc_th', 'long_desc_th',
+      'innovation_type', 'ip_number', 'filing_date', 'grant_date', 'status',
+      'license_type', 'license_holder_name', 'license_contract_no',
+      'license_start_date', 'license_end_date', 'license_territory',
+      'license_fee_thb', 'notes',
+    ];
+    for (const k of fields) {
+      const v = (data as any)[k];
+      if (v != null && v !== '') merged[k] = v;
+    }
+    // license_fee_breakdown gets merged
+    if (data.license_fee_breakdown) {
+      merged.license_fee_breakdown = {
+        ...(merged.license_fee_breakdown || {}),
+        ...data.license_fee_breakdown,
+      };
+      // Sync fee calculator inputs if AI gave disclosure_fee / vat_pct
+      const fb = data.license_fee_breakdown;
+      setFeeInputs({
+        disclosure_fee: fb.disclosure_fee || feeInputs.disclosure_fee,
+        vat_pct: fb.vat_pct ?? feeInputs.vat_pct,
+      });
+    }
+    setEditing(merged);
+    setMessage(`✓ AI กรอกข้อมูลให้แล้ว (${meta.source})`);
+  };
 
   useEffect(() => {
     void fetchAll();
@@ -235,12 +270,21 @@ export default function AdminInnovationsPage() {
           <Link href="/admin" className="text-sm text-blue-600 hover:underline">← Admin Dashboard</Link>
         </div>
         {!editing && (
-          <button
-            onClick={startNew}
-            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
-          >
-            + เพิ่มนวัตกรรมใหม่
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowAIIngest(true)}
+              className="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm rounded-lg hover:opacity-90 font-medium shadow-sm"
+              title="วาง URL/ข้อความ หรืออัปโหลดรูป แล้วให้ AI กรอกฟอร์มให้"
+            >
+              ✨ AI สกัดเอกสาร
+            </button>
+            <button
+              onClick={startNew}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+            >
+              + เพิ่มเปล่า
+            </button>
+          </div>
         )}
       </div>
 
@@ -252,11 +296,21 @@ export default function AdminInnovationsPage() {
 
       {editing && (
         <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="bg-white rounded-xl shadow-md p-6 mb-8 space-y-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
             <h2 className="text-lg font-semibold text-gray-800">
               {editing.id ? '✏️ แก้ไข' : '+ เพิ่ม'} นวัตกรรม
             </h2>
-            <button type="button" onClick={() => { setEditing(null); setMessage(''); }} className="text-gray-500 hover:text-gray-800 text-xl leading-none">×</button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAIIngest(true)}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs rounded-lg hover:opacity-90 font-medium shadow-sm"
+                title="วาง URL/ข้อความ หรืออัปโหลดรูปเอกสาร แล้วให้ AI กรอกฟอร์มให้"
+              >
+                ✨ AI สกัดเอกสาร
+              </button>
+              <button type="button" onClick={() => { setEditing(null); setMessage(''); }} className="text-gray-500 hover:text-gray-800 text-xl leading-none">×</button>
+            </div>
           </div>
 
           {/* Title */}
@@ -561,6 +615,31 @@ export default function AdminInnovationsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {showAIIngest && (
+        <IngestInnovationModal
+          onClose={() => setShowAIIngest(false)}
+          onApply={(data, meta) => {
+            // If no form is open, start a new one so user sees the populated fields
+            if (!editing) {
+              setEditing({
+                title_th: '',
+                innovation_type: 'petty_patent',
+                status: 'filed',
+                inventor_ids: [],
+                image_urls: [],
+                documents: [],
+                is_active: true,
+                sort_order: 0,
+              });
+              // wait a tick so editing state is set before applying
+              setTimeout(() => applyAIExtract(data, meta), 0);
+            } else {
+              applyAIExtract(data, meta);
+            }
+          }}
+        />
       )}
     </div>
   );
