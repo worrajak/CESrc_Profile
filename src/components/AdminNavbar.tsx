@@ -24,7 +24,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: 'ข่าวสาร', href: '/admin/news', icon: '📰', hint: 'News & travel updates' },
       { label: 'ผลงานตีพิมพ์', href: '/admin/publications', icon: '📄', hint: 'Pubs / DOI import' },
-      { label: 'หัวข้อโครงงาน', href: '/admin/projects', icon: '💡', hint: 'Project topics & tokens' },
+      { label: 'นวัตกรรม / IP', href: '/admin/innovations', icon: '💡', hint: 'Patents · License fees' },
+      { label: 'หัวข้อโครงงาน', href: '/admin/projects', icon: '🧪', hint: 'Project topics & tokens' },
     ],
   },
   {

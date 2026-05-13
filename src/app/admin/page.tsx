@@ -112,6 +112,13 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัย</p>
         </Link>
         <Link
+          href="/admin/innovations"
+          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-amber-500 block"
+        >
+          <h3 className="font-semibold text-gray-800 mb-1">💡 จัดการนวัตกรรม / IP</h3>
+          <p className="text-sm text-gray-500">สิทธิบัตร · อนุสิทธิบัตร · ค่าสิทธิ TLO</p>
+        </Link>
+        <Link
           href="/admin/researchers"
           className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-700 block"
         >

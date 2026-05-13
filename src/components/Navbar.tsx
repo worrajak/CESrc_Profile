@@ -12,21 +12,23 @@ export default function Navbar() {
   const { user, profile, signOut } = useAuth();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [outputsOpen, setOutputsOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
+  const aboutRef = useRef<HTMLDivElement>(null);
+  const outputsRef = useRef<HTMLDivElement>(null);
   const serviceRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (serviceRef.current && !serviceRef.current.contains(e.target as Node)) {
-        setServiceOpen(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
-      }
+      if (aboutRef.current && !aboutRef.current.contains(e.target as Node)) setAboutOpen(false);
+      if (outputsRef.current && !outputsRef.current.contains(e.target as Node)) setOutputsOpen(false);
+      if (serviceRef.current && !serviceRef.current.contains(e.target as Node)) setServiceOpen(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -48,14 +50,66 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center space-x-5 text-sm">
             <Link href="/" className="hover:text-yellow-300 transition">{t('nav.home')}</Link>
             <Link href="/news" className="hover:text-yellow-300 transition">{t('nav.news')}</Link>
-            <Link href="/researchers" className="hover:text-yellow-300 transition">{t('nav.researchers')}</Link>
-            <Link href="/research-areas" className="hover:text-yellow-300 transition">{t('nav.research_areas')}</Link>
-            <Link href="/publications" className="hover:text-yellow-300 transition">{t('nav.publications')}</Link>
-            <Link href="/grants" className="hover:text-yellow-300 transition">{t('nav.grants')}</Link>
+
+            {/* About dropdown */}
+            <div ref={aboutRef} className="relative">
+              <button
+                onClick={() => setAboutOpen(!aboutOpen)}
+                className="hover:text-yellow-300 transition flex items-center gap-1"
+              >
+                {t('nav.about_group')}
+                <svg className={`w-3 h-3 transition-transform ${aboutOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {aboutOpen && (
+                <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-xl shadow-xl border py-2 z-50">
+                  <Link href="/researchers" onClick={() => setAboutOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 text-sm">
+                    👨‍🔬 {t('nav.researchers')}
+                  </Link>
+                  <Link href="/research-areas" onClick={() => setAboutOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 text-sm">
+                    🔬 {t('nav.research_areas')}
+                  </Link>
+                  <Link href="/equipment" onClick={() => setAboutOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 text-sm">
+                    🛠️ {t('nav.equipment')}
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Outputs dropdown */}
+            <div ref={outputsRef} className="relative">
+              <button
+                onClick={() => setOutputsOpen(!outputsOpen)}
+                className="hover:text-yellow-300 transition flex items-center gap-1"
+              >
+                {t('nav.outputs_group')}
+                <svg className={`w-3 h-3 transition-transform ${outputsOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {outputsOpen && (
+                <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border py-2 z-50">
+                  <Link href="/publications" onClick={() => setOutputsOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 text-sm">
+                    📄 {t('nav.publications')}
+                  </Link>
+                  <Link href="/innovations" onClick={() => setOutputsOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-amber-50 hover:text-amber-700 text-sm">
+                    💡 {t('nav.innovations')}
+                    <span className="ml-1 text-[9px] font-semibold text-amber-600 bg-amber-100 px-1 py-0.5 rounded">NEW</span>
+                  </Link>
+                  <Link href="/grants" onClick={() => setOutputsOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 text-sm">
+                    💰 {t('nav.grants')}
+                  </Link>
+                  <Link href="/students" onClick={() => setOutputsOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 text-sm">
+                    🎓 {t('nav.students')}
+                  </Link>
+                </div>
+              )}
+            </div>
+
             <Link href="/research-plan" className="hover:text-yellow-300 transition flex items-center gap-1 whitespace-nowrap">
               <span>🎯</span><span>{t('nav.research_plan')}</span>
             </Link>
-            <Link href="/students" className="hover:text-yellow-300 transition">{t('nav.students')}</Link>
 
             {/* Services Dropdown */}
             <div ref={serviceRef} className="relative">
@@ -110,8 +164,6 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-
-            <Link href="/equipment" className="hover:text-yellow-300 transition">{t('nav.equipment')}</Link>
 
             {/* Language Switcher */}
             <LangSwitcher />
@@ -187,12 +239,25 @@ export default function Navbar() {
         <div className="lg:hidden px-4 pb-4 space-y-1">
           <Link href="/" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.home')}</Link>
           <Link href="/news" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.news')}</Link>
-          <Link href="/researchers" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.researchers')}</Link>
-          <Link href="/research-areas" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.research_areas')}</Link>
-          <Link href="/publications" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.publications')}</Link>
-          <Link href="/grants" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.grants')}</Link>
+
+          {/* About group (mobile) */}
+          <div className="border-t border-blue-600 pt-2 mt-2">
+            <p className="text-blue-300 text-xs font-medium uppercase tracking-wider mb-1">{t('nav.about_group')}</p>
+            <Link href="/researchers" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">👨‍🔬 {t('nav.researchers')}</Link>
+            <Link href="/research-areas" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🔬 {t('nav.research_areas')}</Link>
+            <Link href="/equipment" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🛠️ {t('nav.equipment')}</Link>
+          </div>
+
+          {/* Outputs group (mobile) */}
+          <div className="border-t border-blue-600 pt-2 mt-2">
+            <p className="text-blue-300 text-xs font-medium uppercase tracking-wider mb-1">{t('nav.outputs_group')}</p>
+            <Link href="/publications" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">📄 {t('nav.publications')}</Link>
+            <Link href="/innovations" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">💡 {t('nav.innovations')} <span className="ml-1 text-[9px] font-semibold text-amber-300">NEW</span></Link>
+            <Link href="/grants" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">💰 {t('nav.grants')}</Link>
+            <Link href="/students" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🎓 {t('nav.students')}</Link>
+          </div>
+
           <Link href="/research-plan" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>🎯 {t('nav.research_plan')}</Link>
-          <Link href="/students" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.students')}</Link>
 
           {/* Services sub-menu (mobile) */}
           <div className="border-t border-blue-600 pt-2 mt-2">
@@ -211,8 +276,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="border-t border-blue-600 pt-2 flex items-center justify-between">
-            <Link href="/equipment" className="block py-2 hover:text-yellow-300" onClick={() => setOpen(false)}>{t('nav.equipment')}</Link>
+          <div className="border-t border-blue-600 pt-2 flex items-center justify-end">
             <LangSwitcher />
           </div>
           {!user && (
