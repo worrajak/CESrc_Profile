@@ -142,7 +142,12 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
           )}
 
           {tab === 'password' && (
-            <div className="space-y-3">
+            <form
+              key={pwdMode}
+              onSubmit={(e) => { e.preventDefault(); if (!busy) handlePasswordSubmit(); }}
+              className="space-y-3"
+              autoComplete="off"
+            >
               <div className="flex gap-1 text-xs">
                 <button
                   type="button"
@@ -173,7 +178,7 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                autoComplete="email"
+                autoComplete="off"
                 className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               />
               <div className="relative">
@@ -182,14 +187,15 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={locale === 'en' ? 'Password (min 8 chars)' : 'รหัสผ่าน (อย่างน้อย 8 ตัว)'}
-                  autoComplete={pwdMode === 'signin' ? 'current-password' : 'new-password'}
-                  name={pwdMode === 'signin' ? 'current-password' : 'new-password'}
+                  autoComplete="off"
+                  spellCheck={false}
+                  inputMode="text"
                   className="w-full px-3 py-2.5 pr-10 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  onKeyDown={(e) => e.key === 'Enter' && !busy && pwdMode === 'signin' && handlePasswordSubmit()}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd(!showPwd)}
+                  tabIndex={-1}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
                 >
                   {showPwd ? '🙈' : '👁'}
@@ -202,13 +208,15 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
                   value={confirmPwd}
                   onChange={(e) => setConfirmPwd(e.target.value)}
                   placeholder={locale === 'en' ? 'Confirm password' : 'ยืนยันรหัสผ่าน'}
+                  autoComplete="off"
+                  spellCheck={false}
+                  inputMode="text"
                   className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  onKeyDown={(e) => e.key === 'Enter' && !busy && handlePasswordSubmit()}
                 />
               )}
 
               <button
-                onClick={handlePasswordSubmit}
+                type="submit"
                 disabled={busy || !email || !password || (pwdMode === 'signup' && !confirmPwd)}
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition"
               >
@@ -218,7 +226,7 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
                   ? locale === 'en' ? 'Sign in' : '🔓 เข้าสู่ระบบ'
                   : locale === 'en' ? 'Create account' : '✅ สร้างบัญชี'}
               </button>
-            </div>
+            </form>
           )}
 
           {error && (
