@@ -181,6 +181,138 @@ export default function AISettingsPage() {
     });
   };
 
+  // ──────────────────────────────────────────
+  // Export / Import / Browser cache
+  // ──────────────────────────────────────────
+  const CACHE_KEY = 'cesru_ai_config_cache_v1';
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<{
+    file: string;
+    parsed: any;
+    diff: Array<{ provider: string; status: 'new' | 'update' | 'unchanged'; willOverwriteKey: boolean }>;
+  } | null>(null);
+  const [cacheTimestamp, setCacheTimestamp] = useState<number | null>(null);
+
+  // Load cache before network
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached?.configs && cached?.timestamp) {
+          setConfigs(cached.configs);
+          setCacheTimestamp(cached.timestamp);
+          // Build edit state from cache
+          const models: Record<string, string> = {};
+          const endpoints: Record<string, string> = {};
+          cached.configs.forEach((c: AIConfigItem) => {
+            models[c.provider] = c.model_name;
+            endpoints[c.provider] = c.api_endpoint || '';
+          });
+          setEditModels(models);
+          setEditEndpoints(endpoints);
+          setLoading(false); // show cached immediately
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Update cache whenever configs change (without api_key — server-only)
+  useEffect(() => {
+    if (typeof window === 'undefined' || configs.length === 0) return;
+    const cleaned = configs.map((c) => ({ ...c, api_key: '' }));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ configs: cleaned, timestamp: Date.now() }),
+    );
+    setCacheTimestamp(Date.now());
+  }, [configs]);
+
+  const handleExport = () => {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      exported_from: window.location.host,
+      version: 1,
+      configs: configs.map((c) => ({
+        provider: c.provider,
+        display_name: c.display_name,
+        model_name: c.model_name,
+        api_endpoint: c.api_endpoint,
+        is_active: c.is_active,
+        is_default: c.is_default,
+        capabilities: c.capabilities,
+        models: c.models,
+        api_key_masked: c.api_key_masked || '', // never includes real key
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cesru-ai-settings-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed?.configs || !Array.isArray(parsed.configs)) {
+        alert('ไฟล์ไม่ถูกต้อง — ต้องมี field "configs" เป็น array');
+        return;
+      }
+      const diff = parsed.configs.map((incoming: any) => {
+        const existing = configs.find((c) => c.provider === incoming.provider);
+        if (!existing) return { provider: incoming.provider, status: 'new' as const, willOverwriteKey: false };
+        const samesame =
+          existing.model_name === incoming.model_name &&
+          existing.is_active === incoming.is_active &&
+          existing.is_default === incoming.is_default &&
+          existing.api_endpoint === incoming.api_endpoint;
+        return {
+          provider: incoming.provider,
+          status: samesame ? ('unchanged' as const) : ('update' as const),
+          willOverwriteKey: false, // export never includes real keys
+        };
+      });
+      setImportPreview({ file: file.name, parsed, diff });
+    } catch (e: any) {
+      alert('Parse JSON ไม่สำเร็จ: ' + (e?.message || ''));
+    }
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importPreview) return;
+    setImporting(true);
+    try {
+      for (const incoming of importPreview.parsed.configs) {
+        await fetch('/api/admin/ai-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: incoming.provider,
+            model_name: incoming.model_name,
+            api_endpoint: incoming.api_endpoint,
+            is_active: incoming.is_active,
+            is_default: incoming.is_default,
+            capabilities: incoming.capabilities,
+            models: incoming.models,
+            // never overwrite api_key from import (it's masked)
+          }),
+        });
+      }
+      setImportPreview(null);
+      await fetchConfigs();
+      alert('นำเข้าสำเร็จ — โปรดใส่ API key ใหม่ทุก provider ที่ active');
+    } catch (e: any) {
+      alert('นำเข้าไม่สำเร็จ: ' + (e?.message || ''));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   useEffect(() => {
     fetchConfigs();
   }, []);
@@ -321,11 +453,41 @@ export default function AISettingsPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">ตั้งค่า AI Provider</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          กรอก API Key เพื่อเปิดใช้งาน AI แยกเอกสาร / สร้างหลักสูตร / ประเมินผลอัตโนมัติ
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">ตั้งค่า AI Provider</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            กรอก API Key เพื่อเปิดใช้งาน AI แยกเอกสาร / สร้างหลักสูตร / ประเมินผลอัตโนมัติ
+          </p>
+          {cacheTimestamp && (
+            <p className="text-[10px] text-gray-400 mt-1">
+              💾 cache: {new Date(cacheTimestamp).toLocaleString('th-TH')}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExport}
+            disabled={configs.length === 0}
+            className="px-3 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 text-xs font-medium disabled:opacity-50"
+            title="Export config เป็น JSON (ไม่รวม API key)"
+          >
+            📥 Export
+          </button>
+          <label className="px-3 py-2 bg-white border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 text-xs font-medium cursor-pointer">
+            📤 Import
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImportFile(f);
+                e.currentTarget.value = '';
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Info Box */}
@@ -752,6 +914,71 @@ export default function AISettingsPage() {
                   💾 บันทึก {orSelected.size > 0 && `(${orSelected.size})`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Preview Modal */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-lg">📤 ตรวจสอบก่อนนำเข้า</h2>
+                <p className="text-xs text-emerald-100 mt-0.5">{importPreview.file}</p>
+              </div>
+              <button onClick={() => setImportPreview(null)} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1">
+              <p className="text-xs text-gray-500 mb-3">
+                {importPreview.parsed.exported_at && (
+                  <>Exported: {new Date(importPreview.parsed.exported_at).toLocaleString('th-TH')}<br /></>
+                )}
+                {importPreview.parsed.exported_from && (
+                  <>จาก: {importPreview.parsed.exported_from}</>
+                )}
+              </p>
+
+              <div className="space-y-2">
+                {importPreview.diff.map((row) => {
+                  const colors = {
+                    new: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                    update: 'bg-amber-50 border-amber-200 text-amber-700',
+                    unchanged: 'bg-gray-50 border-gray-200 text-gray-500',
+                  };
+                  const labels = { new: '🆕 ใหม่', update: '✏️ แก้ไข', unchanged: '✓ ไม่เปลี่ยน' };
+                  return (
+                    <div key={row.provider} className={`border rounded-lg px-3 py-2 text-sm ${colors[row.status]}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-semibold">{row.provider}</span>
+                        <span className="text-xs">{labels[row.status]}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                ℹ️ การนำเข้า <strong>ไม่ overwrite API key</strong> ของ provider ที่มีอยู่ — คุณต้องใส่ key เองหลังจาก import
+              </div>
+            </div>
+
+            <div className="px-5 py-3 bg-gray-50 border-t flex gap-2 justify-end">
+              <button
+                onClick={() => setImportPreview(null)}
+                className="px-4 py-2 border text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleImportConfirm}
+                disabled={importing}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {importing ? 'กำลังนำเข้า...' : '✅ ยืนยันนำเข้า'}
+              </button>
             </div>
           </div>
         </div>

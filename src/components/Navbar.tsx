@@ -5,12 +5,14 @@ import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useI18n } from '@/lib/I18nContext';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 import LangSwitcher from '@/components/LangSwitcher';
 import SignInModal from '@/components/SignInModal';
 
 export default function Navbar() {
   const { user, profile, signOut } = useAuth();
   const { t } = useI18n();
+  const { role: adminRole } = useAdminAuth();
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [outputsOpen, setOutputsOpen] = useState(false);
@@ -212,8 +214,17 @@ export default function Navbar() {
                     className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     ⚙️ {t('nav.account')}
                   </Link>
+                  {(adminRole === 'superadmin' || adminRole === 'admin') && (
+                    <Link href="/admin" onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 border-t border-gray-100">
+                      🛠️ Admin Console
+                      {adminRole === 'superadmin' && (
+                        <span className="ml-2 text-[9px] font-bold uppercase tracking-wider px-1 py-0.5 bg-amber-500 text-white rounded">Super</span>
+                      )}
+                    </Link>
+                  )}
                   <button onClick={() => { setUserMenuOpen(false); signOut(); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 border-t border-gray-100">
                     🚪 {t('nav.signout')}
                   </button>
                 </div>
