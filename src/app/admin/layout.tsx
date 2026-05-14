@@ -3,20 +3,21 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import AdminNavbar from '@/components/AdminNavbar';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [authed, setAuthed] = useState(false);
+  const { role, loading: roleLoading } = useAdminAuth();
+  const [legacyAuthed, setLegacyAuthed] = useState(false);
 
+  // Keep the legacy sessionStorage check in case user logged in via password
+  // before the new flow.
   useEffect(() => {
     const check = () => {
       const v = typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true';
-      setAuthed(!!v);
+      setLegacyAuthed(!!v);
     };
     check();
-    // Catch login transitions inside the same tab (the admin page sets
-    // sessionStorage without a navigation event, so we poll briefly + listen
-    // for storage / focus events)
     const id = setInterval(check, 800);
     window.addEventListener('focus', check);
     window.addEventListener('storage', check);
@@ -27,9 +28,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
   }, [pathname]);
 
+  // Show admin navbar if EITHER:
+  //   - Supabase user is admin (superadmin / admin via researchers.email match)
+  //   - OR legacy admin session is set in sessionStorage
+  const showNavbar = !roleLoading && (role === 'superadmin' || role === 'admin' || legacyAuthed);
+
   return (
     <>
-      {authed && <AdminNavbar />}
+      {showNavbar && <AdminNavbar />}
       {children}
     </>
   );

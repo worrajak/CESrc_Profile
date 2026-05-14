@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkAdmin } from '@/lib/admin-auth';
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get('file') as File;
-  const password = formData.get('password') as string;
+  const password = (formData.get('password') as string) || null;
   const folder = (formData.get('folder') as string) || 'news';
   const typeHint = (formData.get('type') as string) || '';
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  // Accept either legacy password OR Supabase Bearer / access_token
+  const headerAuth = request.headers.get('authorization') || '';
+  const headerToken = headerAuth.toLowerCase().startsWith('bearer ') ? headerAuth.slice(7).trim() : null;
+  const formToken = (formData.get('access_token') as string) || null;
+
+  const auth = await checkAdmin({ password, accessToken: headerToken || formToken });
+  if (!auth.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

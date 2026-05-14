@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkAdmin } from '@/lib/admin-auth';
 
 // GET - list news
 export async function GET(request: NextRequest) {
@@ -52,8 +53,11 @@ export async function POST(request: NextRequest) {
     travel_activity_type,
   } = body;
 
-  // Verify admin
-  if (password !== process.env.ADMIN_PASSWORD) {
+  // Verify admin — accept either legacy password OR Supabase Bearer token
+  const headerAuth = request.headers.get('authorization') || '';
+  const headerToken = headerAuth.toLowerCase().startsWith('bearer ') ? headerAuth.slice(7).trim() : null;
+  const auth = await checkAdmin({ password, accessToken: headerToken || body.access_token || null });
+  if (!auth.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useAdminAuth } from '@/lib/admin-auth-client';
+import { useAuth } from '@/lib/AuthContext';
 
 type NavItem = {
   label: string;
@@ -83,6 +85,8 @@ const GROUPS: NavGroup[] = [
 export default function AdminNavbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { role, email } = useAdminAuth();
+  const { signOut } = useAuth();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -104,9 +108,13 @@ export default function AdminNavbar() {
     setMobileOpen(false);
   }, [pathname]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem('admin_auth');
     sessionStorage.removeItem('admin_pwd');
+    // If user is admin via Supabase, also sign them out of Supabase
+    if (role === 'superadmin' || role === 'admin') {
+      try { await signOut(); } catch {}
+    }
     router.push('/admin');
     setTimeout(() => window.location.reload(), 50);
   };
@@ -125,6 +133,32 @@ export default function AdminNavbar() {
               <span className="hidden md:block text-[10px] text-slate-400">Operations console</span>
             </div>
           </Link>
+
+          {/* Role badge */}
+          {role && (
+            <div className="hidden md:flex items-center gap-2 ml-3 pl-3 border-l border-slate-700">
+              {role === 'superadmin' && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded">
+                  ⭐ Super
+                </span>
+              )}
+              {role === 'admin' && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-600 text-white rounded">
+                  Admin
+                </span>
+              )}
+              {role === 'legacy' && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-gray-600 text-white rounded" title="เข้าด้วยรหัสผ่าน (anonymous)">
+                  Legacy
+                </span>
+              )}
+              {email && (
+                <span className="text-[10px] text-slate-300 max-w-[180px] truncate" title={email}>
+                  {email}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Desktop nav — grouped dropdowns */}
           <div ref={wrapRef} className="hidden lg:flex items-center gap-1">

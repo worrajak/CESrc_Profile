@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { checkAdmin } from '@/lib/admin-auth';
 
 // GET single news
 export async function GET(
@@ -28,9 +29,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { password } = await request.json();
+  const body = await request.json();
+  const password = body.password ?? null;
+  const accessTokenFromBody = body.access_token ?? null;
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const headerAuth = request.headers.get('authorization') || '';
+  const headerToken = headerAuth.toLowerCase().startsWith('bearer ') ? headerAuth.slice(7).trim() : null;
+  const auth = await checkAdmin({ password, accessToken: headerToken || accessTokenFromBody });
+  if (!auth.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -59,7 +65,10 @@ export async function PUT(
     travel_funding_source, travel_participants, travel_activity_type,
   } = body;
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const headerAuthPUT = request.headers.get('authorization') || '';
+  const headerTokenPUT = headerAuthPUT.toLowerCase().startsWith('bearer ') ? headerAuthPUT.slice(7).trim() : null;
+  const authPUT = await checkAdmin({ password, accessToken: headerTokenPUT || body.access_token || null });
+  if (!authPUT.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
