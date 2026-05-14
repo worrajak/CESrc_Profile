@@ -34,34 +34,47 @@ export function useAdminAuth(): AdminStatus {
     if (authLoading) return;
 
     (async () => {
+      let researcherId: string | undefined;
+      let email: string | undefined;
+      let role: ClientAdminRole = null;
+
       // 1) Supabase user — check researchers.email match
       if (user?.email) {
-        const email = user.email.toLowerCase();
+        email = user.email;
+        const lcEmail = user.email.toLowerCase();
+        // Note: is_admin column may not exist if migration 049 hasn't run yet
+        // — query defensively
         const { data: r } = await supabase
           .from('researchers')
-          .select('id, is_admin, is_active, email')
-          .ilike('email', email)
+          .select('id, is_active, email')
+          .ilike('email', lcEmail)
           .maybeSingle();
 
         if (r) {
-          if (r.is_admin) {
-            setStatus({ loading: false, role: 'superadmin', email: user.email, researcherId: r.id, checked: true });
-            return;
-          }
-          if (r.is_active) {
-            setStatus({ loading: false, role: 'admin', email: user.email, researcherId: r.id, checked: true });
-            return;
+          researcherId = r.id;          // Always expose so user can jump to own profile
+        }
+
+        // Try the is_admin column separately so missing column doesn't break is_active path
+        if (r) {
+          const { data: adminCheck } = await supabase
+            .from('researchers')
+            .select('is_admin')
+            .eq('id', r.id)
+            .maybeSingle();
+          if (adminCheck && (adminCheck as any).is_admin === true) {
+            role = 'superadmin';
+          } else if (r.is_active) {
+            role = 'admin';
           }
         }
       }
 
       // 2) Legacy password session
-      if (typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true') {
-        setStatus({ loading: false, role: 'legacy', checked: true });
-        return;
+      if (!role && typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true') {
+        role = 'legacy';
       }
 
-      setStatus({ loading: false, role: null, checked: true });
+      setStatus({ loading: false, role, email, researcherId, checked: true });
     })();
   }, [user, authLoading]);
 
