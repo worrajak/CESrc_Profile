@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callAIText } from '@/lib/ai-provider';
+import { EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS } from '@/lib/evidence-chain';
 
 export const runtime = 'nodejs';
 export const maxDuration = 90;
@@ -143,6 +144,27 @@ Schema:
     "ความเสี่ยง 3: ..."
   ],
 
+  "evidence_chain": [
+    {
+      "claim": "ข้อเท็จจริงในเอกสาร เช่น 'ระบบ Wireless Power Transfer ที่ใช้คอยล์ Litz wire ได้ประสิทธิภาพ ≥85% ที่ระยะ 5cm'",
+      "chain": [
+        {
+          "source": "Smith et al. — IEEE Trans. Power Electronics 2024",
+          "source_type": "peer_reviewed",
+          "source_url": "https://doi.org/...",
+          "authors": ["Smith J.", "Lee K."],
+          "year": 2024,
+          "credibility": "high",
+          "credibility_reason": "ตีพิมพ์ใน IEEE TPE (impact factor 6+) ผ่าน peer review",
+          "verification_path": "ค้น DOI ใน IEEE Xplore"
+        }
+      ],
+      "independent_corroborations": 2,
+      "concerns": ["ถ้ามี — ระบุ"],
+      "suggestions": ["วิธีเสริมหลักฐานเพิ่ม"]
+    }
+  ],
+
   "next_steps_th": [
     "1. ตรวจสอบ prior art เพิ่มเติมที่ฐาน Google Patents, J-PlatPat, IPThailand search",
     "2. วาดภาพประกอบ (อาจใช้ AutoCAD/Visio) ตาม drawings_description",
@@ -162,6 +184,15 @@ CRITICAL RULES:
 - Abstract must be exactly one paragraph, ≤ 200 Thai words (count Thai 'syllable groups' as words)
 - Be realistic about costs — actual IPThailand fees: petty patent filing ~250 baht + publication ~250 + annual 250-400 baht/year
 - Be helpful and concrete — researchers will use this directly. Avoid generic advice.
+
+${EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS}
+
+For patent applications specifically, "evidence_chain" should cover at least:
+  - Each prior art entry (the prior art itself is a chain link, but verify the prior art exists)
+  - Key technical claims (e.g. "ระบบนี้สามารถทำงานที่ความถี่ X" must trace to peer-reviewed source or own experiment)
+  - Performance numbers / specifications cited in disclosure / best_mode
+  - Market size / TAM claims if any
+Provide at least 5 evidence_chain entries for a typical filing.
 `;
 
 export async function POST(req: NextRequest) {

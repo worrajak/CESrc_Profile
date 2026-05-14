@@ -13,6 +13,9 @@ type Researcher = {
   expertise: string[] | null;
 };
 
+import EvidenceChainPanel from '@/components/EvidenceChainPanel';
+import type { EvidenceChain } from '@/lib/evidence-chain';
+
 type DraftedProposal = {
   title_th?: string;
   title_en?: string;
@@ -31,6 +34,7 @@ type DraftedProposal = {
   ai_match_score?: number;
   ai_match_rationale?: string;
   budget_breakdown?: Record<string, number>;
+  evidence_chain?: EvidenceChain[];
 };
 
 export default function DraftProposalModal({
@@ -409,6 +413,16 @@ export default function DraftProposalModal({
                     <p className="text-xs text-violet-900">{drafted.ai_match_rationale}</p>
                   </div>
                 )}
+
+                {drafted?.evidence_chain?.length ? (
+                  <EvidenceChainPanel
+                    chains={drafted.evidence_chain}
+                    title={locale === 'en' ? 'Evidence Trust Chain' : 'ห่วงโซ่ความน่าเชื่อถือของหลักฐาน'}
+                    intro={locale === 'en'
+                      ? 'Each factual claim in the draft is traced back through its sources. Weak chains surface first so you can strengthen them before submission.'
+                      : 'ทุกข้อความที่อ้างเป็นข้อเท็จจริงจะถูกตรวจสอบที่มา — claim ที่ห่วงโซ่อ่อนถูกยกขึ้นมาก่อน เพื่อให้ผู้วิจัยเสริมหลักฐานก่อนยื่นจริง'}
+                  />
+                ) : null}
               </div>
 
               {error && (

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import EvidenceChainPanel from '@/components/EvidenceChainPanel';
+import type { EvidenceChain } from '@/lib/evidence-chain';
 
 type DraftResult = {
   recommended_type?: string;
@@ -17,6 +19,7 @@ type DraftResult = {
   filing_strategy?: any;
   risks_th?: string[];
   next_steps_th?: string[];
+  evidence_chain?: EvidenceChain[];
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -444,6 +447,14 @@ export default function DraftFilingPage() {
               )}
             </Section>
           )}
+
+          {/* Evidence Trust Chain */}
+          {result.evidence_chain?.length ? (
+            <EvidenceChainPanel
+              chains={result.evidence_chain}
+              title="ห่วงโซ่ความน่าเชื่อถือของหลักฐาน (ตามหลักการตรวจสอบรายงานของนักวิชาการคลาสสิก)"
+            />
+          ) : null}
 
           {/* Risks + next steps */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callAIText } from '@/lib/ai-provider';
 import { supabase } from '@/lib/supabase';
+import { EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS } from '@/lib/evidence-chain';
 
 export const runtime = 'nodejs';
 
@@ -42,7 +43,26 @@ Output ONLY a single JSON object — no markdown, no commentary. Schema:
     "travel": 30000,
     "apc_publication": 50000,
     "other": 20000
-  }
+  },
+  "evidence_chain": [
+    {
+      "claim": "ข้อความสำคัญใน problem_statement / methodology / expected_outputs ที่อ้างเป็นข้อเท็จจริง",
+      "chain": [
+        {
+          "source": "Author et al. — Journal 2024",
+          "source_type": "peer_reviewed",
+          "source_url": "https://doi.org/...",
+          "year": 2024,
+          "credibility": "high",
+          "credibility_reason": "...",
+          "verification_path": "..."
+        }
+      ],
+      "independent_corroborations": 1,
+      "concerns": [],
+      "suggestions": []
+    }
+  ]
 }
 
 RULES:
@@ -52,6 +72,14 @@ RULES:
 - Thai language for title_th/abstract_th/problem_statement/methodology/objectives/expected_outputs/expected_outcomes.
 - English language for title_en/abstract_en/keywords (mix Thai+English OK for keywords).
 - ai_match_score 0-100 — be honest. If PI expertise doesn't fit grant scope well, score lower and explain.
+
+${EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS}
+
+For proposals specifically, evidence_chain should cover at minimum:
+  - 2-3 strongest claims in problem_statement (research gap, prior work, market need)
+  - The methodology's key technique (cite peer-reviewed source or PI's own prior work)
+  - Each numeric target in expected_outputs / expected_outcomes (cite baseline data)
+Provide at least 4 evidence_chain entries for a research proposal.
 `;
 
 export async function POST(req: NextRequest) {
