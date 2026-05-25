@@ -4,6 +4,28 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
 
+/**
+ * Domains we know render content with JS (SPA / Next.js / React).
+ * Server-side URL fetch returns mostly "กำลังโหลด..." — not usable for AI extraction.
+ * When URL matches one of these, we show a hint asking the user to paste text instead.
+ * Add new entries here as you confirm each site's behaviour.
+ */
+const JS_RENDERED_DOMAINS: { match: string; name_th: string; name_en: string }[] = [
+  { match: 'nriis.go.th', name_th: 'NRIIS (ระบบ ววน. แห่งชาติ)', name_en: 'NRIIS' },
+];
+
+function detectJsRendered(input: string) {
+  if (!input) return null;
+  const lower = input.toLowerCase();
+  // Try parsing as URL first, fall back to substring match for partial typing
+  try {
+    const host = new URL(input).hostname.toLowerCase();
+    return JS_RENDERED_DOMAINS.find((d) => host.includes(d.match)) || null;
+  } catch {
+    return JS_RENDERED_DOMAINS.find((d) => lower.includes(d.match)) || null;
+  }
+}
+
 type ExtractedGrant = {
   agency_code?: string;
   agency_name_th?: string;
@@ -70,6 +92,9 @@ export default function IngestGrantModal({
     reader.readAsDataURL(file);
   };
 
+  // Derived: is the user's URL pointing at a JS-rendered SPA?
+  const jsHint = mode === 'text' ? detectJsRendered(url) : null;
+
   const handleExtract = async () => {
     if (mode === 'image' && !imageBase64) {
       setError(locale === 'en' ? 'Upload an image first' : 'กรุณาอัปโหลดรูปก่อน');
@@ -77,6 +102,15 @@ export default function IngestGrantModal({
     }
     if (mode === 'text' && !url.trim() && !text.trim()) {
       setError(locale === 'en' ? 'Provide URL or paste text' : 'กรุณาใส่ URL หรือข้อความ');
+      return;
+    }
+    // Guard: JS-rendered URL + no pasted text → server fetch would just get "Loading..."
+    if (mode === 'text' && jsHint && !text.trim()) {
+      setError(
+        locale === 'en'
+          ? `${jsHint.name_en} loads content with JavaScript — URL fetch will not work. Please open the page in your browser, copy the announcement text, and paste it in the Text box below.`
+          : `${jsHint.name_th} โหลดเนื้อหาด้วย JavaScript — ดึง URL ตรงไม่ได้ กรุณาเปิดหน้าในเบราว์เซอร์ คัดลอกเนื้อหา แล้ววางในช่อง "ข้อความ" ด้านล่าง`,
+      );
       return;
     }
     setProcessing(true);
@@ -204,13 +238,42 @@ export default function IngestGrantModal({
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://www.rmutl.ac.th/..."
-                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 ${
+                          jsHint ? 'border-amber-300 bg-amber-50/30' : ''
+                        }`}
                       />
-                      <p className="text-[11px] text-gray-400 mt-1">
-                        {locale === 'en'
-                          ? '(Currently URL fetch may be blocked by some sites — paste text below for best results)'
-                          : '(บางเว็บไม่ให้ดึงข้อมูล — แนะนำ paste ข้อความด้านล่างเพื่อความแม่นยำ)'}
-                      </p>
+                      {jsHint ? (
+                        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
+                          <div className="font-semibold mb-1">
+                            ⚠{' '}
+                            {locale === 'en'
+                              ? `${jsHint.name_en} loads content with JavaScript — direct URL fetch returns only "Loading…"`
+                              : `${jsHint.name_th} โหลดเนื้อหาด้วย JavaScript — ดึง URL ตรงได้แค่ "กำลังโหลด…"`}
+                          </div>
+                          <div className="text-amber-700">
+                            {locale === 'en' ? 'Please do this instead:' : 'กรุณาทำตามนี้แทน:'}
+                          </div>
+                          <ol className="list-decimal pl-4 mt-1 space-y-0.5 text-amber-700">
+                            <li>{locale === 'en' ? 'Open the URL in your browser' : 'เปิด URL ในเบราว์เซอร์'}</li>
+                            <li>
+                              {locale === 'en'
+                                ? 'Select the announcement content and copy (Cmd/Ctrl+C)'
+                                : 'เลือกเนื้อหาประกาศ แล้ว copy (Cmd/Ctrl+C)'}
+                            </li>
+                            <li>
+                              {locale === 'en'
+                                ? 'Paste into the Text box below ↓'
+                                : 'วางในช่อง "ข้อความ" ด้านล่าง ↓'}
+                            </li>
+                          </ol>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          {locale === 'en'
+                            ? '(Currently URL fetch may be blocked by some sites — paste text below for best results)'
+                            : '(บางเว็บไม่ให้ดึงข้อมูล — แนะนำ paste ข้อความด้านล่างเพื่อความแม่นยำ)'}
+                        </p>
+                      )}
                     </div>
 
                     <div>
