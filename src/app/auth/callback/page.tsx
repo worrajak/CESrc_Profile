@@ -37,29 +37,36 @@ export default function AuthCallbackPage() {
       if (cancelled) return;
       setUser(sessionUser);
 
-      // Race the profile lookup against a 2.5s timeout — if guest_users query
-      // hangs (RLS / network), we still show the consent form. The form's
-      // upsert handles existing rows gracefully.
+      // Aggressive race — first try a fast 1.5 s profile lookup so users with
+      // existing profiles get redirected. If anything goes wrong (slow RLS,
+      // network, hang), fall through to the consent form. The form's upsert
+      // handles existing rows gracefully, so we never lose data even if a
+      // returning user lands here briefly.
       const profilePromise = supabase
         .from('guest_users')
-        .select('*')
+        .select('id')                          // narrowest possible query
         .eq('id', sessionUser.id)
         .maybeSingle()
-        .then((r) => ({ kind: 'data' as const, data: r.data }));
+        .then(
+          (r) => ({ kind: 'data' as const, data: r.data }),
+          () => ({ kind: 'error' as const }),  // never let Supabase reject the race
+        );
       const timeoutPromise = new Promise<{ kind: 'timeout' }>((resolve) =>
-        setTimeout(() => resolve({ kind: 'timeout' }), 2500),
+        setTimeout(() => resolve({ kind: 'timeout' }), 1500),
       );
 
       const result = await Promise.race([profilePromise, timeoutPromise]);
       if (cancelled) return;
 
       if (result.kind === 'data' && result.data) {
-        // Already registered — full reload to refresh AuthContext
+        // Returning user — already has a profile row. Redirect.
         const returnUrl = sessionStorage.getItem('auth_return_url') || '/';
         sessionStorage.removeItem('auth_return_url');
         window.location.href = returnUrl;
       } else {
-        // No profile OR query timed out — show consent form
+        // No profile, query errored, or timed out — show consent form.
+        // (Returning users without a profile fall here too; if they
+        // re-submit the form, upsert is a no-op for non-changed fields.)
         showConsentForm(sessionUser);
       }
     };
