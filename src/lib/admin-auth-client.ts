@@ -39,29 +39,37 @@ export function useAdminAuth(): AdminStatus {
       let role: ClientAdminRole = null;
 
       // 1) Supabase user — check researchers.email match
+      //    Single query asks for both is_active + is_admin; if the
+      //    is_admin column doesn't exist (migration 049 not run yet)
+      //    we retry without it. Collapses 2 sequential round-trips
+      //    into 1 in the common case — ~500ms saved per page load.
       if (user?.email) {
         email = user.email;
         const lcEmail = user.email.toLowerCase();
-        // Note: is_admin column may not exist if migration 049 hasn't run yet
-        // — query defensively
-        const { data: r } = await supabase
+
+        let r: any = null;
+        let hasAdminCol = true;
+        const primary = await supabase
           .from('researchers')
-          .select('id, is_active, email')
+          .select('id, is_active, email, is_admin')
           .ilike('email', lcEmail)
           .maybeSingle();
-
-        if (r) {
-          researcherId = r.id;          // Always expose so user can jump to own profile
+        if (primary.error && /is_admin/i.test(primary.error.message || '')) {
+          // is_admin column missing — fall back to legacy selection
+          hasAdminCol = false;
+          const fallback = await supabase
+            .from('researchers')
+            .select('id, is_active, email')
+            .ilike('email', lcEmail)
+            .maybeSingle();
+          r = fallback.data;
+        } else {
+          r = primary.data;
         }
 
-        // Try the is_admin column separately so missing column doesn't break is_active path
         if (r) {
-          const { data: adminCheck } = await supabase
-            .from('researchers')
-            .select('is_admin')
-            .eq('id', r.id)
-            .maybeSingle();
-          if (adminCheck && (adminCheck as any).is_admin === true) {
+          researcherId = r.id; // Always expose so user can jump to own profile
+          if (hasAdminCol && r.is_admin === true) {
             role = 'superadmin';
           } else if (r.is_active) {
             role = 'admin';
