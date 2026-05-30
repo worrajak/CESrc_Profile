@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useAdminAuth } from '@/lib/admin-auth-client';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -84,7 +84,6 @@ const GROUPS: NavGroup[] = [
 
 export default function AdminNavbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { role, email } = useAdminAuth();
   const { signOut } = useAuth();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -115,8 +114,10 @@ export default function AdminNavbar() {
     if (role === 'superadmin' || role === 'admin') {
       try { await signOut(); } catch {}
     }
-    router.push('/admin');
-    setTimeout(() => window.location.reload(), 50);
+    // Send users to the public homepage on logout rather than back to
+    // /admin (which would just render the login form). Use full reload
+    // so AuthContext picks up the cleared session.
+    window.location.href = '/';
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
