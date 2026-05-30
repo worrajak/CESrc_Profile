@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import ConditionalNavbar from "@/components/ConditionalNavbar";
 import Footer from "@/components/Footer";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { AuthProvider } from "@/lib/AuthContext";
@@ -36,7 +36,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} antialiased bg-gray-50 min-h-screen flex flex-col`}>
         <I18nProvider initialLocale={locale}>
           <AuthProvider>
-            <Navbar />
+            <ConditionalNavbar />
             <main className="flex-1">{children}</main>
             <Footer />
             <EngagementTracker />

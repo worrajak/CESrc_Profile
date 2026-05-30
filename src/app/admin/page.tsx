@@ -8,6 +8,77 @@ import HomepageCacheControl from '@/components/admin/HomepageCacheControl';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
+/**
+ * Quick action cards grouped by category. Order + grouping match the
+ * AdminNavbar dropdowns so visitors can flip between top-bar dropdowns
+ * and dashboard cards without re-learning the layout.
+ */
+type AdminItem = { title: string; desc: string; href: string; border: string; external?: boolean };
+type AdminGroup = { title: string; icon: string; items: AdminItem[] };
+
+const ADMIN_GROUPS: AdminGroup[] = [
+  {
+    title: 'เนื้อหา',
+    icon: '📝',
+    items: [
+      { title: 'จัดการข่าวสาร', desc: 'เขียนข่าว, เพิ่มรูป, ลบข่าว', href: '/admin/news', border: 'border-blue-500' },
+      { title: 'นำเข้าผลงานตีพิมพ์', desc: 'Import จาก DOI, จับคู่นักวิจัย', href: '/admin/publications', border: 'border-green-500' },
+      { title: '💡 จัดการนวัตกรรม / IP', desc: 'สิทธิบัตร · อนุสิทธิบัตร · ค่าสิทธิ TLO', href: '/admin/innovations', border: 'border-amber-500' },
+    ],
+  },
+  {
+    title: 'บุคลากร',
+    icon: '👥',
+    items: [
+      { title: 'จัดการนักวิจัย', desc: 'เพิ่ม/แก้ไขโปรไฟล์ บทบาท ORCID', href: '/admin/researchers', border: 'border-blue-700' },
+      { title: 'จัดการนักศึกษา', desc: 'เพิ่ม/แก้ไข นศ. ป.ตรี-เอก', href: '/admin/students', border: 'border-indigo-500' },
+      { title: 'หัวข้อโครงงาน', desc: 'ประกาศหัวข้อ, ออก Token', href: '/admin/projects', border: 'border-orange-500' },
+    ],
+  },
+  {
+    title: 'ทุนวิจัย',
+    icon: '💰',
+    items: [
+      { title: 'จัดการทุนวิจัย', desc: 'เพิ่ม/แก้ไข ทุน, แนบสัญญา', href: '/admin/grants', border: 'border-emerald-500' },
+      { title: 'ติดตามทุนวิจัย', desc: 'Milestones, S-Curve, AI วิเคราะห์', href: '/admin/grants/tracking', border: 'border-lime-500' },
+    ],
+  },
+  {
+    title: 'ครุภัณฑ์',
+    icon: '🔧',
+    items: [
+      { title: 'จัดการครุภัณฑ์', desc: 'ทะเบียน เพิ่ม/ลด/ตัดจำหน่าย', href: '/admin/equipment', border: 'border-cyan-500' },
+      { title: 'ระบบยืม-คืน', desc: 'อนุมัติ/คืน/ติดตามเกินกำหนด', href: '/admin/equipment/borrowing', border: 'border-teal-500' },
+    ],
+  },
+  {
+    title: 'บริการ',
+    icon: '🎓',
+    items: [
+      { title: 'จัดการหลักสูตรอบรม', desc: 'นำเข้าเอกสาร AI แยกกำหนดการ/เกณฑ์', href: '/admin/training', border: 'border-violet-500' },
+      { title: 'จัดการคำขอบริการ', desc: 'อนุมัติ/มอบหมาย/ติดตามคำขอ', href: '/admin/services', border: 'border-purple-500' },
+    ],
+  },
+  {
+    title: 'เชื่อมต่อ / ตั้งค่า',
+    icon: '🔗',
+    items: [
+      { title: 'ORCID Integration', desc: 'ดึงผลงาน/ทุนจาก ORCID ลง DB', href: '/admin/orcid', border: 'border-green-500' },
+      { title: 'OpenAlex Sync', desc: 'Citations, H-index, 250M+ ผลงาน (ฟรี)', href: '/admin/openalex', border: 'border-orange-500' },
+      { title: 'ตั้งค่า AI', desc: 'API Key, เลือกโมเดล, ทดสอบ', href: '/admin/ai-settings', border: 'border-pink-500' },
+      { title: 'Supabase Dashboard', desc: 'จัดการฐานข้อมูลและ Storage', href: 'https://supabase.com/dashboard', border: 'border-gray-400', external: true },
+    ],
+  },
+  {
+    title: 'วิเคราะห์',
+    icon: '📊',
+    items: [
+      { title: 'ประเมินภาระงาน', desc: 'สรุปผลงาน/ทุน/เดินทาง/อบรม รายปี', href: '/admin/workload', border: 'border-emerald-500' },
+      { title: 'Engagement Analytics', desc: 'Heatmap, comments, ผู้เยี่ยมชม (PDPA)', href: '/admin/engagement', border: 'border-rose-500' },
+    ],
+  },
+];
+
 export default function AdminPage() {
   const { role, loading: roleLoading } = useAdminAuth();
   const [authenticated, setAuthenticated] = useState(false);
@@ -136,136 +207,50 @@ export default function AdminPage() {
         <HomepageCacheControl />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <Link
-          href="/admin/news"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการข่าวสาร</h3>
-          <p className="text-sm text-gray-500">เขียนข่าว, เพิ่มรูป, ลบข่าว</p>
-        </Link>
-        <Link
-          href="/admin/publications"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">นำเข้าผลงานตีพิมพ์</h3>
-          <p className="text-sm text-gray-500">Import จาก DOI, จับคู่นักวิจัย</p>
-        </Link>
-        <Link
-          href="/admin/innovations"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-amber-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">💡 จัดการนวัตกรรม / IP</h3>
-          <p className="text-sm text-gray-500">สิทธิบัตร · อนุสิทธิบัตร · ค่าสิทธิ TLO</p>
-        </Link>
-        <Link
-          href="/admin/researchers"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-blue-700 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการนักวิจัย</h3>
-          <p className="text-sm text-gray-500">เพิ่ม/แก้ไขโปรไฟล์ บทบาท ORCID</p>
-        </Link>
-        <Link
-          href="/admin/students"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-indigo-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการนักศึกษา</h3>
-          <p className="text-sm text-gray-500">เพิ่ม/แก้ไข นศ. ป.ตรี-เอก</p>
-        </Link>
-        <Link
-          href="/admin/projects"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-orange-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">หัวข้อโครงงาน</h3>
-          <p className="text-sm text-gray-500">ประกาศหัวข้อ, ออก Token</p>
-        </Link>
-        <Link
-          href="/admin/grants"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-emerald-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการทุนวิจัย</h3>
-          <p className="text-sm text-gray-500">เพิ่ม/แก้ไข ทุน, แนบสัญญา</p>
-        </Link>
-        <Link
-          href="/admin/grants/tracking"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-lime-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">ติดตามทุนวิจัย</h3>
-          <p className="text-sm text-gray-500">Milestones, S-Curve, AI วิเคราะห์</p>
-        </Link>
-        <Link
-          href="/admin/equipment"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-cyan-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการครุภัณฑ์</h3>
-          <p className="text-sm text-gray-500">ทะเบียน เพิ่ม/ลด/ตัดจำหน่าย</p>
-        </Link>
-        <Link
-          href="/admin/equipment/borrowing"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-teal-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">ระบบยืม-คืน</h3>
-          <p className="text-sm text-gray-500">อนุมัติ/คืน/ติดตามเกินกำหนด</p>
-        </Link>
-        <Link
-          href="/admin/training"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-violet-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการหลักสูตรอบรม</h3>
-          <p className="text-sm text-gray-500">นำเข้าเอกสาร AI แยกกำหนดการ/เกณฑ์</p>
-        </Link>
-        <Link
-          href="/admin/services"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-purple-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">จัดการคำขอบริการ</h3>
-          <p className="text-sm text-gray-500">อนุมัติ/มอบหมาย/ติดตามคำขอ</p>
-        </Link>
-        <Link
-          href="/admin/orcid"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-green-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">ORCID Integration</h3>
-          <p className="text-sm text-gray-500">ดึงผลงาน/ทุนจาก ORCID ลง DB</p>
-        </Link>
-        <Link
-          href="/admin/openalex"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-orange-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">OpenAlex Sync</h3>
-          <p className="text-sm text-gray-500">Citations, H-index, 250M+ ผลงาน (ฟรี)</p>
-        </Link>
-        <Link
-          href="/admin/workload"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-emerald-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">ประเมินภาระงาน</h3>
-          <p className="text-sm text-gray-500">สรุปผลงาน/ทุน/เดินทาง/อบรม รายปี</p>
-        </Link>
-        <Link
-          href="/admin/engagement"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-rose-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">Engagement Analytics</h3>
-          <p className="text-sm text-gray-500">Heatmap, comments, ผู้เยี่ยมชม (PDPA)</p>
-        </Link>
-        <Link
-          href="/admin/ai-settings"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-pink-500 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">ตั้งค่า AI</h3>
-          <p className="text-sm text-gray-500">API Key, เลือกโมเดล, ทดสอบ</p>
-        </Link>
-        <a
-          href="https://supabase.com/dashboard"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition border-l-4 border-gray-400 block"
-        >
-          <h3 className="font-semibold text-gray-800 mb-1">Supabase Dashboard</h3>
-          <p className="text-sm text-gray-500">จัดการฐานข้อมูลและ Storage</p>
-        </a>
+      {/* Quick Actions — organised into 7 categories matching the AdminNavbar Operations console */}
+      <div className="space-y-6 mb-8">
+        {ADMIN_GROUPS.map((group) => (
+          <section key={group.title}>
+            <div className="flex items-baseline justify-between mb-2">
+              <h2 className="text-sm font-semibold text-gray-600 tracking-wide uppercase flex items-center gap-2">
+                <span>{group.icon}</span>
+                <span>{group.title}</span>
+                <span className="text-[10px] text-gray-400 normal-case font-normal">
+                  ({group.items.length})
+                </span>
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {group.items.map((item) =>
+                item.external ? (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`bg-white rounded-lg border border-slate-200 hover:border-slate-400 hover:shadow-sm transition p-3 block border-l-4 ${item.border}`}
+                  >
+                    <h3 className="font-semibold text-gray-800 text-sm leading-snug">
+                      {item.title}
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{item.desc}</p>
+                  </a>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`bg-white rounded-lg border border-slate-200 hover:border-slate-400 hover:shadow-sm transition p-3 block border-l-4 ${item.border}`}
+                  >
+                    <h3 className="font-semibold text-gray-800 text-sm leading-snug">
+                      {item.title}
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{item.desc}</p>
+                  </Link>
+                ),
+              )}
+            </div>
+          </section>
+        ))}
       </div>
 
       {/* GA Embed Dashboard */}
