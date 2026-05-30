@@ -32,7 +32,30 @@ Schema (omit fields you cannot determine; do not invent):
   "research_areas": ["พลังงานทดแทน", "EV", "smart grid"],
   "required_outputs": ["บทความ Q1", "patent"],
   "announcement_url": "https://...",
-  "regulations_url": "https://..."
+  "regulations_url": "https://...",
+
+  // NRIIS-style strategy hierarchy (NRCT and other agencies). Omit if absent.
+  "strategy": {
+    "strategy_no": "ยุทธศาสตร์ที่ 2 การยกระดับสังคมและสิ่งแวดล้อม ...",
+    "program": "P9 พัฒนาสังคมสูงวัยด้วยวิทยาศาสตร์ วิจัยและนวัตกรรม",
+    "sub_programs": [
+      {
+        "code": "F8 (S2P9)",
+        "name": "พัฒนาผู้สูงอายุในภาคชนบทและเมือง ...",
+        "topic": "การพัฒนาผู้สูงอายุในภาคชนบทและเมือง ให้มีศักยภาพในการพึ่งตนเอง",
+        "groups": [
+          "นวัตกรรมทางสังคมเพื่อสนับสนุนให้ผู้สูงอายุมีพลังและยังประโยชน์",
+          "เปลี่ยนเกษียณเป็นพลัง"
+        ]
+      }
+    ]
+  },
+
+  // How to submit (registration URL, required attachments, confirmation step)
+  "submission_details_th": "ลงทะเบียนส่งข้อเสนอที่ https://nriis.go.th ...",
+
+  // Where results will be announced (URLs or channel names)
+  "result_channels": ["https://www.nrct.go.th", "https://nriis.go.th"]
 }
 
 CRITICAL RULES:
@@ -43,6 +66,22 @@ CRITICAL RULES:
 - If only one budget figure given, fill budget_max only.
 - duration_months: convert ปี → 12, 18 เดือน → 18.
 - research_areas: short Thai phrases or English keywords.
+
+STRATEGY EXTRACTION (NRIIS-style only):
+- Look for headers like "ยุทธศาสตร์ที่ N", "แผนงาน Pxx", "แผนงานย่อย Fxx / Nxx", "แผนงานย่อยรายประเด็น", "กลุ่มเรื่อง".
+- "แผนงานย่อย" and "แผนงานย่อยรายประเด็น" are TWO different levels:
+    • แผนงานย่อย     → code like F8 (S2P9), N13 (S2P9). Maps to sub_programs[].code/name.
+    • แผนงานย่อยรายประเด็น → a heading describing the topic of that sub-program.
+                              Maps to sub_programs[].topic (NOT to sub_programs[].name).
+- "กลุ่มเรื่อง" lines under a sub-program map to that sub-program's "groups" array.
+- A single announcement can list multiple sub-programs under the same strategy/program — include each in the sub_programs array in order.
+- If the source uses simpler structure (just "ยุทธศาสตร์" and "แผนงาน" without sub-program codes), still fill the fields you can find — omit the rest.
+
+SUBMISSION + RESULT EXTRACTION:
+- submission_details_th: capture the FULL submission instructions paragraph,
+  including the URL, required confirmation step, status meanings, etc.
+- result_channels: pull every URL that appears under "ประกาศผล" / "ประกาศผลการพิจารณา" / "การประกาศผล". Strip Markdown link syntax.
+
 - If text is mostly noise/empty, return {} (empty JSON).
 `;
 

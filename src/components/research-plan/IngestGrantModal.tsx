@@ -26,6 +26,19 @@ function detectJsRendered(input: string) {
   }
 }
 
+type StrategySubProgram = {
+  code?: string;
+  name?: string;
+  topic?: string;       // แผนงานย่อยรายประเด็น
+  groups?: string[];    // กลุ่มเรื่อง
+};
+
+type StrategyHierarchy = {
+  strategy_no?: string;
+  program?: string;
+  sub_programs?: StrategySubProgram[];
+};
+
 type ExtractedGrant = {
   agency_code?: string;
   agency_name_th?: string;
@@ -48,6 +61,10 @@ type ExtractedGrant = {
   required_outputs?: string[];
   announcement_url?: string;
   regulations_url?: string;
+  // NRIIS-style strategy hierarchy + submission/result details
+  strategy?: StrategyHierarchy;
+  submission_details_th?: string;
+  result_channels?: string[];
 };
 
 export default function IngestGrantModal({
@@ -164,6 +181,10 @@ export default function IngestGrantModal({
         required_outputs: extracted.required_outputs?.length ? extracted.required_outputs : null,
         announcement_url: extracted.announcement_url || url || null,
         regulations_url: extracted.regulations_url || null,
+        // NRIIS-style strategy hierarchy + submission/result details (migration 053)
+        strategy: extracted.strategy && Object.keys(extracted.strategy).length ? extracted.strategy : null,
+        submission_details_th: extracted.submission_details_th || null,
+        result_channels: extracted.result_channels?.length ? extracted.result_channels : null,
         status: 'upcoming',
         ai_extracted_data: extracted as any,
         ai_provider: aiMeta?.source || null,
@@ -492,6 +513,107 @@ export default function IngestGrantModal({
                           .filter(Boolean),
                       })
                     }
+                    className="w-full px-3 py-1.5 border rounded text-sm"
+                  />
+                </Field>
+
+                {/* ── NRIIS-style strategy hierarchy ── */}
+                <div className="border-t border-slate-200 pt-3 mt-3">
+                  <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                    🧭 {locale === 'en' ? 'Strategy hierarchy (NRIIS)' : 'โครงสร้างยุทธศาสตร์ (NRIIS)'}
+                  </h4>
+                  <div className="space-y-2">
+                    <Field label={locale === 'en' ? 'Strategy (ยุทธศาสตร์ที่)' : 'ยุทธศาสตร์ที่'}>
+                      <input
+                        type="text"
+                        value={extracted?.strategy?.strategy_no || ''}
+                        onChange={(e) =>
+                          setExtracted({
+                            ...(extracted || {}),
+                            strategy: { ...(extracted?.strategy || {}), strategy_no: e.target.value },
+                          })
+                        }
+                        placeholder="ยุทธศาสตร์ที่ 2 การยกระดับสังคม..."
+                        className="w-full px-3 py-1.5 border rounded text-sm"
+                      />
+                    </Field>
+                    <Field label={locale === 'en' ? 'Program (แผนงาน)' : 'แผนงาน'}>
+                      <input
+                        type="text"
+                        value={extracted?.strategy?.program || ''}
+                        onChange={(e) =>
+                          setExtracted({
+                            ...(extracted || {}),
+                            strategy: { ...(extracted?.strategy || {}), program: e.target.value },
+                          })
+                        }
+                        placeholder="P9 พัฒนาสังคมสูงวัย..."
+                        className="w-full px-3 py-1.5 border rounded text-sm"
+                      />
+                    </Field>
+
+                    {/* Sub-programs (repeating) — read-only listing for now, admins can edit later via JSON */}
+                    {(extracted?.strategy?.sub_programs || []).length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-medium text-gray-600 mb-1">
+                          {locale === 'en' ? 'Sub-programs (แผนงานย่อย)' : 'แผนงานย่อย'}
+                        </div>
+                        <div className="space-y-2">
+                          {(extracted?.strategy?.sub_programs || []).map((sp, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs"
+                            >
+                              <div className="font-semibold text-slate-700">
+                                {sp.code ? `[${sp.code}] ` : ''}
+                                {sp.name || '—'}
+                              </div>
+                              {sp.topic && (
+                                <div className="mt-1 text-slate-600">
+                                  <span className="text-slate-400">แผนงานย่อยรายประเด็น:</span> {sp.topic}
+                                </div>
+                              )}
+                              {sp.groups && sp.groups.length > 0 && (
+                                <ul className="mt-1 text-slate-600 list-disc pl-5">
+                                  {sp.groups.map((g, gi) => (
+                                    <li key={gi}>{g}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Submission details + result channels ── */}
+                <Field label={locale === 'en' ? 'Submission details' : 'การส่งข้อเสนอ (วิธีลงทะเบียน · ขั้นตอนยืนยัน)'}>
+                  <textarea
+                    value={extracted?.submission_details_th || ''}
+                    onChange={(e) =>
+                      setExtracted({ ...(extracted || {}), submission_details_th: e.target.value })
+                    }
+                    rows={3}
+                    placeholder="ลงทะเบียนที่ https://nriis.go.th ... ทำการ ‘ยืนยัน’ การส่ง..."
+                    className="w-full px-3 py-1.5 border rounded text-sm"
+                  />
+                </Field>
+                <Field label={locale === 'en' ? 'Result channels (URLs, comma-separated)' : 'ช่องทางประกาศผล (URL คั่นด้วย ,)'}>
+                  <input
+                    type="text"
+                    value={(extracted?.result_channels || []).join(', ')}
+                    onChange={(e) =>
+                      setExtracted({
+                        ...(extracted || {}),
+                        result_channels: e.target.value
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    placeholder="https://www.nrct.go.th, https://nriis.go.th"
                     className="w-full px-3 py-1.5 border rounded text-sm"
                   />
                 </Field>
