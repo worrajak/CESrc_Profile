@@ -64,16 +64,47 @@ export default function AuthCallbackPage() {
       }
     };
 
-    // Safety net: if the page is still on the spinner after 3.5s but Supabase
-    // does have a session, force-show the consent form so the user is never
-    // trapped.
+    // Safety net #1 (4 s): try to recover session via getSession() and
+    // force-show the consent form if a session exists.
     const safetyId = setTimeout(async () => {
       if (cancelled) return;
-      const { data: { session: latest } } = await supabase.auth.getSession();
-      if (latest?.user && !user) {
-        showConsentForm(latest.user);
+      try {
+        const { data: { session: latest } } = await supabase.auth.getSession();
+        if (latest?.user && !user) {
+          showConsentForm(latest.user);
+        }
+      } catch {
+        /* ignore — hard fallback below will fire */
       }
-    }, 3500);
+    }, 4000);
+
+    // Safety net #2 (6 s): if we're STILL on the spinner after 6 s — meaning
+    // getSession() itself is hanging — break out by reading the session
+    // synchronously from localStorage. supabase-js persists the session
+    // there, so even if the network call is hung we can usually recover.
+    // Worst case, fall through to the error UI (no infinite spinner).
+    const hardSafetyId = setTimeout(() => {
+      if (cancelled) return;
+      try {
+        // supabase-js v2 storage key — best-effort
+        for (const k of Object.keys(localStorage)) {
+          if (!k.startsWith('sb-') || !k.endsWith('-auth-token')) continue;
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const u = parsed?.user || parsed?.currentSession?.user;
+          if (u?.id && u?.email) {
+            showConsentForm(u);
+            return;
+          }
+        }
+      } catch {
+        /* fall through */
+      }
+      // No session anywhere — show error so user can retry login
+      setStatus('error');
+      setErrorMsg('โหลดข้อมูล session ไม่สำเร็จ — กรุณาลองส่ง Magic Link ใหม่อีกครั้ง');
+    }, 6000);
 
     (async () => {
       // 1) Try existing session first
@@ -105,6 +136,7 @@ export default function AuthCallbackPage() {
     return () => {
       cancelled = true;
       if (safetyId) clearTimeout(safetyId);
+      if (hardSafetyId) clearTimeout(hardSafetyId);
       if (timeoutId) clearTimeout(timeoutId);
       if (subscription) subscription.unsubscribe();
     };
