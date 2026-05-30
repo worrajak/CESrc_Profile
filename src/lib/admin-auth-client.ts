@@ -26,105 +26,64 @@ export type AdminStatus = {
   checked: boolean;
 };
 
-/**
- * Module-level cache + single-flight dedup so multiple components
- * calling useAdminAuth() on the same page share ONE supabase query.
- *
- * /admin pages render <AdminLayout/>, <AdminNavbar/>, and /admin/page.tsx
- * — all 3 used to fire their own researchers query in parallel. The dedup
- * collapses them into a single fetch per (userId, 30s TTL).
- */
-type CacheEntry = { userId: string | null; status: AdminStatus; ts: number };
-let cachedEntry: CacheEntry | null = null;
-let pendingQuery: Promise<AdminStatus> | null = null;
-const CACHE_TTL_MS = 30_000;
-
-async function fetchAdminStatus(user: any): Promise<AdminStatus> {
-  let researcherId: string | undefined;
-  let email: string | undefined;
-  let role: ClientAdminRole = null;
-
-  if (user?.email) {
-    email = user.email;
-    const lcEmail = user.email.toLowerCase();
-
-    let r: any = null;
-    let hasAdminCol = true;
-    const primary = await supabase
-      .from('researchers')
-      .select('id, is_active, email, is_admin')
-      .ilike('email', lcEmail)
-      .maybeSingle();
-    if (primary.error && /is_admin/i.test(primary.error.message || '')) {
-      hasAdminCol = false;
-      const fallback = await supabase
-        .from('researchers')
-        .select('id, is_active, email')
-        .ilike('email', lcEmail)
-        .maybeSingle();
-      r = fallback.data;
-    } else {
-      r = primary.data;
-    }
-
-    if (r) {
-      researcherId = r.id;
-      if (hasAdminCol && r.is_admin === true) {
-        role = 'superadmin';
-      } else if (r.is_active) {
-        role = 'admin';
-      }
-    }
-  }
-
-  if (!role && typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true') {
-    role = 'legacy';
-  }
-
-  return { loading: false, role, email, researcherId, checked: true };
-}
-
 export function useAdminAuth(): AdminStatus {
   const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<AdminStatus>({ loading: true, role: null, checked: false });
 
   useEffect(() => {
     if (authLoading) return;
-    let cancelled = false;
 
     (async () => {
-      const userId = user?.id || null;
+      let researcherId: string | undefined;
+      let email: string | undefined;
+      let role: ClientAdminRole = null;
 
-      // Cache hit?
-      if (
-        cachedEntry &&
-        cachedEntry.userId === userId &&
-        Date.now() - cachedEntry.ts < CACHE_TTL_MS
-      ) {
-        if (!cancelled) setStatus(cachedEntry.status);
-        return;
+      // 1) Supabase user — check researchers.email match
+      //    Single query asks for both is_active + is_admin; if the
+      //    is_admin column doesn't exist (migration 049 not run yet)
+      //    we retry without it. ~250ms saved per call vs the 2-query
+      //    legacy path; we don't share across components so multiple
+      //    callers will each do their own query — acceptable for now.
+      if (user?.email) {
+        email = user.email;
+        const lcEmail = user.email.toLowerCase();
+
+        let r: any = null;
+        let hasAdminCol = true;
+        const primary = await supabase
+          .from('researchers')
+          .select('id, is_active, email, is_admin')
+          .ilike('email', lcEmail)
+          .maybeSingle();
+        if (primary.error && /is_admin/i.test(primary.error.message || '')) {
+          hasAdminCol = false;
+          const fallback = await supabase
+            .from('researchers')
+            .select('id, is_active, email')
+            .ilike('email', lcEmail)
+            .maybeSingle();
+          r = fallback.data;
+        } else {
+          r = primary.data;
+        }
+
+        if (r) {
+          researcherId = r.id;
+          if (hasAdminCol && r.is_admin === true) {
+            role = 'superadmin';
+          } else if (r.is_active) {
+            role = 'admin';
+          }
+        }
       }
 
-      // Single-flight: if a query is already in flight, wait for it
-      if (!pendingQuery) {
-        pendingQuery = fetchAdminStatus(user).then((s) => {
-          cachedEntry = { userId, status: s, ts: Date.now() };
-          pendingQuery = null;
-          return s;
-        });
+      // 2) Legacy password session
+      if (!role && typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true') {
+        role = 'legacy';
       }
 
-      try {
-        const result = await pendingQuery;
-        if (!cancelled) setStatus(result);
-      } catch {
-        if (!cancelled) setStatus({ loading: false, role: null, checked: true });
-      }
+      setStatus({ loading: false, role, email, researcherId, checked: true });
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [user, authLoading]);
 
   return status;
