@@ -147,10 +147,7 @@ export default async function HomePage() {
         locale={locale === 'en' ? 'en' : 'th'}
       />
 
-      {/* Recent Activity — derived from publications/patents/grants/innovations */}
-      <ActivityStream locale={locale === 'en' ? 'en' : 'th'} limit={7} />
-
-      {/* News & IEEE Spectrum — moved above Featured Research so visitors see latest activity first */}
+      {/* News (left 2/3) + Recent Activity cards (right 1/3) */}
       <section className="max-w-7xl mx-auto px-4 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
@@ -205,19 +202,8 @@ export default async function HomePage() {
             )}
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                🌐 {st('home.energy_trends.global', locale)}
-              </span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-700 to-lime-700 bg-clip-text text-transparent mb-4">
-              {st('home.spectrum.title', locale)}
-            </h2>
-            <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 rounded-2xl p-4 border border-emerald-200 shadow-sm">
-              <ScholarNews />
-            </div>
-          </div>
+          {/* Right column — Recent Activity cards (replaces previous IEEE Spectrum slot) */}
+          <ActivityStream locale={locale === 'en' ? 'en' : 'th'} limit={6} />
         </div>
       </section>
 
@@ -475,6 +461,21 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* IEEE Spectrum / global energy news — placed at the bottom as a "further reading" feed */}
+      <section className="max-w-7xl mx-auto px-4 py-10 border-t border-slate-200">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+            🌐 {st('home.energy_trends.global', locale)}
+          </span>
+        </div>
+        <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-700 to-lime-700 bg-clip-text text-transparent mb-4">
+          {st('home.spectrum.title', locale)}
+        </h2>
+        <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 rounded-2xl p-4 border border-emerald-200 shadow-sm">
+          <ScholarNews />
+        </div>
+      </section>
 
     </div>
   );
