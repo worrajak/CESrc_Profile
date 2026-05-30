@@ -71,12 +71,20 @@ type ExtractedGrant = {
 export default function IngestGrantModal({
   onClose,
   onSaved,
+  editTarget,
 }: {
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * If provided, the modal opens directly in the review step with the row's
+   * fields pre-populated and saves via UPDATE instead of UPSERT. Used by the
+   * admin Edit menu on /research-plan cards.
+   */
+  editTarget?: (ExtractedGrant & { id: string }) | null;
 }) {
   const { t, locale } = useI18n();
-  const [step, setStep] = useState<'input' | 'review'>('input');
+  const isEditing = Boolean(editTarget);
+  const [step, setStep] = useState<'input' | 'review'>(isEditing ? 'review' : 'input');
   const [mode, setMode] = useState<'text' | 'image'>('text');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
@@ -85,7 +93,7 @@ export default function IngestGrantModal({
   const [imagePreview, setImagePreview] = useState<string>('');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
-  const [extracted, setExtracted] = useState<ExtractedGrant | null>(null);
+  const [extracted, setExtracted] = useState<ExtractedGrant | null>(editTarget || null);
   const [aiMeta, setAiMeta] = useState<{ source: string; model: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -233,9 +241,11 @@ export default function IngestGrantModal({
         ai_provider: aiMeta?.source || null,
         ingested_at: new Date().toISOString(),
       };
-      const { error: dbErr } = await supabase
-        .from('grant_calls')
-        .upsert(payload, { onConflict: 'agency_code,call_code' });
+      const { error: dbErr } = isEditing && editTarget?.id
+        ? await supabase.from('grant_calls').update(payload).eq('id', editTarget.id)
+        : await supabase
+            .from('grant_calls')
+            .upsert(payload, { onConflict: 'agency_code,call_code' });
       if (dbErr) throw dbErr;
       onSaved();
     } catch (e: any) {
@@ -251,9 +261,15 @@ export default function IngestGrantModal({
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-purple-700 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-lg">{t('rplan.ingest.title')}</h2>
+            <h2 className="font-bold text-lg">
+              {isEditing
+                ? locale === 'en' ? 'Edit grant call' : 'แก้ไขแหล่งทุน'
+                : t('rplan.ingest.title')}
+            </h2>
             <p className="text-xs text-blue-100 mt-0.5">
-              {step === 'input'
+              {isEditing
+                ? locale === 'en' ? 'Update fields and save' : 'แก้ไขข้อมูลและบันทึก'
+                : step === 'input'
                 ? locale === 'en'
                   ? 'AI will extract dates, budget, conditions automatically'
                   : 'AI จะสกัดวันสำคัญ งบประมาณ เงื่อนไข อัตโนมัติ'
@@ -671,18 +687,32 @@ export default function IngestGrantModal({
               )}
 
               <div className="flex gap-2 mt-5">
-                <button
-                  onClick={() => setStep('input')}
-                  className="px-4 py-2 border text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
-                >
-                  ← {locale === 'en' ? 'Back' : 'ย้อนกลับ'}
-                </button>
+                {!isEditing && (
+                  <button
+                    onClick={() => setStep('input')}
+                    className="px-4 py-2 border text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    ← {locale === 'en' ? 'Back' : 'ย้อนกลับ'}
+                  </button>
+                )}
+                {isEditing && (
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 border text-gray-600 rounded-lg hover:bg-gray-50 text-sm"
+                  >
+                    {locale === 'en' ? 'Cancel' : 'ยกเลิก'}
+                  </button>
+                )}
                 <button
                   onClick={handleSave}
                   disabled={saving}
                   className="flex-1 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 transition"
                 >
-                  {saving ? '...' : locale === 'en' ? 'Save grant call' : 'บันทึกแหล่งทุน'}
+                  {saving
+                    ? '...'
+                    : isEditing
+                    ? locale === 'en' ? 'Update' : 'บันทึกการแก้ไข'
+                    : locale === 'en' ? 'Save grant call' : 'บันทึกแหล่งทุน'}
                 </button>
               </div>
             </>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
 import { useAuth } from '@/lib/AuthContext';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 import IngestGrantModal from '@/components/research-plan/IngestGrantModal';
 import TimelineView from '@/components/research-plan/TimelineView';
 import ProposalsList from '@/components/research-plan/ProposalsList';
@@ -60,12 +61,34 @@ const STATUS_BADGE: Record<string, { th: string; en: string; cls: string }> = {
 export default function ResearchPlanPage() {
   const { t, locale } = useI18n();
   const { user } = useAuth();
+  const { role: adminRole } = useAdminAuth();
+  const isAdmin = adminRole === 'superadmin' || adminRole === 'admin' || adminRole === 'legacy';
   const [calls, setCalls] = useState<GrantCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'calendar' | 'timeline' | 'proposals' | 'action_plan' | 'career'>('calendar');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [showIngest, setShowIngest] = useState(false);
+  const [editingCall, setEditingCall] = useState<GrantCall | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const handleDelete = async (c: GrantCall) => {
+    const label = c.call_name_th || c.call_code || 'this grant';
+    if (!window.confirm(
+      locale === 'en'
+        ? `Delete grant call "${label}"? This cannot be undone.`
+        : `ลบแหล่งทุน “${label}” ใช่ไหม? (ลบแล้วกู้คืนไม่ได้)`,
+    )) return;
+    const { error: delErr } = await supabase.from('grant_calls').delete().eq('id', c.id);
+    if (delErr) {
+      window.alert(
+        (locale === 'en' ? 'Delete failed: ' : 'ลบไม่สำเร็จ: ') + delErr.message,
+      );
+      return;
+    }
+    setOpenMenuId(null);
+    await fetchCalls();
+  };
 
   const fetchCalls = async () => {
     setLoading(true);
@@ -306,17 +329,62 @@ export default function ResearchPlanPage() {
                       key={c.id}
                       className={`relative bg-white rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 hover:border-slate-300 transition-all overflow-hidden flex flex-col before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 ${URGENCY.stripe}`}
                     >
-                      {/* Top row — urgency chip + agency code */}
-                      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                      {/* Top row — urgency chip + agency code + admin menu */}
+                      <div className="flex items-center justify-between px-4 pt-4 pb-2 gap-2">
                         <span
                           className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${URGENCY.chipBg}`}
                         >
                           <span>{URGENCY.icon}</span>
                           <span>{locale === 'en' ? URGENCY.label_en : URGENCY.label_th}</span>
                         </span>
-                        <span className="text-[10px] font-semibold tracking-wider text-slate-500">
-                          {c.agency_code} · {c.call_code}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold tracking-wider text-slate-500">
+                            {c.agency_code} · {c.call_code}
+                          </span>
+                          {isAdmin && (
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === c.id ? null : c.id);
+                                }}
+                                className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700 text-base leading-none"
+                                title={locale === 'en' ? 'Admin actions' : 'การจัดการ (admin)'}
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === c.id}
+                              >
+                                ⋯
+                              </button>
+                              {openMenuId === c.id && (
+                                <>
+                                  {/* click-outside backdrop */}
+                                  <div
+                                    className="fixed inset-0 z-30"
+                                    onClick={() => setOpenMenuId(null)}
+                                  />
+                                  <div className="absolute right-0 top-7 z-40 w-36 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-xs">
+                                    <button
+                                      onClick={() => {
+                                        setEditingCall(c);
+                                        setOpenMenuId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-700"
+                                    >
+                                      ✏️ {locale === 'en' ? 'Edit' : 'แก้ไข'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(c)}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600"
+                                    >
+                                      🗑️ {locale === 'en' ? 'Delete' : 'ลบ'}
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Body */}
@@ -454,6 +522,17 @@ export default function ResearchPlanPage() {
           onClose={() => setShowIngest(false)}
           onSaved={() => {
             setShowIngest(false);
+            fetchCalls();
+          }}
+        />
+      )}
+
+      {editingCall && (
+        <IngestGrantModal
+          editTarget={editingCall as any}
+          onClose={() => setEditingCall(null)}
+          onSaved={() => {
+            setEditingCall(null);
             fetchCalls();
           }}
         />
