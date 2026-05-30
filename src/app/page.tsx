@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import ScholarNews from '@/components/ScholarNews';
+import ExecutiveHero, { ExecutiveSummary, HomeKpi } from '@/components/home/ExecutiveHero';
+import ActivityStream from '@/components/home/ActivityStream';
 import Link from 'next/link';
-import Image from 'next/image';
 import { getServerLocale, st } from '@/lib/i18n-server';
 import { getLocalizedField } from '@/lib/translations';
 
@@ -9,14 +10,14 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 async function getHomeData() {
-  const [researchersRes, pubCountRes, grantCountRes, newsRes, sessionsRes, topPubsRes, activeGrantsRes] = await Promise.all([
-    supabase
-      .from('researchers')
-      .select('*')
-      .eq('is_active', true)
-      .order('unit_role', { ascending: true }),
-    supabase.from('publications').select('id', { count: 'exact', head: true }),
-    supabase.from('grants').select('id', { count: 'exact', head: true }),
+  const [
+    newsRes,
+    sessionsRes,
+    topPubsRes,
+    activeGrantsRes,
+    kpiRes,
+    cacheRes,
+  ] = await Promise.all([
     supabase
       .from('news')
       .select(`
@@ -55,16 +56,44 @@ async function getHomeData() {
       .eq('status', 'active')
       .order('fiscal_year', { ascending: false })
       .limit(4),
+    // Executive overview — KPI summary (migration 050)
+    supabase.from('cesru_kpi_summary').select('*').maybeSingle(),
+    // AI executive summary cache (may be empty / stale)
+    supabase
+      .from('cesru_homepage_cache')
+      .select('*')
+      .eq('id', 'executive_summary')
+      .maybeSingle(),
   ]);
 
+  // Hand the cached summary to the client component only if it is still fresh.
+  // A stale or missing row makes the client fetch /api/homepage/executive-summary on mount.
+  const cached = cacheRes.data;
+  const fresh =
+    cached &&
+    cached.expires_at &&
+    new Date(cached.expires_at).getTime() > Date.now() &&
+    cached.summary_th
+      ? ({
+          summary_th: cached.summary_th,
+          summary_en: cached.summary_en,
+          evidence_chain: cached.evidence_chain || [],
+          source: cached.source,
+          model: cached.model,
+          generated_at: cached.generated_at,
+          cached: true,
+        } as ExecutiveSummary)
+      : null;
+
+  const kpi = (kpiRes.data || {}) as HomeKpi;
+
   return {
-    researchers: researchersRes.data || [],
-    pubCount: pubCountRes.count || 0,
-    grantCount: grantCountRes.count || 0,
     news: newsRes.data || [],
     sessions: sessionsRes.data || [],
     topPubs: topPubsRes.data || [],
     activeGrants: activeGrantsRes.data || [],
+    kpi,
+    executiveSummary: fresh,
   };
 }
 
@@ -99,71 +128,27 @@ const PUB_TYPE_BADGE: Record<string, { th: string; en: string; color: string }> 
 };
 
 export default async function HomePage() {
-  const { researchers, pubCount, grantCount, news, sessions, topPubs, activeGrants } = await getHomeData();
+  const { news, sessions, topPubs, activeGrants, kpi, executiveSummary } = await getHomeData();
   const locale = getServerLocale();
-  const totalCitations = researchers.reduce((sum: number, r: any) => sum + (r.cited_by_count || 0), 0);
-  const avgHIndex = researchers.length
-    ? (researchers.reduce((sum: number, r: any) => sum + (r.h_index || 0), 0) / researchers.length).toFixed(1)
-    : '0';
+
+  // Tagline for ExecutiveHero (replaces old hero subtitle block)
+  const tagline =
+    locale === 'en'
+      ? st('home.hero.affiliation', locale)
+      : `${st('home.hero.subtitle_th', locale)} • ${st('home.hero.affiliation', locale)}`;
 
   return (
     <div className="bg-gradient-to-b from-slate-50 via-white to-slate-50 min-h-screen">
-      {/* Hero — Compact with Animated Background */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-teal-900 to-emerald-900">
-        {/* Animated gradient blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-20 -left-20 w-72 h-72 bg-emerald-400 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute top-10 right-0 w-72 h-72 bg-lime-400 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-cyan-400 rounded-full mix-blend-screen filter blur-3xl opacity-15 animate-blob" style={{ animationDelay: '4s' }}></div>
-        </div>
+      {/* Hero — Executive AI Overview (replaces previous hero) */}
+      <ExecutiveHero
+        initial={executiveSummary}
+        kpi={kpi}
+        tagline={tagline}
+        locale={locale === 'en' ? 'en' : 'th'}
+      />
 
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '40px 40px'
-        }}></div>
-
-        <div className="relative max-w-7xl mx-auto px-4 py-10 md:py-14">
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-            {/* Left: Logo + Title */}
-            <div className="flex items-center gap-4 md:gap-5 flex-shrink-0">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-lime-400 to-emerald-400 rounded-2xl blur-xl opacity-60"></div>
-                <Image
-                  src="/logo-cesru.jpeg"
-                  alt="CESRU Logo"
-                  width={72}
-                  height={72}
-                  className="relative rounded-2xl bg-white p-1.5 shadow-2xl"
-                />
-              </div>
-              <div className="text-white">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-lime-400/20 text-lime-300 border border-lime-400/30">
-                    <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse"></span>
-                    {st('home.hero.badge', locale)}
-                  </span>
-                </div>
-                <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-white via-lime-100 to-emerald-200 bg-clip-text text-transparent leading-tight">
-                  {st('home.hero.title', locale)}
-                </h1>
-                <p className="text-slate-300 text-xs md:text-sm mt-0.5">
-                  {locale === 'en' ? st('home.hero.affiliation', locale) : `${st('home.hero.subtitle_th', locale)} • ${st('home.hero.affiliation', locale)}`}
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Glass Stats Cards */}
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3 w-full">
-              <StatCard value={researchers.length} label={st('home.stats.researchers', locale)} color="from-emerald-400 to-teal-400" />
-              <StatCard value={pubCount} label={st('home.stats.publications', locale)} color="from-cyan-400 to-blue-400" />
-              <StatCard value={totalCitations.toLocaleString()} label={st('home.stats.citations', locale)} color="from-amber-400 to-orange-400" />
-              <StatCard value={avgHIndex} label={st('home.stats.h_index', locale)} color="from-violet-400 to-fuchsia-400" />
-              <StatCard value={grantCount} label={st('home.stats.grants', locale)} color="from-lime-400 to-emerald-400" />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Recent Activity — derived from publications/patents/grants/innovations */}
+      <ActivityStream locale={locale === 'en' ? 'en' : 'th'} limit={7} />
 
       {/* News & IEEE Spectrum — moved above Featured Research so visitors see latest activity first */}
       <section className="max-w-7xl mx-auto px-4 py-10">
@@ -491,21 +476,6 @@ export default async function HomePage() {
         </section>
       )}
 
-    </div>
-  );
-}
-
-// Compact stat card with glass morphism
-function StatCard({ value, label, color }: { value: string | number; label: string; color: string }) {
-  return (
-    <div className="group relative">
-      <div className={`absolute inset-0 bg-gradient-to-br ${color} rounded-xl blur opacity-20 group-hover:opacity-40 transition-opacity`}></div>
-      <div className="relative backdrop-blur-md bg-white/10 border border-white/20 rounded-xl p-3 hover:bg-white/15 transition-all">
-        <div className={`text-xl md:text-2xl font-bold bg-gradient-to-br ${color} bg-clip-text text-transparent`}>
-          {value}
-        </div>
-        <div className="text-[10px] md:text-xs text-slate-300 mt-0.5 uppercase tracking-wide">{label}</div>
-      </div>
     </div>
   );
 }
