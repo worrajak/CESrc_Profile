@@ -98,7 +98,7 @@ export default function HomepageCacheControl() {
         <div className="text-xs text-gray-400">กำลังโหลดสถานะ cache...</div>
       ) : !cache ? (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-          ⚠ ยังไม่มี cache — กด "สร้างสรุปใหม่" เพื่อ generate ครั้งแรก
+          ⚠ ยังไม่มี cache — กดปุ่ม “สร้างสรุปใหม่” เพื่อ generate ครั้งแรก
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
