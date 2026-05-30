@@ -77,11 +77,11 @@ export default function HomepageCacheControl() {
       <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            🤖 AI Executive Summary — หน้าแรก
+            📌 ภาพรวมหน่วยวิจัย — หน้าแรก
           </h2>
           <p className="text-xs text-gray-500 mt-0.5 max-w-xl leading-relaxed">
-            สรุป 3-5 ประโยคที่ AI สร้างจาก KPI + กิจกรรมล่าสุด แสดงบน Hero ของ /
-            · cache อายุ 24 ชม. · กดปุ่มเพื่อสร้างใหม่ทันทีหลัง publish งานใหม่
+            สรุป 3-5 ประโยคจาก KPI + กิจกรรมล่าสุด แสดงบน Hero ของ / · cache
+            อายุ 24 ชม. · กดปุ่มเพื่อสร้างใหม่ทันทีหลัง publish งานใหม่
           </p>
         </div>
         <button
