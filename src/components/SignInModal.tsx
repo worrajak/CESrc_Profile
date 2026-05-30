@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useI18n } from '@/lib/I18nContext';
 
@@ -68,8 +69,13 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
     setBusy(false);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+  // SSR-safe portal mount — wait until document is available
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  const modal = (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white px-6 py-4 flex items-center justify-between">
@@ -247,4 +253,9 @@ export default function SignInModal({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+
+  // Portal to document.body so the modal escapes any parent <form> on the
+  // page (e.g. /admin's password form) and isn't affected by the parent's
+  // event handling, focus capture, or z-index stacking.
+  return createPortal(modal, document.body);
 }
