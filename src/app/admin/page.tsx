@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAdminAuth } from '@/lib/admin-auth-client';
 import SignInModal from '@/components/SignInModal';
+import HomepageCacheControl from '@/components/admin/HomepageCacheControl';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -128,6 +129,11 @@ export default function AdminPage() {
         >
           ออกจากระบบ
         </button>
+      </div>
+
+      {/* Homepage AI cache control */}
+      <div className="mb-6">
+        <HomepageCacheControl />
       </div>
 
       {/* Quick Actions */}

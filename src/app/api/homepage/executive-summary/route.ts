@@ -26,6 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { callAIText } from '@/lib/ai-provider';
 import { EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS } from '@/lib/evidence-chain';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -51,6 +52,14 @@ function getAdminClient() {
 // Prompt
 // ─────────────────────────────────────────────────────────
 function buildPrompt(kpi: any, activity: any[]) {
+  // Bucket activity by kind so the AI can lead with the most credible
+  // (and most informative for collaborators) signals.
+  //   Primary   : grants + publications  — funded work + peer-reviewed output
+  //   Secondary : patents + innovations  — applied/IP outputs (mention briefly)
+  const primaryKinds = new Set(['grant', 'publication']);
+  const primary = activity.filter((a) => primaryKinds.has(a.kind));
+  const secondary = activity.filter((a) => !primaryKinds.has(a.kind));
+
   return `You are summarising the current state of CESRU (Clean Energy System Research Unit,
 Rajamangala University of Technology Lanna — RMUTL) for the public homepage Hero.
 
@@ -63,11 +72,23 @@ WRITE STYLE:
 - 3-5 sentences in Thai (summary_th) AND 3-5 sentences in English (summary_en).
 - No emojis.
 
+NARRATIVE PRIORITY (important):
+- LEAD with grants and publications. These are the strongest signals of active
+  research depth — funded projects + peer-reviewed output — and what
+  collaborators want to see first.
+- MENTION patents and innovations briefly, as supporting evidence of translation/
+  impact. Do not lead with them; do not list more than 1-2 across both kinds.
+- If primary data is sparse, it is OK to lean on KPI totals instead of inventing
+  notable activity from secondary kinds.
+
 DATA — KPI snapshot (computed at ${kpi.computed_at || 'now'}):
 ${JSON.stringify(kpi, null, 2)}
 
-DATA — Recent activity (top 10, sorted by occurred_at DESC):
-${JSON.stringify(activity, null, 2)}
+DATA — PRIMARY activity (grants + publications, lead with these — sorted by occurred_at DESC):
+${JSON.stringify(primary.slice(0, 8), null, 2)}
+
+DATA — SECONDARY activity (patents + innovations, mention briefly — sorted by occurred_at DESC):
+${JSON.stringify(secondary.slice(0, 4), null, 2)}
 
 OUTPUT — single JSON object inside one pair of curly braces, no markdown:
 {
@@ -145,7 +166,20 @@ async function generate(): Promise<{
 // ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const force = url.searchParams.get('refresh') === '1';
+  const refreshRequested = url.searchParams.get('refresh') === '1';
+
+  // Force-refresh is admin-only — keeps random visitors from running up AI cost
+  let force = false;
+  if (refreshRequested) {
+    const admin = await authorizeAdminRequest(req);
+    if (!admin.authorized || !admin.role) {
+      return NextResponse.json(
+        { error: 'Force refresh requires admin auth.' },
+        { status: 403 },
+      );
+    }
+    force = true;
+  }
 
   // 1) Read existing cache (anon-readable per RLS)
   const { data: cached } = await supabase
