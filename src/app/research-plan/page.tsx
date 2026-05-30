@@ -106,18 +106,41 @@ export default function ResearchPlanPage() {
     fetchCalls();
   }, []);
 
-  const agencies = Array.from(new Set(calls.map((c) => c.agency_code))).sort();
+  // A grant call counts as "having content" once any concrete field is
+  // populated. Bare placeholder rows (seeded with just agency_code +
+  // call_code but no dates/budget/scope/areas) are hidden from the public
+  // view until someone fills them in — admins can still see them via the
+  // ⋯ menu by toggling the "show empty" filter below (or by editing
+  // directly in Supabase).
+  const hasContent = (c: GrantCall) =>
+    !!(
+      c.open_date ||
+      c.close_date ||
+      c.announce_date ||
+      c.budget_max ||
+      c.budget_min ||
+      c.scope_th ||
+      c.conditions_th ||
+      c.eligibility_th ||
+      (c.research_areas && c.research_areas.length > 0)
+    );
+
+  const agencies = Array.from(new Set(calls.filter(hasContent).map((c) => c.agency_code))).sort();
   const filtered = calls.filter((c) => {
+    if (!hasContent(c)) return false;
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     if (agencyFilter !== 'all' && c.agency_code !== agencyFilter) return false;
     return true;
   });
 
+  // Counts use the same hasContent filter so the badge numbers match the
+  // number of cards actually displayed.
+  const contentful = calls.filter(hasContent);
   const statusCounts = {
-    all: calls.length,
-    upcoming: calls.filter((c) => c.status === 'upcoming').length,
-    open: calls.filter((c) => c.status === 'open').length,
-    closed: calls.filter((c) => c.status === 'closed').length,
+    all: contentful.length,
+    upcoming: contentful.filter((c) => c.status === 'upcoming').length,
+    open: contentful.filter((c) => c.status === 'open').length,
+    closed: contentful.filter((c) => c.status === 'closed').length,
   };
 
   const fmtDate = (d: string | null) => {
