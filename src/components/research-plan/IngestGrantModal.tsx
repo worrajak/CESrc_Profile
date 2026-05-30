@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/lib/I18nContext';
+import { extractFromPDF } from '@/lib/extractPDF';
 
 /**
  * Domains we know render content with JS (SPA / Next.js / React).
@@ -88,15 +89,58 @@ export default function IngestGrantModal({
   const [aiMeta, setAiMeta] = useState<{ source: string; model: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError(locale === 'en' ? 'Please upload an image (PNG/JPG)' : 'กรุณาอัปโหลดไฟล์รูป (PNG/JPG)');
+  const handleFile = async (file: File) => {
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const isImage = file.type.startsWith('image/');
+
+    if (!isPdf && !isImage) {
+      setError(
+        locale === 'en'
+          ? 'Please upload an image (PNG/JPG) or a PDF file'
+          : 'กรุณาอัปโหลดไฟล์รูป (PNG/JPG) หรือ PDF',
+      );
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setError(locale === 'en' ? 'Image too large (max 8MB)' : 'ไฟล์ใหญ่เกิน 8MB');
+    if (file.size > 16 * 1024 * 1024) {
+      setError(locale === 'en' ? 'File too large (max 16MB)' : 'ไฟล์ใหญ่เกิน 16MB');
       return;
     }
+
+    setError('');
+
+    // ── PDF path: extract text in browser; fall back to vision on scanned PDFs ──
+    if (isPdf) {
+      setProcessing(true);
+      try {
+        const result = await extractFromPDF(file);
+        if (result.kind === 'text') {
+          // Got embedded text — switch to TEXT mode + populate textarea so the
+          // user can review/edit before sending to AI.
+          setMode('text');
+          setUrl('');
+          setText(result.text);
+          setImageBase64('');
+          setImageMime('');
+          setImagePreview('');
+        } else {
+          // Scanned PDF — first page rendered to PNG → vision path
+          setMode('image');
+          setImageBase64(result.imageBase64);
+          setImageMime(result.imageMime);
+          setImagePreview(result.preview);
+        }
+      } catch (e: any) {
+        setError(
+          (locale === 'en' ? 'PDF extraction failed: ' : 'อ่าน PDF ไม่สำเร็จ: ') +
+            (e?.message || 'unknown error'),
+        );
+      } finally {
+        setProcessing(false);
+      }
+      return;
+    }
+
+    // ── Image path (unchanged) ──
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
@@ -104,7 +148,6 @@ export default function IngestGrantModal({
       setImageBase64(base64);
       setImageMime(file.type);
       setImagePreview(dataUrl);
-      setError('');
     };
     reader.readAsDataURL(file);
   };
@@ -243,7 +286,7 @@ export default function IngestGrantModal({
                     mode === 'image' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  📷 {locale === 'en' ? 'Image / Brochure' : 'รูป / โบรชัวร์'}
+                  📷 {locale === 'en' ? 'Image / PDF' : 'รูป / PDF'}
                 </button>
               </div>
 
@@ -318,7 +361,9 @@ export default function IngestGrantModal({
                   <>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-2">
-                        {locale === 'en' ? 'Upload grant announcement / brochure image' : 'อัปโหลดรูปประกาศ / โบรชัวร์แหล่งทุน'}
+                        {locale === 'en'
+                          ? 'Upload announcement — image (PNG/JPG) or PDF'
+                          : 'อัปโหลดประกาศ — รูป (PNG/JPG) หรือ PDF'}
                       </label>
 
                       {!imagePreview ? (
@@ -331,16 +376,16 @@ export default function IngestGrantModal({
                               </span>{' '}
                               {locale === 'en' ? 'or drag & drop' : 'หรือลากมาวาง'}
                             </p>
-                            <p className="text-xs text-gray-400 mt-1">PNG, JPG (max 8MB)</p>
+                            <p className="text-xs text-gray-400 mt-1">PDF, PNG, JPG (max 16MB)</p>
                             <p className="text-[10px] text-gray-400 mt-2 text-center max-w-sm leading-relaxed">
                               {locale === 'en'
-                                ? 'AI will read dates, budget, conditions like FF71 was extracted'
-                                : 'AI จะอ่านวันสำคัญ งบประมาณ เงื่อนไข เหมือนที่สกัด FF71'}
+                                ? 'PDF: extracts text automatically, falls back to vision for scanned PDFs. Image: vision AI reads dates, budget, conditions.'
+                                : 'PDF: ดึงตัวอักษรอัตโนมัติ ถ้าเป็น PDF สแกนใช้ vision · รูป: vision อ่านวันสำคัญ งบประมาณ เงื่อนไข'}
                             </p>
                           </div>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,application/pdf,.pdf"
                             className="hidden"
                             onChange={(e) => {
                               const f = e.target.files?.[0];
