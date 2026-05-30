@@ -33,15 +33,67 @@ export default function AuthCallbackPage() {
       setStatus('consent');
     };
 
+    const redirectToReturnUrl = () => {
+      const returnUrl = sessionStorage.getItem('auth_return_url') || '/';
+      sessionStorage.removeItem('auth_return_url');
+      window.location.href = returnUrl;
+    };
+
+    const autoCreateForResearcher = async (sessionUser: any): Promise<boolean> => {
+      // If the signed-in email matches a row in researchers, we know this
+      // person is a CESRU member — skip the consent form, auto-create a
+      // minimal guest_users row with sensible defaults so the rest of the
+      // app (comments, engagement) works, then redirect.
+      if (!sessionUser.email) return false;
+      try {
+        const { data: r } = await supabase
+          .from('researchers')
+          .select('id, first_name_th, last_name_th, first_name_en, last_name_en')
+          .ilike('email', sessionUser.email.toLowerCase())
+          .maybeSingle();
+        if (!r) return false;
+
+        const displayName =
+          [r.first_name_th, r.last_name_th].filter(Boolean).join(' ').trim() ||
+          [r.first_name_en, r.last_name_en].filter(Boolean).join(' ').trim() ||
+          sessionUser.email.split('@')[0];
+
+        await supabase.from('guest_users').upsert(
+          {
+            id: sessionUser.id,
+            email: sessionUser.email,
+            display_name: displayName,
+            user_type: 'researcher',
+            institution: 'มทร.ล้านนา',
+            consent_version: CURRENT_CONSENT_VERSION,
+            consented_at: new Date().toISOString(),
+            marketing_opt_in: false,
+          },
+          { onConflict: 'id' },
+        );
+
+        // Log implicit consent — staff membership in researchers acts as the
+        // legal basis here (different from explicit visitor opt-in).
+        await supabase.from('consent_log').insert([
+          { user_id: sessionUser.id, consent_version: CURRENT_CONSENT_VERSION, consent_type: 'privacy', action: 'granted_implicit_staff' },
+          { user_id: sessionUser.id, consent_version: CURRENT_CONSENT_VERSION, consent_type: 'cookies', action: 'granted_implicit_staff' },
+        ]);
+
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     const handleSession = async (sessionUser: any) => {
       if (cancelled) return;
       setUser(sessionUser);
 
       // Aggressive race — first try a fast 1.5 s profile lookup so users with
       // existing profiles get redirected. If anything goes wrong (slow RLS,
-      // network, hang), fall through to the consent form. The form's upsert
-      // handles existing rows gracefully, so we never lose data even if a
-      // returning user lands here briefly.
+      // network, hang), fall through. The form's upsert handles existing
+      // rows gracefully, so a returning user briefly hitting the form path
+      // never loses data.
       const profilePromise = supabase
         .from('guest_users')
         .select('id')                          // narrowest possible query
@@ -60,15 +112,22 @@ export default function AuthCallbackPage() {
 
       if (result.kind === 'data' && result.data) {
         // Returning user — already has a profile row. Redirect.
-        const returnUrl = sessionStorage.getItem('auth_return_url') || '/';
-        sessionStorage.removeItem('auth_return_url');
-        window.location.href = returnUrl;
-      } else {
-        // No profile, query errored, or timed out — show consent form.
-        // (Returning users without a profile fall here too; if they
-        // re-submit the form, upsert is a no-op for non-changed fields.)
-        showConsentForm(sessionUser);
+        redirectToReturnUrl();
+        return;
       }
+
+      // No profile row yet. Before showing the consent form, check whether
+      // this email belongs to a known researcher / admin — if so, auto-create
+      // their guest_users entry and skip the form entirely.
+      const autoHandled = await autoCreateForResearcher(sessionUser);
+      if (cancelled) return;
+      if (autoHandled) {
+        redirectToReturnUrl();
+        return;
+      }
+
+      // Genuine new visitor — show the consent form.
+      showConsentForm(sessionUser);
     };
 
     // Safety net #1 (4 s): try to recover session via getSession() and
