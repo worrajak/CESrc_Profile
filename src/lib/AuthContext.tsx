@@ -53,13 +53,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async (u: User) => {
     setProfileLoading(true);
     try {
-      const { data } = await supabase
+      // Race the query against a 3 s timeout — if Supabase hangs on RLS
+      // or network, we still flip profileLoading→false so the Navbar
+      // can render something instead of an infinite spinner.
+      const queryPromise = supabase
         .from('guest_users')
         .select('*')
         .eq('id', u.id)
-        .maybeSingle();
-      if (data) setProfile(data as GuestProfile);
-      else setProfile(null);
+        .maybeSingle()
+        .then(
+          (r) => ({ ok: true as const, data: r.data }),
+          () => ({ ok: false as const, data: null }), // swallow rejections
+        );
+      const timeoutPromise = new Promise<{ ok: false; data: null }>((resolve) =>
+        setTimeout(() => resolve({ ok: false, data: null }), 3000),
+      );
+
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      if (result.ok && result.data) {
+        setProfile(result.data as GuestProfile);
+      } else {
+        setProfile(null);
+      }
     } finally {
       setProfileLoading(false);
     }
