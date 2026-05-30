@@ -10,7 +10,7 @@ import LangSwitcher from '@/components/LangSwitcher';
 import SignInModal from '@/components/SignInModal';
 
 export default function Navbar() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, profileLoading, signOut } = useAuth();
   const { t } = useI18n();
   const { role: adminRole, researcherId } = useAdminAuth();
   const [open, setOpen] = useState(false);
@@ -183,6 +183,17 @@ export default function Navbar() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
+              ) : user && profileLoading ? (
+                // Session restored but guest_users profile still loading.
+                // Show a neutral pill instead of "กรอก profile" so we don't
+                // misleadingly imply the user has no profile yet.
+                <div
+                  className="flex items-center gap-1.5 bg-white/20 text-white/80 rounded-full px-3 py-1.5 text-xs font-medium shadow-sm"
+                  aria-busy="true"
+                >
+                  <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  <span>กำลังโหลด</span>
+                </div>
               ) : user ? (
                 <Link
                   href="/auth/callback"
@@ -304,7 +315,7 @@ export default function Navbar() {
               🔓 Sign in
             </button>
           )}
-          {user && !profile && (
+          {user && !profile && !profileLoading && (
             <Link
               href="/auth/callback"
               onClick={() => setOpen(false)}

@@ -24,6 +24,10 @@ interface AuthContextType {
   user: User | null;
   profile: GuestProfile | null;
   loading: boolean;
+  /** True while we're still fetching the guest_users profile row for the
+   *  current session. Use this to AVOID rendering "no profile" UI during
+   *  the brief window between session-restored and profile-fetched. */
+  profileLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<{ ok: boolean; error?: string }>;
   signInWithPassword: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
@@ -41,22 +45,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<GuestProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Starts true so that on initial mount with a restored session, the
+  // Navbar (and anyone else watching profileLoading) doesn't flash
+  // "no profile" UI before the guest_users query finishes.
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const loadProfile = useCallback(async (u: User) => {
-    const { data } = await supabase
-      .from('guest_users')
-      .select('*')
-      .eq('id', u.id)
-      .single();
-    if (data) setProfile(data as GuestProfile);
+    setProfileLoading(true);
+    try {
+      const { data } = await supabase
+        .from('guest_users')
+        .select('*')
+        .eq('id', u.id)
+        .maybeSingle();
+      if (data) setProfile(data as GuestProfile);
+      else setProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user || null);
-      if (session?.user) loadProfile(session.user);
+      if (session?.user) {
+        await loadProfile(session.user);
+      } else {
+        // No session at all — nothing to load
+        setProfile(null);
+        setProfileLoading(false);
+      }
       setLoading(false);
     });
 
@@ -68,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadProfile(session.user);
       } else {
         setProfile(null);
+        setProfileLoading(false);
       }
       setLoading(false);
     });
@@ -184,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session, user, profile, loading,
+      session, user, profile, loading, profileLoading,
       signInWithGoogle, signInWithMagicLink, signInWithPassword, signUpWithPassword,
       signOut, updateProfile, deleteAccount, refreshProfile,
     }}>
