@@ -244,100 +244,172 @@ export default function ResearchPlanPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map((c) => {
                   const days = daysUntil(c.close_date);
-                  const urgent = days !== null && days >= 0 && days <= 14 && c.status !== 'closed';
-                  const badge = STATUS_BADGE[c.status];
-                  const gradient = AGENCY_COLORS[c.agency_code] || 'from-gray-500 to-gray-700';
                   const callTitle = locale === 'en' && c.call_name_en ? c.call_name_en : c.call_name_th;
                   const agencyTitle = locale === 'en' && c.agency_name_en ? c.agency_name_en : c.agency_name_th;
+                  // Strategy line (migration 053) — optional
+                  const strategy = (c as any).strategy as
+                    | { strategy_no?: string; program?: string; sub_programs?: any[] }
+                    | undefined;
+                  const strategyLine = strategy
+                    ? [strategy.strategy_no, strategy.program].filter(Boolean).join(' · ')
+                    : '';
+
+                  // ───── Urgency model ─────
+                  // Used both for the countdown chip and the left accent stripe.
+                  let urgencyKey: 'critical' | 'soon' | 'open' | 'upcoming' | 'closed';
+                  if (c.status === 'closed' || (days !== null && days < 0)) urgencyKey = 'closed';
+                  else if (c.status === 'upcoming' && (days === null || days > 60)) urgencyKey = 'upcoming';
+                  else if (days !== null && days <= 7) urgencyKey = 'critical';
+                  else if (days !== null && days <= 30) urgencyKey = 'soon';
+                  else urgencyKey = 'open';
+
+                  const URGENCY = {
+                    critical: {
+                      stripe: 'before:bg-rose-500',
+                      chipBg: 'bg-rose-100 text-rose-700 border-rose-200',
+                      icon: '🔥',
+                      label_th: days === 0 ? 'ปิดวันนี้' : `เหลือ ${days} วัน`,
+                      label_en: days === 0 ? 'closes today' : `${days}d left`,
+                    },
+                    soon: {
+                      stripe: 'before:bg-amber-500',
+                      chipBg: 'bg-amber-100 text-amber-800 border-amber-200',
+                      icon: '⏳',
+                      label_th: `เหลือ ${days} วัน`,
+                      label_en: `${days}d left`,
+                    },
+                    open: {
+                      stripe: 'before:bg-emerald-500',
+                      chipBg: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                      icon: '✓',
+                      label_th: days !== null ? `เหลือ ${days} วัน` : 'เปิดรับอยู่',
+                      label_en: days !== null ? `${days}d left` : 'open',
+                    },
+                    upcoming: {
+                      stripe: 'before:bg-slate-300',
+                      chipBg: 'bg-slate-100 text-slate-600 border-slate-200',
+                      icon: '🗓️',
+                      label_th: 'จะเปิดเร็วๆ นี้',
+                      label_en: 'upcoming',
+                    },
+                    closed: {
+                      stripe: 'before:bg-slate-300',
+                      chipBg: 'bg-slate-100 text-slate-500 border-slate-200',
+                      icon: '🚫',
+                      label_th: 'ปิดรับแล้ว',
+                      label_en: 'closed',
+                    },
+                  }[urgencyKey];
 
                   return (
                     <div
                       key={c.id}
-                      className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 hover:border-blue-200 transition-all overflow-hidden flex flex-col"
+                      className={`relative bg-white rounded-2xl shadow-sm hover:shadow-lg border border-slate-200 hover:border-slate-300 transition-all overflow-hidden flex flex-col before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 ${URGENCY.stripe}`}
                     >
-                      {/* Banner */}
-                      <div className={`px-4 py-3 bg-gradient-to-r ${gradient} text-white`}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold tracking-wider opacity-90">{c.agency_code}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/20`}>
-                            {locale === 'en' ? badge.en : badge.th}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-bold mt-1 leading-snug line-clamp-2">{c.call_code}</h3>
+                      {/* Top row — urgency chip + agency code */}
+                      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${URGENCY.chipBg}`}
+                        >
+                          <span>{URGENCY.icon}</span>
+                          <span>{locale === 'en' ? URGENCY.label_en : URGENCY.label_th}</span>
+                        </span>
+                        <span className="text-[10px] font-semibold tracking-wider text-slate-500">
+                          {c.agency_code} · {c.call_code}
+                        </span>
                       </div>
 
                       {/* Body */}
-                      <div className="p-4 flex-1 flex flex-col">
-                        <p className="text-xs text-gray-500 line-clamp-1 mb-1">{agencyTitle}</p>
-                        <h4 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2 min-h-[2.5rem]">
+                      <div className="px-4 pb-4 flex-1 flex flex-col">
+                        <h4 className="font-bold text-gray-900 text-[15px] leading-snug line-clamp-2 mb-1">
                           {callTitle}
                         </h4>
+                        <p className="text-[11px] text-gray-500 line-clamp-1">{agencyTitle}</p>
 
-                        {/* Dates */}
-                        <div className="mt-3 space-y-1.5 text-xs">
-                          {c.open_date && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-500">{t('rplan.field.open')}</span>
-                              <span className="font-medium text-gray-700">{fmtDate(c.open_date)}</span>
-                            </div>
-                          )}
-                          {c.close_date && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-500">{t('rplan.field.close')}</span>
-                              <span className={`font-medium ${urgent ? 'text-red-600' : 'text-gray-700'}`}>
-                                {fmtDate(c.close_date)}
-                                {urgent && <span className="ml-1 text-red-500">({days}d)</span>}
-                              </span>
-                            </div>
-                          )}
+                        {/* Strategy line (migration 053) — optional */}
+                        {strategyLine && (
+                          <p className="text-[11px] text-slate-600 mt-2 line-clamp-2">
+                            <span className="text-slate-400">🧭</span> {strategyLine}
+                          </p>
+                        )}
+
+                        {/* Key facts — budget + duration + open/close in 1-2 lines */}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
                           {(c.budget_min || c.budget_max) && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-500">{t('rplan.field.budget_range')}</span>
-                              <span className="font-medium text-emerald-700">{fmtBudget(c.budget_min, c.budget_max)}</span>
-                            </div>
+                            <span className="font-semibold text-emerald-700">
+                              💰 {fmtBudget(c.budget_min, c.budget_max)}
+                            </span>
                           )}
                           {c.duration_months && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-gray-500">{t('rplan.field.duration')}</span>
-                              <span className="font-medium text-gray-700">
-                                {c.duration_months} {locale === 'en' ? 'months' : 'เดือน'}
-                              </span>
-                            </div>
+                            <span className="text-gray-600">
+                              ⏱ {c.duration_months} {locale === 'en' ? 'mo' : 'เดือน'}
+                            </span>
+                          )}
+                          {c.close_date && (
+                            <span className="text-gray-500">
+                              📅 {locale === 'en' ? 'closes' : 'ปิด'} {fmtDate(c.close_date)}
+                            </span>
                           )}
                         </div>
 
+                        {/* Required outputs (Q1 paper, patent, …) */}
+                        {(c as any).required_outputs?.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(c as any).required_outputs.slice(0, 3).map((o: string, i: number) => (
+                              <span
+                                key={i}
+                                className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded font-medium"
+                              >
+                                📤 {o}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         {/* Research areas */}
                         {c.research_areas && c.research_areas.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-3">
-                            {c.research_areas.slice(0, 3).map((a, i) => (
-                              <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {c.research_areas.slice(0, 4).map((a, i) => (
+                              <span
+                                key={i}
+                                className="text-[10px] bg-slate-50 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded"
+                              >
                                 {a}
                               </span>
                             ))}
-                            {c.research_areas.length > 3 && (
-                              <span className="text-[10px] text-gray-400">+{c.research_areas.length - 3}</span>
+                            {c.research_areas.length > 4 && (
+                              <span className="text-[10px] text-slate-400 self-center">
+                                +{c.research_areas.length - 4}
+                              </span>
                             )}
                           </div>
                         )}
 
                         {/* Footer actions */}
-                        <div className="mt-auto pt-3 flex items-center gap-2">
+                        <div className="mt-auto pt-3 flex items-center gap-2 border-t border-slate-100 mt-3">
                           {c.announcement_url && (
                             <a
                               href={c.announcement_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[11px] text-blue-600 hover:underline"
+                              className="text-[11px] text-slate-600 hover:text-blue-700 hover:underline"
                             >
                               ↗ {t('rplan.action.view_announcement')}
                             </a>
                           )}
-                          {user && (
+                          {user ? (
+                            <Link
+                              href={`/research-plan/${c.id}`}
+                              className="ml-auto inline-flex items-center gap-1 text-xs px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 rounded-md font-medium transition shadow-sm"
+                            >
+                              ✨ {t('rplan.action.draft_proposal')} →
+                            </Link>
+                          ) : (
                             <Link
                               href={`/research-plan/${c.id}`}
                               className="ml-auto text-[11px] px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md font-medium transition"
                             >
-                              {t('rplan.action.draft_proposal')} →
+                              {locale === 'en' ? 'View details' : 'ดูรายละเอียด'} →
                             </Link>
                           )}
                         </div>
