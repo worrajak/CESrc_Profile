@@ -172,22 +172,32 @@ Write a focused snapshot of what CESRU is doing now.
 ──────────────────────────────────────────────────────────
 PARAGRAPH 2 — Research-news bridge (300+ words each language)
 ──────────────────────────────────────────────────────────
-THIS IS THE NEW PARAGRAPH. Read the latest CM108 Chiang Mai news headlines
-below and weave 3-5 of them into a substantive narrative showing HOW CESRU's
+THIS IS THE NEW PARAGRAPH. Read the latest Chiang Mai news headlines below
+and weave 3-5 of them into a substantive narrative showing HOW CESRU's
 expertise (IoT, clean energy, sensor networks, EV, energy audit, etc) could
 contribute to those local issues.
 
+EDITORIAL VOICE — important:
+- Refer to events NATURALLY, in your own words, as part of the unit's
+  perspective on what's happening locally. E.g. "ในช่วงที่เชียงใหม่กำลัง
+  เข้าสู่ฤดูฝน…", "การระบาดของไข้เลือดออกในหลายอำเภอ…", "ภัยจาก
+  ซูเปอร์เอลนีโญที่คาดการณ์ปีนี้…"
+- DO NOT name "CM108" or any other news outlet INSIDE the paragraph.
+- DO NOT introduce events with phrases like "ข่าวจาก…" or "รายงานจาก…".
+  Just write about the situation, like a unit perspective piece.
+- Sources are tracked separately in evidence_chain — the UI shows them as
+  a small "ข่าวที่อ้างอิง" credit footer with clickable links. So you
+  don't need to credit anyone inline; just write naturally.
+
 Goals of paragraph 2:
-- Make research feel TANGIBLE — name specific news events + name specific
-  CESRU capabilities that could apply.
+- Make research feel TANGIBLE — name specific local events (in your own
+  words) + name specific CESRU capabilities that could apply.
 - Suggest research questions, service offerings, or collaborations the unit
   could pursue based on the news.
 - Reference SDGs where they naturally fit (climate, water, public health,
   sustainable communities — don't shoehorn them).
 - Mention up to 5 distinct news topics, in flowing prose (NOT bullet points).
 - Aim for 300-450 words in Thai, similar length in English.
-- Cite each news item by its title in the text (e.g., "ข่าว 'ฤดูฝน...'
-  สะท้อนความจำเป็น...").
 
 EXAMPLES of the kind of bridge the user wants:
 - "ฝนเริ่มตกมากขึ้น" → IoT sensor networks + flood-prediction models can
@@ -224,11 +234,16 @@ EVIDENCE CHAIN REQUIREMENTS
   MUST point to its row: source = "kind:ref_id title", source_url = link_path,
   source_type matching the kind (publication → peer_reviewed, patent →
   patent, grant → gov_data, innovation → patent).
-- Every CM108 news item cited in paragraph 2 MUST have an evidence_chain
-  entry with source = "CM108 — <article title>", source_url = the article
-  link, source_type = "media", credibility = "low",
-  credibility_reason = "Local Chiang Mai news outlet — useful for context
-  but not a primary source for technical claims".
+- Every news item referenced in paragraph 2 (even though not named inline)
+  MUST have an evidence_chain entry so the credit footer can show it:
+    source       = the article's title (NOT the outlet name)
+    source_url   = the article link
+    source_type  = "media"
+    credibility  = "low"
+    credibility_reason = "Local Chiang Mai news outlet — useful for
+                         context but not a primary source for technical claims".
+  The UI extracts every evidence_chain entry where source_type='media' and
+  renders them as a small "ข่าวที่อ้างอิง" credit footer with clickable links.
 - DO NOT invent achievements, news, or news details not present above.
 - If KPI shows publications_total: 209, write "209 ผลงาน" not "หลายร้อย".
 

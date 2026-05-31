@@ -91,6 +91,27 @@ export default function ExecutiveHero({ initial, kpi, tagline, locale }: Props) 
 
   // Has the AI provided structured evidence we can show?
   const chains = (summary?.evidence_chain || []) as EvidenceChain[];
+
+  // Extract news credits from the evidence chain — every link in any chain
+  // with source_type "media" becomes a credit-footer item. Deduped by URL
+  // so the same article isn't shown twice if cited multiple times.
+  const newsCredits: { label: string; url: string }[] = [];
+  if (summary?.evidence_chain) {
+    const seen = new Set<string>();
+    for (const chain of summary.evidence_chain) {
+      const links = (chain?.chain || []) as Array<{
+        source: string;
+        source_type: string;
+        source_url?: string;
+      }>;
+      for (const link of links) {
+        if (link.source_type !== 'media' || !link.source_url) continue;
+        if (seen.has(link.source_url)) continue;
+        seen.add(link.source_url);
+        newsCredits.push({ label: link.source, url: link.source_url });
+      }
+    }
+  }
   const hasChains = chains.length > 0;
 
   return (
@@ -185,9 +206,32 @@ export default function ExecutiveHero({ initial, kpi, tagline, locale }: Props) 
                 <p className="text-amber-300/70 text-xs">{error}</p>
               </div>
             ) : summaryText ? (
-              <p className="text-slate-100 text-sm md:text-base leading-relaxed whitespace-pre-line">
-                {summaryText}
-              </p>
+              <>
+                <p className="text-slate-100 text-sm md:text-base leading-relaxed whitespace-pre-line">
+                  {summaryText}
+                </p>
+                {newsCredits.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-white/5 text-[10px] text-slate-400 leading-relaxed">
+                    <span className="font-medium text-slate-300">
+                      {locale === 'en' ? 'Cited news: ' : 'ข่าวที่อ้างอิง: '}
+                    </span>
+                    {newsCredits.map((n, i) => (
+                      <span key={n.url}>
+                        {i > 0 && <span className="mx-1 text-slate-500">·</span>}
+                        <a
+                          href={n.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-300 hover:text-emerald-200 underline decoration-dotted decoration-slate-500 hover:decoration-emerald-300"
+                          title={n.label}
+                        >
+                          {n.label.length > 38 ? n.label.slice(0, 36) + '…' : n.label}
+                        </a>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-slate-300 text-sm italic">
                 {locale === 'en'
