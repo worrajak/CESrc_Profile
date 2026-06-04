@@ -26,6 +26,17 @@ export const maxDuration = 30;
 
 const RMUTL_EXEC_URL = 'https://www.rmutl.ac.th/structure/executive';
 
+// Only fetch from rmutl.ac.th subdomains — light guardrail so the admin tool
+// can't be turned into a generic web fetcher by a crafted URL.
+function isAllowedUrl(u: string): boolean {
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    return host === 'rmutl.ac.th' || host.endsWith('.rmutl.ac.th');
+  } catch {
+    return false;
+  }
+}
+
 // ── HTML helpers ─────────────────────────────────────────────────────────
 function decodeEntities(s: string): string {
   return s
@@ -248,8 +259,8 @@ function getAdminClient() {
 // GET ?preview=1 — scrape + match, return proposed matches without writing
 // ─────────────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  if (url.searchParams.get('preview') !== '1') {
+  const reqUrl = new URL(req.url);
+  if (reqUrl.searchParams.get('preview') !== '1') {
     return NextResponse.json({ error: 'Use GET ?preview=1 or POST.' }, { status: 400 });
   }
   const admin = await authorizeAdminRequest(req);
@@ -257,8 +268,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Admin auth required.' }, { status: 403 });
   }
 
+  // ?url=<rmutl page> — defaults to the main executive roster. Restricted to
+  // rmutl.ac.th subdomains. Verified compatible pages:
+  //   • https://www.rmutl.ac.th/structure/executive
+  //   • https://rdi.rmutl.ac.th/structure/Executives_personnel
+  //   • Other RMUTL CMS pages using the same panel/post_thumbnail layout.
+  const sourceUrl = (reqUrl.searchParams.get('url') || RMUTL_EXEC_URL).trim();
+  if (!isAllowedUrl(sourceUrl)) {
+    return NextResponse.json(
+      { error: 'URL ต้องเป็นโดเมน *.rmutl.ac.th เท่านั้น' },
+      { status: 400 },
+    );
+  }
+
   try {
-    const res = await fetch(RMUTL_EXEC_URL, {
+    const res = await fetch(sourceUrl, {
       headers: { 'User-Agent': 'CESRU-Admin-Sync/1.0' },
       signal: AbortSignal.timeout(15000),
     });
@@ -272,7 +296,7 @@ export async function GET(req: NextRequest) {
     const execs = parseExecPage(html);
     if (execs.length === 0) {
       return NextResponse.json(
-        { error: 'No executive cards parsed — the page structure may have changed.' },
+        { error: 'No executive cards parsed — the page structure may not match the expected RMUTL CMS layout.' },
         { status: 502 },
       );
     }
@@ -285,7 +309,7 @@ export async function GET(req: NextRequest) {
     const proposals = matchExecs(execs, researchers);
 
     return NextResponse.json({
-      source_url: RMUTL_EXEC_URL,
+      source_url: sourceUrl,
       total_execs: execs.length,
       matched: proposals.filter((p) => p.researcher_id).length,
       proposals,

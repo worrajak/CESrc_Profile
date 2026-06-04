@@ -48,7 +48,13 @@ const CONFIDENCE_LABEL: Record<Proposal['confidence'], string> = {
   none: 'ไม่พบ',
 };
 
+const PRESET_URLS: { label: string; url: string }[] = [
+  { label: 'มหา\'ลัย (อธิการ/รองอธิการ/คณบดี)', url: 'https://www.rmutl.ac.th/structure/executive' },
+  { label: 'สถาบันวิจัยและพัฒนา (RDI)', url: 'https://rdi.rmutl.ac.th/structure/Executives_personnel' },
+];
+
 export default function SyncExecutivesPanel() {
+  const [sourceUrl, setSourceUrl] = useState<string>(PRESET_URLS[0].url);
   const [preview, setPreview] = useState<PreviewResp | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -56,11 +62,18 @@ export default function SyncExecutivesPanel() {
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   const loadPreview = async () => {
+    if (!sourceUrl.trim()) {
+      setMessage({ kind: 'err', text: 'กรุณาใส่ URL ก่อน' });
+      return;
+    }
     setLoading(true);
     setMessage(null);
     setSelected(new Set());
     try {
-      const res = await adminFetch('/api/admin/researchers/sync-executives?preview=1');
+      const res = await adminFetch(
+        '/api/admin/researchers/sync-executives?preview=1&url=' +
+          encodeURIComponent(sourceUrl.trim()),
+      );
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
       const data = json as PreviewResp;
@@ -119,23 +132,53 @@ export default function SyncExecutivesPanel() {
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            🏛️ ซิงค์ตำแหน่งบริหาร RMUTL
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5 max-w-xl leading-relaxed">
-            ดึงข้อมูลจาก rmutl.ac.th/structure/executive → จับคู่กับ researchers ในระบบ →
-            preview ก่อนบันทึก · ตรวจสอบ checkbox ของแต่ละแถวก่อน Apply
-          </p>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          🏛️ ซิงค์ตำแหน่งบริหารจากเว็บ RMUTL
+        </h2>
+        <p className="text-xs text-gray-500 mt-0.5 max-w-2xl leading-relaxed">
+          ดึงข้อมูลจากหน้าโครงสร้างผู้บริหารบนเว็บ rmutl.ac.th → จับคู่กับ researchers ในระบบ →
+          preview ก่อนบันทึก · ตรวจสอบ checkbox ของแต่ละแถวก่อน Apply · รองรับเฉพาะโดเมน *.rmutl.ac.th
+        </p>
+      </div>
+
+      <div className="mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3">
+        <label className="block text-[11px] font-medium text-gray-600 uppercase tracking-wide mb-1">
+          URL ของหน้าผู้บริหาร
+        </label>
+        <input
+          type="url"
+          value={sourceUrl}
+          onChange={(e) => setSourceUrl(e.target.value)}
+          placeholder="https://...rmutl.ac.th/.../structure/..."
+          className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-blue-500"
+        />
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <span className="text-[10px] text-gray-400 mr-1">ตัวอย่างเร็ว:</span>
+          {PRESET_URLS.map((p) => (
+            <button
+              key={p.url}
+              type="button"
+              onClick={() => setSourceUrl(p.url)}
+              className={`text-[11px] px-2 py-0.5 rounded-full border transition ${
+                sourceUrl === p.url
+                  ? 'bg-blue-100 text-blue-800 border-blue-300'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
-        <button
-          onClick={loadPreview}
-          disabled={loading}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition whitespace-nowrap"
-        >
-          {loading ? '⏳ กำลังดึงข้อมูล...' : '🔍 ดึงข้อมูล + จับคู่'}
-        </button>
+        <div className="flex justify-end mt-3">
+          <button
+            onClick={loadPreview}
+            disabled={loading || !sourceUrl.trim()}
+            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition whitespace-nowrap"
+          >
+            {loading ? '⏳ กำลังดึงข้อมูล...' : '🔍 ดึงข้อมูล + จับคู่'}
+          </button>
+        </div>
       </div>
 
       {message && (
