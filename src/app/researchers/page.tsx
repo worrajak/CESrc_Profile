@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import ResearcherCard from '@/components/ResearcherCard';
 import { getServerLocale, st } from '@/lib/i18n-server';
+import { compareByExecutive } from '@/lib/executiveRank';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,11 +23,16 @@ export default async function ResearchersPage() {
     .eq('is_active', true)
     .order('unit_role', { ascending: true });
 
+  // Within each unit_role group, sort by executive seniority — researchers
+  // with higher RMUTL admin positions (อธิการบดี → รองอธิการบดี → คณบดี → ฯลฯ)
+  // bubble up. Non-executives keep their original relative order at the end.
+  const sortGroup = (rs: any[]) => [...rs].sort(compareByExecutive);
+
   const grouped = {
-    advisor: (researchers || []).filter((r: any) => r.unit_role === 'advisor'),
-    head: (researchers || []).filter((r: any) => r.unit_role === 'head'),
-    member: (researchers || []).filter((r: any) => r.unit_role === 'member'),
-    phd_student: (researchers || []).filter((r: any) => r.unit_role === 'phd_student'),
+    advisor: sortGroup((researchers || []).filter((r: any) => r.unit_role === 'advisor')),
+    head: sortGroup((researchers || []).filter((r: any) => r.unit_role === 'head')),
+    member: sortGroup((researchers || []).filter((r: any) => r.unit_role === 'member')),
+    phd_student: sortGroup((researchers || []).filter((r: any) => r.unit_role === 'phd_student')),
   };
 
   const locale = getServerLocale();
