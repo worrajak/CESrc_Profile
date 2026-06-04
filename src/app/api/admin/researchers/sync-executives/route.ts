@@ -151,11 +151,21 @@ function parseExecPage(html: string): ParsedExec[] {
     );
     const nameInPanel = nameMatch ? stripHtml(nameMatch[1]) : '';
 
-    // Role — the next <p class="text-center kanit"> with min-height 24px.
-    const roleMatch = win.match(
-      /<p class="text-center kanit"[^>]*min-height:\s*24px[^>]*>([\s\S]*?)<\/p>/i,
-    );
-    const role = roleMatch ? stripHtml(roleMatch[1]) : '';
+    // Role — the next <p class="text-center kanit"> after the bold name <p>.
+    // Different RMUTL pages use different min-height values (e.g. main exec
+    // page = 24px; RDI Executives_personnel = 40px), so don't pin a fixed
+    // height. Take the first non-bold paragraph between the name and the
+    // <hr> separator that precedes phone/email.
+    let role = '';
+    if (nameMatch && nameMatch.index !== undefined) {
+      const afterName = win.slice(nameMatch.index + nameMatch[0].length);
+      // Stop searching at the <hr> divider — anything below it is contact info.
+      const beforeHr = afterName.split(/<hr\b/i)[0];
+      const roleMatch = beforeHr.match(
+        /<p class="text-center kanit"(?![^>]*font-weight:\s*bold)[^>]*>([\s\S]*?)<\/p>/i,
+      );
+      role = roleMatch ? stripHtml(roleMatch[1]) : '';
+    }
 
     // Prefer the in-panel name (richer formatting) but fall back to the
     // anchor's title attribute if the <p> wasn't found.
