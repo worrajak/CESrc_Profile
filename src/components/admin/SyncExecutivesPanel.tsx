@@ -117,12 +117,42 @@ export default function SyncExecutivesPanel() {
       const res = await adminJSON('/api/admin/researchers/sync-executives', 'POST', { matches });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
-      setMessage({
-        kind: 'ok',
-        text: `อัปเดต ${json.applied}/${matches.length} คนสำเร็จ${json.failed ? ` · ล้มเหลว ${json.failed}` : ''}`,
-      });
-      setPreview(null);
-      setSelected(new Set());
+
+      const applied = Number(json.applied || 0);
+      const failed = Number(json.failed || 0);
+
+      // Pull the first per-row error message (if any) — usually surfaces
+      // missing-column errors ("column ... does not exist") when the
+      // migration hasn't been run yet.
+      const firstError =
+        (json.results || [])
+          .filter((r: any) => !r.ok)
+          .map((r: any) => r.error)
+          .find(Boolean) || '';
+
+      if (applied === 0 && failed > 0) {
+        // Total failure — surface as error, not a green success.
+        setMessage({
+          kind: 'err',
+          text:
+            `ล้มเหลวทั้งหมด ${failed} คน` +
+            (firstError ? ` · ${firstError}` : '') +
+            (/column.*does not exist/i.test(firstError)
+              ? ' · กรุณารัน supabase/055_researcher_executive_role.sql ใน Supabase SQL Editor ก่อน'
+              : ''),
+        });
+      } else {
+        setMessage({
+          kind: 'ok',
+          text:
+            `อัปเดต ${applied}/${matches.length} คนสำเร็จ` +
+            (failed
+              ? ` · ล้มเหลว ${failed}${firstError ? ` (${firstError})` : ''}`
+              : ''),
+        });
+        setPreview(null);
+        setSelected(new Set());
+      }
     } catch (e: any) {
       setMessage({ kind: 'err', text: e.message || 'Apply failed' });
     } finally {
