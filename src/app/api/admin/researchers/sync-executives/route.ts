@@ -46,35 +46,46 @@ function stripHtml(s: string): string {
 }
 
 // ── Name normalisation for fuzzy match ───────────────────────────────────
-const TITLE_PREFIXES = [
+// Strip every known title-prefix form from the START of the name string,
+// iteratively, until no more match. Handles:
+//   • title glued to first name: "ผู้ช่วยศาสตราจารย์พิสิษฐ์ วิมลฯ"
+//   • title + space + ดร.: "ผู้ช่วยศาสตราจารย์ ดร.วรจักร์ เมืองใจ"
+//   • typo on the live page: "ผู้ช่วยศาสตราจาย์ ดร.ศิรประภา ชัยเนตร"
+//                                          ↑ missing ร
+//
+// The list is ordered LONGEST-FIRST so that "ผู้ช่วยศาสตราจารย์ ดร." is
+// tried before plain "ผู้ช่วยศาสตราจารย์" — otherwise the leading title
+// would be stripped but "ดร." would remain glued to the first name.
+const TITLE_STRINGS = [
   'ศาสตราจารย์ ดร.',
   'รองศาสตราจารย์ ดร.',
   'ผู้ช่วยศาสตราจารย์ ดร.',
+  'ผู้ช่วยศาสตราจาย์ ดร.', // typo seen on rmutl.ac.th — missing ร
   'อาจารย์ ดร.',
-  'ศ.ดร.',
-  'รศ.ดร.',
-  'ผศ.ดร.',
-  'ศ.',
-  'รศ.',
-  'ผศ.',
-  'อ.',
-  'ดร.',
-  'อาจารย์',
   'ผู้ช่วยศาสตราจารย์',
+  'ผู้ช่วยศาสตราจาย์', // typo
   'รองศาสตราจารย์',
   'ศาสตราจารย์',
-  'นาย',
-  'นาง',
-  'นางสาว',
+  'อาจารย์',
+  'ผศ.ดร.',
+  'รศ.ดร.',
+  'ศ.ดร.',
+  'ผศ.',
+  'รศ.',
+  'ศ.',
+  'ดร.',
+  'อ.',
+  'นาย ',
+  'นาง ',
+  'นางสาว ',
 ];
 
 function normalizeName(raw: string): string {
   let s = raw.replace(/\s+/g, ' ').trim();
-  // Strip every known title prefix iteratively (e.g. "ผศ.ดร.ก สมศักดิ์")
   let changed = true;
   while (changed) {
     changed = false;
-    for (const p of TITLE_PREFIXES) {
+    for (const p of TITLE_STRINGS) {
       if (s.startsWith(p)) {
         s = s.slice(p.length).trim();
         changed = true;
@@ -96,39 +107,47 @@ type ParsedExec = {
 
 function parseExecPage(html: string): ParsedExec[] {
   const execs: ParsedExec[] = [];
-  // Each person sits inside a <div class="panel panel-default"> ... </div>.
-  // The panel structure isn't strictly nestable so we grab inner-body chunks.
-  const panelRe = /<div class="panel panel-default">[\s\S]*?<div class="panel-body">([\s\S]*?)<\/div>\s*<\/div>/g;
-  let m: RegExpExecArray | null;
-  while ((m = panelRe.exec(html)) !== null) {
-    const body = m[1];
-    // Photo URL — original (high-res) via the post_thumbnail anchor href.
-    const photoMatch = body.match(
-      /<a[^>]*id="post_thumbnail"[^>]*href="([^"]+\.(?:jpe?g|png|webp))"/i,
-    );
-    if (!photoMatch) continue;
-    const photo_url = photoMatch[1];
 
-    // Name — the bold <p> following the modal link.
-    const nameMatch = body.match(
-      /<p class="text-center kanit"[^>]*font-weight: bold[^>]*>([\s\S]*?)<\/p>/i,
+  // Anchor on each <a id="post_thumbnail" ... href="<photo>" ... title="<name>">
+  // — there is exactly one per executive card (verified by grepping the live
+  // page: 25 anchors → 25 executives). For each anchor, look forward in the
+  // HTML for the bold name <p> and the role <p>. This is far more robust than
+  // trying to balance nested <div> elements with a single regex.
+  const anchorRe =
+    /<a[^>]*id="post_thumbnail"[^>]*href="([^"]+\.(?:jpe?g|png|webp))"[^>]*title="([^"]+)"/gi;
+  let m: RegExpExecArray | null;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const photo_url = m[1];
+    const titleAttr = stripHtml(m[2]);
+
+    // Forward window of ~2 KB is plenty — name and role sit a few lines below
+    // the photo anchor in every card.
+    const offset = m.index + m[0].length;
+    const win = html.slice(offset, offset + 2000);
+
+    // Name — the first <p class="text-center kanit"> with bold styling.
+    const nameMatch = win.match(
+      /<p class="text-center kanit"[^>]*font-weight:\s*bold[^>]*>([\s\S]*?)<\/p>/i,
     );
-    if (!nameMatch) continue;
-    const full_name_raw = stripHtml(nameMatch[1]);
-    if (!full_name_raw) continue;
+    const nameInPanel = nameMatch ? stripHtml(nameMatch[1]) : '';
 
     // Role — the next <p class="text-center kanit"> with min-height 24px.
-    const roleMatch = body.match(
+    const roleMatch = win.match(
       /<p class="text-center kanit"[^>]*min-height:\s*24px[^>]*>([\s\S]*?)<\/p>/i,
     );
     const role = roleMatch ? stripHtml(roleMatch[1]) : '';
+
+    // Prefer the in-panel name (richer formatting) but fall back to the
+    // anchor's title attribute if the <p> wasn't found.
+    const full_name_raw = nameInPanel || titleAttr;
+    if (!full_name_raw) continue;
 
     execs.push({
       full_name_raw,
       full_name_norm: normalizeName(full_name_raw),
       role,
       photo_url,
-      panel_html: body.slice(0, 400),
+      panel_html: win.slice(0, 400),
     });
   }
   return execs;
