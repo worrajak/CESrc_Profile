@@ -108,22 +108,31 @@ type ParsedExec = {
 function parseExecPage(html: string): ParsedExec[] {
   const execs: ParsedExec[] = [];
 
-  // Anchor on each <a id="post_thumbnail" ... href="<photo>" ... title="<name>">
-  // — there is exactly one per executive card (verified by grepping the live
-  // page: 25 anchors → 25 executives). For each anchor, look forward in the
-  // HTML for the bold name <p> and the role <p>. This is far more robust than
-  // trying to balance nested <div> elements with a single regex.
+  // Anchor on each <a id="post_thumbnail" ... title="<name>"> — there is
+  // exactly one per executive card (verified by grepping the live page: 25
+  // anchors → 25 executives). Crucially, only 4 of those have href pointing
+  // at the .png/.jpg portrait; the other 21 link to lms.rmutl.ac.th teacher
+  // pages. The portrait URL is reliably inside the <img src="..."> nested
+  // in the anchor, so we extract it from a forward window instead of the
+  // href attribute.
   const anchorRe =
-    /<a[^>]*id="post_thumbnail"[^>]*href="([^"]+\.(?:jpe?g|png|webp))"[^>]*title="([^"]+)"/gi;
+    /<a[^>]*id="post_thumbnail"[^>]*title="([^"]+)"[^>]*>/gi;
   let m: RegExpExecArray | null;
   while ((m = anchorRe.exec(html)) !== null) {
-    const photo_url = m[1];
-    const titleAttr = stripHtml(m[2]);
+    const titleAttr = stripHtml(m[1]);
 
-    // Forward window of ~2 KB is plenty — name and role sit a few lines below
-    // the photo anchor in every card.
+    // Forward window of ~2 KB is plenty — img, name and role all sit within
+    // ~1 KB of the anchor in every card.
     const offset = m.index + m[0].length;
     const win = html.slice(offset, offset + 2000);
+
+    // Photo URL — pull the first <img src="..."> inside the anchor body.
+    // The src is usually the thumbnail proxy
+    // (e-cms.rmutl.ac.th/images?src=ORIGINAL&w=…); we keep the proxy URL
+    // verbatim so the browser handles sizing too.
+    const imgMatch = win.match(/<img[^>]*src="([^"]+)"/i);
+    if (!imgMatch) continue;
+    const photo_url = imgMatch[1];
 
     // Name — the first <p class="text-center kanit"> with bold styling.
     const nameMatch = win.match(
