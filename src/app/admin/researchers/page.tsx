@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import SyncExecutivesPanel from '@/components/admin/SyncExecutivesPanel';
 
 const ROLE_OPTIONS = [
   { value: 'advisor', label: '👨‍🏫 ที่ปรึกษา', color: 'bg-purple-100 text-purple-800' },
@@ -356,6 +357,11 @@ export default function AdminResearchersPage() {
           {message}
         </div>
       )}
+
+      {/* Executive role sync tool */}
+      <div className="mb-6">
+        <SyncExecutivesPanel />
+      </div>
 
       {/* Form (collapsible) */}
       {showForm && (

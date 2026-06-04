@@ -44,8 +44,19 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
     >
       <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-300 h-full">
         <div className="flex items-start justify-between mb-3">
+          {/* Avatar: own avatar → fallback to executive portrait → fallback to initials */}
           {r.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={r.avatar_url} alt={primaryName} className="w-14 h-14 rounded-full object-cover" />
+          ) : (r as any).executive_photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={(r as any).executive_photo_url}
+              alt={primaryName}
+              referrerPolicy="no-referrer"
+              className="w-14 h-14 rounded-full object-cover ring-2 ring-amber-200"
+              title="ภาพจาก mhesi.rmutl.ac.th"
+            />
           ) : (
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-xl font-bold">
               {r.first_name_th.charAt(0)}
@@ -71,6 +82,15 @@ export default function ResearcherCard({ researcher }: { researcher: Researcher 
         {(locale === 'en' && r.position_en ? r.position_en : r.position_th) && (
           <p className="text-sm text-blue-600 mt-2">
             {locale === 'en' && r.position_en ? r.position_en : r.position_th}
+          </p>
+        )}
+
+        {/* Executive role chip (RMUTL admin role, if any) */}
+        {(r as any).executive_role_th && (
+          <p className="mt-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              🏛️ {(r as any).executive_role_th}
+            </span>
           </p>
         )}
 

@@ -224,7 +224,17 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
         <div className="flex flex-col md:flex-row items-start gap-6">
           {r.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={r.avatar_url} alt={fullNameTh} className="w-24 h-24 rounded-full object-cover flex-shrink-0" />
+          ) : (r as any).executive_photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={(r as any).executive_photo_url}
+              alt={fullNameTh}
+              referrerPolicy="no-referrer"
+              className="w-24 h-24 rounded-full object-cover ring-2 ring-amber-200 flex-shrink-0"
+              title="ภาพจาก rmutl.ac.th/structure/executive"
+            />
           ) : (
             <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white text-3xl font-bold flex-shrink-0">
               {r.first_name_th.charAt(0)}
@@ -236,7 +246,38 @@ export default async function ResearcherProfilePage({ params }: { params: { id: 
 
             {r.position_th && <p className="text-blue-600 font-medium mt-2">{r.position_th}</p>}
 
-            <p className="text-gray-600 mt-1">
+            {/* Executive role (RMUTL admin role, if any) */}
+            {(r as any).executive_role_th && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-start gap-2 max-w-xl">
+                <span className="text-base leading-none mt-0.5">🏛️</span>
+                <div>
+                  <div className="text-xs font-medium text-amber-900">ตำแหน่งบริหารปัจจุบัน</div>
+                  <div className="text-sm text-amber-800 font-semibold mt-0.5">
+                    {(r as any).executive_role_th}
+                  </div>
+                  {(r as any).executive_unit && (
+                    <div className="text-[11px] text-amber-700 mt-0.5">
+                      {(r as any).executive_unit}
+                      {(r as any).executive_source_url && (
+                        <>
+                          {' · '}
+                          <a
+                            href={(r as any).executive_source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline decoration-dotted hover:text-amber-900"
+                          >
+                            ดูที่มา
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <p className="text-gray-600 mt-3">
               {r.department}, {r.faculty}
             </p>
             <p className="text-gray-500 text-sm">{r.university}, {r.campus}</p>
