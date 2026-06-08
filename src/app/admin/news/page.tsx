@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 interface NewsItem {
   id: string;
@@ -129,16 +130,22 @@ export default function AdminNewsPage() {
     }
   };
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
   useEffect(() => {
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
     const storedPwd = sessionStorage.getItem('admin_pwd');
-    if (sessionStorage.getItem('admin_auth') === 'true' && storedPwd) {
+    const legacyOK = sessionStorage.getItem('admin_auth') === 'true' && storedPwd;
+    if (supabaseOK || legacyOK) {
       setAuthenticated(true);
-      setPassword(storedPwd);
+      if (storedPwd) setPassword(storedPwd);
       fetchNews();
       fetchTagOptions();
       fetchResearchers();
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminRole, adminRoleLoading]);
 
   const fetchResearchers = async () => {
     try {

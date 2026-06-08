@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 interface Author {
   given: string;
@@ -64,8 +65,14 @@ export default function AdminPublicationsPage() {
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [matchLoading, setMatchLoading] = useState(false);
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
   useEffect(() => {
-    if (sessionStorage.getItem('admin_auth') === 'true') {
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
+    if (supabaseOK) {
+      setAuthenticated(true);
+    } else if (sessionStorage.getItem('admin_auth') === 'true') {
       setAuthenticated(true);
       setPassword(sessionStorage.getItem('admin_pwd') || '');
     }
@@ -74,7 +81,7 @@ export default function AdminPublicationsPage() {
       .then(r => r.json())
       .then(d => setAiProviders(d.providers || []))
       .catch(() => {});
-  }, []);
+  }, [adminRole, adminRoleLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

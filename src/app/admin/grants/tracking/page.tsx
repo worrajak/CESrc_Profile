@@ -6,6 +6,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import GrantPlanImportPanel from '@/components/admin/GrantPlanImportPanel';
 import WorkplanProgressDashboard from '@/components/admin/grants/WorkplanProgressDashboard';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 const SCurveChart = dynamic(() => import('@/components/SCurveChart'), { ssr: false });
 
@@ -59,12 +60,19 @@ export default function AdminGrantTrackingPage() {
     planned_pct: '', actual_pct: '', budget_spent: '', summary: '', issues: '',
   });
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
   const login = async () => {
     const res = await fetch('/api/admin/auth', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     });
-    if (res.ok) { setAuthed(true); } else alert('รหัสผ่านไม่ถูกต้อง');
+    if (res.ok) {
+      // Persist so a tab reload doesn't bounce back to the password gate.
+      sessionStorage.setItem('admin_auth', 'true');
+      sessionStorage.setItem('admin_pwd', password);
+      setAuthed(true);
+    } else alert('รหัสผ่านไม่ถูกต้อง');
   };
 
   const loadGrants = async () => {
@@ -90,11 +98,15 @@ export default function AdminGrantTrackingPage() {
     } catch {}
   };
 
+  // Accept ANY of:
+  //   - Supabase-auth admin (researchers.is_admin or is_active match)
+  //   - Legacy sessionStorage password gate (set by login() above)
   useEffect(() => {
-    if (sessionStorage.getItem('admin_auth') === 'true') {
-      setAuthed(true);
-    }
-  }, []);
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
+    const legacyOK = typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true';
+    if (supabaseOK || legacyOK) setAuthed(true);
+  }, [adminRole, adminRoleLoading]);
 
   useEffect(() => {
     if (authed) { loadGrants(); loadAIProviders(); }

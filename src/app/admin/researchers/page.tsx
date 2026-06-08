@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import SyncExecutivesPanel from '@/components/admin/SyncExecutivesPanel';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 const ROLE_OPTIONS = [
   { value: 'advisor', label: '👨‍🏫 ที่ปรึกษา', color: 'bg-purple-100 text-purple-800' },
@@ -100,14 +101,23 @@ export default function AdminResearchersPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
+  // Auto-enter when Supabase Auth admin OR legacy sessionStorage flag.
   useEffect(() => {
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
+    if (supabaseOK) {
+      setAuthenticated(true);
+      return;
+    }
     const auth = sessionStorage.getItem('admin_auth');
     const pwd = sessionStorage.getItem('admin_pwd');
     if (auth === 'true' && pwd) {
       setAuthenticated(true);
       setPassword(pwd);
     }
-  }, []);
+  }, [adminRole, adminRoleLoading]);
 
   const getSupabase = useCallback(async () => {
     const { createClient } = await import('@supabase/supabase-js');

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 const statusLabels: Record<string, { label: string; cls: string }> = {
   active: { label: 'กำลังดำเนินการ', cls: 'bg-blue-100 text-blue-800' },
@@ -55,12 +56,21 @@ export default function AdminGrantsPage() {
   };
   const [form, setForm] = useState(emptyForm);
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
   const login = async () => {
     const res = await fetch('/api/admin/auth', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
     });
-    if (res.ok) { setAuthed(true); loadGrants(); loadResearchers(); loadAIProviders(); } else alert('รหัสผ่านไม่ถูกต้อง');
+    if (res.ok) {
+      sessionStorage.setItem('admin_auth', 'true');
+      sessionStorage.setItem('admin_pwd', password);
+      setAuthed(true);
+      loadGrants();
+      loadResearchers();
+      loadAIProviders();
+    } else alert('รหัสผ่านไม่ถูกต้อง');
   };
 
   const loadResearchers = async () => {
@@ -389,14 +399,18 @@ export default function AdminGrantsPage() {
     await loadGrants();
   };
 
+  // Auto-enter if Supabase-auth admin OR legacy sessionStorage flag.
   useEffect(() => {
-    if (sessionStorage.getItem('admin_auth') === 'true') {
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
+    const legacyOK = typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') === 'true';
+    if (supabaseOK || legacyOK) {
       setAuthed(true);
       loadGrants();
       loadResearchers();
       loadAIProviders();
     }
-  }, []);
+  }, [adminRole, adminRoleLoading]);
 
   const filtered = filter === 'all' ? grants : grants.filter((g: any) => g.status === filter);
   const totalBudget = grants.reduce((sum: number, g: any) => sum + (Number(g.budget) || 0), 0);

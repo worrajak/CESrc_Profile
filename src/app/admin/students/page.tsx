@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useAdminAuth } from '@/lib/admin-auth-client';
 
 const DEGREE_OPTIONS = [
   { value: 'bachelor', label: 'ปริญญาตรี' },
@@ -72,14 +73,22 @@ export default function AdminStudentsPage() {
   const [message, setMessage] = useState('');
   const [filterDegree, setFilterDegree] = useState('all');
 
+  const { role: adminRole, loading: adminRoleLoading } = useAdminAuth();
+
   useEffect(() => {
+    if (adminRoleLoading) return;
+    const supabaseOK = adminRole === 'admin' || adminRole === 'superadmin' || adminRole === 'legacy';
+    if (supabaseOK) {
+      setAuthenticated(true);
+      return;
+    }
     const auth = sessionStorage.getItem('admin_auth');
     const pwd = sessionStorage.getItem('admin_pwd');
     if (auth === 'true' && pwd) {
       setAuthenticated(true);
       setPassword(pwd);
     }
-  }, []);
+  }, [adminRole, adminRoleLoading]);
 
   const handleLogin = async () => {
     const res = await fetch('/api/admin/auth', {
