@@ -92,7 +92,7 @@ export default function GrantPlanImportPanel({ grantId, grantTitle }: { grantId:
             📥 Import แผนดำเนินงานจาก Excel
           </h2>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            อัปโหลด .xlsx ในรูปแบบ "แผนดำเนินงาน DaaS Wildfire" (11 sheets) เพื่อบันทึก:
+            อัปโหลด .xlsx ในรูปแบบ “แผนดำเนินงาน DaaS Wildfire” (11 sheets) เพื่อบันทึก:
             ทีม + RACI · WP × เดือน · Milestones · แผนรายวัน · Procurement · Contracts · Cashbook · Budget · Disbursement · Risks
           </p>
           <p className="text-[10px] text-gray-400 mt-0.5">
