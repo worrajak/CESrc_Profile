@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { CareerPlan } from './CareerPlanView';
-
-type Reviewer = { id: string; title_th: string | null; first_name_th: string; last_name_th: string };
 
 const POSITIONS: { v: string; label: string }[] = [
   { v: 'อาจารย์', label: 'อาจารย์' },
@@ -34,23 +32,9 @@ export default function PlanSettingsModal({
   const [eligStart, setEligStart] = useState(plan.eligibility_window_start || '');
   const [eligEnd, setEligEnd] = useState(plan.eligibility_window_end || '');
   const [targetSub, setTargetSub] = useState(plan.target_submission_date || '');
-  const [reviewerId, setReviewerId] = useState(plan.reviewer_id || '');
   const [threshold, setThreshold] = useState(plan.approval_threshold || 80);
-  const [reviewers, setReviewers] = useState<Reviewer[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  // Pull researcher list for the reviewer picker
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from('researchers')
-        .select('id, title_th, first_name_th, last_name_th')
-        .eq('is_active', true)
-        .order('last_name_th');
-      setReviewers((data as Reviewer[]) || []);
-    })();
-  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -64,7 +48,6 @@ export default function PlanSettingsModal({
         eligibility_window_start: eligStart || null,
         eligibility_window_end: eligEnd || null,
         target_submission_date: targetSub || null,
-        reviewer_id: reviewerId || null,
         approval_threshold: threshold,
       })
       .eq('id', plan.id);
@@ -174,22 +157,7 @@ export default function PlanSettingsModal({
             />
           </Section>
 
-          {/* Reviewer */}
-          <Section title="ที่ปรึกษา / ผู้ดูแผน">
-            <select
-              value={reviewerId}
-              onChange={(e) => setReviewerId(e.target.value)}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded text-xs"
-            >
-              <option value="">— ไม่ระบุ —</option>
-              {reviewers.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.title_th || ''}
-                  {r.first_name_th} {r.last_name_th}
-                </option>
-              ))}
-            </select>
-          </Section>
+          {/* Reviewer section removed by user request — DB column kept for future use */}
 
           {/* Threshold */}
           <Section title="Threshold ขั้นต่ำเพื่อกดยื่น (%)">

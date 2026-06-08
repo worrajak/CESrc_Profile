@@ -22,7 +22,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/AuthContext';
-import { useAdminAuth } from '@/lib/admin-auth-client';
 import TeamCareerOverview from './TeamCareerOverview';
 import MyCareerPlan from './MyCareerPlan';
 
@@ -64,7 +63,6 @@ export type TeamOverviewRow = {
 
 export default function CareerPlanView() {
   const { user, profile } = useAuth();
-  const { role: adminRole } = useAdminAuth();
 
   const [team, setTeam] = useState<TeamOverviewRow[]>([]);
   const [myPlan, setMyPlan] = useState<CareerPlan | null>(null);
@@ -141,7 +139,6 @@ export default function CareerPlanView() {
         <MyCareerPlan
           researcherId={myResearcherId}
           plan={myPlan}
-          adminRole={adminRole}
           onChanged={refresh}
         />
       ) : (

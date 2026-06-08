@@ -52,12 +52,10 @@ function fmtCountdown(deadline: string | null): { days: number | null; text: str
 export default function MyCareerPlan({
   researcherId,
   plan,
-  adminRole,
   onChanged,
 }: {
   researcherId: string;
   plan: CareerPlan | null;
-  adminRole: string | null;
   onChanged: () => void;
 }) {
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -197,37 +195,25 @@ export default function MyCareerPlan({
         <DocChecklistSection plan={plan} docs={docs} onChanged={refreshDocs} />
 
         {/* Notes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-          <div>
-            <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
-              📝 บันทึกของฉัน
-            </label>
-            <textarea
-              defaultValue={plan.notes || ''}
-              rows={3}
-              onBlur={async (e) => {
-                const v = e.target.value;
-                if (v === (plan.notes || '')) return;
-                await supabase
-                  .from('academic_position_plans')
-                  .update({ notes: v })
-                  .eq('id', plan.id);
-                onChanged();
-              }}
-              placeholder="โน้ตส่วนตัว..."
-              className="mt-1 w-full px-2 py-1.5 border border-slate-200 rounded text-xs"
-            />
-          </div>
-          {plan.reviewer_notes && (
-            <div>
-              <label className="text-[11px] font-medium text-amber-700 uppercase tracking-wide">
-                💬 ความเห็นจากที่ปรึกษา
-              </label>
-              <div className="mt-1 bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-900 whitespace-pre-line">
-                {plan.reviewer_notes}
-              </div>
-            </div>
-          )}
+        <div className="pt-3 border-t border-slate-100">
+          <label className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+            📝 บันทึกของฉัน
+          </label>
+          <textarea
+            defaultValue={plan.notes || ''}
+            rows={3}
+            onBlur={async (e) => {
+              const v = e.target.value;
+              if (v === (plan.notes || '')) return;
+              await supabase
+                .from('academic_position_plans')
+                .update({ notes: v })
+                .eq('id', plan.id);
+              onChanged();
+            }}
+            placeholder="โน้ตส่วนตัว..."
+            className="mt-1 w-full px-2 py-1.5 border border-slate-200 rounded text-xs"
+          />
         </div>
 
         {/* Actions */}
