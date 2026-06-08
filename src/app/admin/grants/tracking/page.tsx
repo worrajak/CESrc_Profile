@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import GrantPlanImportPanel from '@/components/admin/GrantPlanImportPanel';
+import WorkplanProgressDashboard from '@/components/admin/grants/WorkplanProgressDashboard';
 
 const SCurveChart = dynamic(() => import('@/components/SCurveChart'), { ssr: false });
 
@@ -262,6 +263,11 @@ export default function AdminGrantTrackingPage() {
             grantId={selectedGrant.id}
             grantTitle={selectedGrant.title_th}
           />
+
+          {/* Workplan progress dashboard (Phase X2) */}
+          <div className="mb-6">
+            <WorkplanProgressDashboard grantId={selectedGrant.id} />
+          </div>
 
           {/* Grant Info */}
           <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl border p-4 mb-6">
