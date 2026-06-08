@@ -231,7 +231,7 @@ export default function AdminGrantTrackingPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">ติดตามทุนวิจัย (Grant Tracking)</h1>
-          <p className="text-sm text-gray-500">จัดการ Milestones, บันทึกความก้าวหน้า, S-Curve</p>
+          <p className="text-sm text-gray-500">นำเข้าแผน .xlsx · WP × เดือน Gantt · Milestones · รายงานความคืบหน้า</p>
         </div>
         <div className="flex gap-2">
           <Link href="/admin/grants" className="text-sm bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300">จัดการทุนวิจัย</Link>
@@ -279,18 +279,22 @@ export default function AdminGrantTrackingPage() {
             </div>
           </div>
 
-          {/* S-Curve Preview */}
-          {progressLogs.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-              <h3 className="font-bold text-gray-800 mb-3">S-Curve</h3>
-              <SCurveChart
-                dataPoints={progressLogs}
-                startDate={selectedGrant.start_date}
-                endDate={selectedGrant.end_date}
-                height={280}
-              />
-            </div>
-          )}
+          {/* S-Curve Preview — deprecated. Phase X2 WorkplanProgressDashboard
+              above renders the on-track % bar from new grant_workplan_*
+              tables. Kept commented for reference / future re-enable if
+              S-Curve view is preferred over Gantt + KPI.
+            {progressLogs.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <h3 className="font-bold text-gray-800 mb-3">S-Curve</h3>
+                <SCurveChart
+                  dataPoints={progressLogs}
+                  startDate={selectedGrant.start_date}
+                  endDate={selectedGrant.end_date}
+                  height={280}
+                />
+              </div>
+            )}
+          */}
 
           {/* Tabs */}
           <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1">

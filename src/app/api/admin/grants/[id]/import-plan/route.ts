@@ -19,16 +19,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
-import { authorizeAdminRequest } from '@/lib/admin-auth';
+import { authorizeAdminRequest, extractAdminInputs } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function getAdminClient() {
+/**
+ * Build a Supabase client for write operations.
+ *
+ * Prefers SUPABASE_SERVICE_ROLE_KEY (bypasses RLS — fastest path).
+ * Falls back to a client built from the caller's access token,
+ * which is RLS-governed by `apos_is_admin()` policy on every
+ * grant_workplan_* / grant_team_* / grant_procurement / ... table.
+ *
+ * Throws only if neither path is available.
+ */
+function getAdminClient(accessToken: string | null = null) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set.');
-  return createClient(url, key, { auth: { persistSession: false } });
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set.');
+
+  if (serviceKey) {
+    return createClient(url, serviceKey, { auth: { persistSession: false } });
+  }
+
+  if (accessToken && anonKey) {
+    return createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+  }
+
+  throw new Error(
+    'No write client available — set SUPABASE_SERVICE_ROLE_KEY or include access_token (admin Bearer).',
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -444,6 +470,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const inputs = await extractAdminInputs(req);
   const admin = await authorizeAdminRequest(req);
   if (!admin.authorized || !admin.role) {
     return NextResponse.json({ error: 'Admin auth required.' }, { status: 403 });
@@ -515,8 +542,14 @@ export async function POST(
     return NextResponse.json({ ok: true, dry: true, counts });
   }
 
-  // Bulk insert via service-role client
-  const client = getAdminClient();
+  // Bulk insert — prefer service-role; fall back to user's admin-authed
+  // session (RLS will enforce apos_is_admin()).
+  let client;
+  try {
+    client = getAdminClient(inputs.accessToken);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
   const ctx = { grant_id: grantId };
 
   // Wipe existing rows for this grant (idempotent re-imports)

@@ -44,7 +44,17 @@ const LOAD_INTENSITY: Record<string, string> = {
   high: 'opacity-100',
 };
 
-export default function WorkplanProgressDashboard({ grantId }: { grantId: string }) {
+export default function WorkplanProgressDashboard({
+  grantId,
+  readOnly = false,
+}: {
+  grantId: string;
+  /** When true: hide click-to-report affordances (Gantt cells render as plain
+   *  divs, milestones list omits status pills' edit modal trigger). Used on
+   *  the public /grants/[id] page where visitors should see progress without
+   *  the ability to submit reports. */
+  readOnly?: boolean;
+}) {
   const [wp, setWp] = useState<WPRow[]>([]);
   const [cells, setCells] = useState<WPCellRow[]>([]);
   const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
@@ -161,7 +171,9 @@ export default function WorkplanProgressDashboard({ grantId }: { grantId: string
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-800 text-sm">📦 Work Package × เดือน</h3>
-            <span className="text-[10px] text-gray-500">คลิกเซลล์เพื่อรายงาน</span>
+            {!readOnly && (
+              <span className="text-[10px] text-gray-500">คลิกเซลล์เพื่อรายงาน</span>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -193,26 +205,36 @@ export default function WorkplanProgressDashboard({ grantId }: { grantId: string
                       }
                       const meta = STATUS_META[(cell.progress_status || 'not_started') as ProgressStatus];
                       const loadClass = cell.load ? LOAD_INTENSITY[cell.load] : 'opacity-30';
+                      const cellTitle = `${w.wp_code} M${m}: ${meta.label}${cell.progress_note ? ' · ' + cell.progress_note : ''}`;
                       return (
                         <td key={m} className="px-1 py-1 w-10 text-center">
                           <div className="relative inline-block">
-                            <button
-                              type="button"
-                              onClick={() => document.getElementById(`reportbtn-${cell.id}`)?.click()}
-                              className={`block w-7 h-7 rounded ${meta.cell} ${loadClass} hover:ring-2 hover:ring-blue-400 transition`}
-                              title={`${w.wp_code} M${m}: ${meta.label}${cell.progress_note ? ' · ' + cell.progress_note : ''}`}
-                            />
-                            <span id={`reportbtn-${cell.id}`} className="hidden">
-                              <ProgressStatusPill
-                                grantId={grantId}
-                                entityType="wp_month"
-                                entityId={cell.id}
-                                status={cell.progress_status}
-                                note={cell.progress_note}
-                                compact
-                                onReported={refresh}
+                            {readOnly ? (
+                              <div
+                                className={`block w-7 h-7 rounded ${meta.cell} ${loadClass}`}
+                                title={cellTitle}
                               />
-                            </span>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => document.getElementById(`reportbtn-${cell.id}`)?.click()}
+                                  className={`block w-7 h-7 rounded ${meta.cell} ${loadClass} hover:ring-2 hover:ring-blue-400 transition`}
+                                  title={cellTitle}
+                                />
+                                <span id={`reportbtn-${cell.id}`} className="hidden">
+                                  <ProgressStatusPill
+                                    grantId={grantId}
+                                    entityType="wp_month"
+                                    entityId={cell.id}
+                                    status={cell.progress_status}
+                                    note={cell.progress_note}
+                                    compact
+                                    onReported={refresh}
+                                  />
+                                </span>
+                              </>
+                            )}
                           </div>
                         </td>
                       );
@@ -230,22 +252,31 @@ export default function WorkplanProgressDashboard({ grantId }: { grantId: string
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <h3 className="font-bold text-gray-800 text-sm mb-3">★ Milestones</h3>
           <ul className="divide-y divide-slate-100">
-            {milestones.map((ms) => (
-              <li key={ms.id} className="py-1.5 flex items-center gap-2 text-xs">
-                <span className="font-bold text-gray-700 w-8">M{ms.month_no}</span>
-                <span className="flex-1 text-gray-800">{ms.title}</span>
-                {ms.due_date && (
-                  <span className="text-[10px] text-gray-500">{ms.due_date}</span>
-                )}
-                <ProgressStatusPill
-                  grantId={grantId}
-                  entityType="milestone"
-                  entityId={ms.id}
-                  status={ms.progress_status}
-                  onReported={refresh}
-                />
-              </li>
-            ))}
+            {milestones.map((ms) => {
+              const meta = STATUS_META[(ms.progress_status || 'not_started') as ProgressStatus];
+              return (
+                <li key={ms.id} className="py-1.5 flex items-center gap-2 text-xs">
+                  <span className="font-bold text-gray-700 w-8">M{ms.month_no}</span>
+                  <span className="flex-1 text-gray-800">{ms.title}</span>
+                  {ms.due_date && (
+                    <span className="text-[10px] text-gray-500">{ms.due_date}</span>
+                  )}
+                  {readOnly ? (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${meta.chip}`}>
+                      {meta.icon} {meta.label}
+                    </span>
+                  ) : (
+                    <ProgressStatusPill
+                      grantId={grantId}
+                      entityType="milestone"
+                      entityId={ms.id}
+                      status={ms.progress_status}
+                      onReported={refresh}
+                    />
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
