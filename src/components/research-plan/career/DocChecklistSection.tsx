@@ -40,7 +40,7 @@ const GROUPS: { title: string; icon: string; docs: DocSpec[] }[] = [
     docs: [
       { type: 'textbook', label: 'ตำรา' },
       { type: 'book', label: 'หนังสือ' },
-      { type: 'research', label: 'งานวิจัยที่เตรียมตีพิมพ์', hint: 'Phase B จะดึงจาก publications' },
+      { type: 'research', label: 'งานวิจัยที่เตรียมตีพิมพ์ (เอกสารแนบเพิ่ม)', hint: 'รายการบทความจริงอยู่ในส่วน “งานวิจัยที่เตรียมตีพิมพ์” ด้านล่าง' },
     ],
   },
   {

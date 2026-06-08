@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import type { CareerPlan } from './CareerPlanView';
 import PlanSettingsModal from './PlanSettingsModal';
 import DocChecklistSection from './DocChecklistSection';
+import ResearchPipelineSection from './ResearchPipelineSection';
 
 export type DocRow = {
   id: string;
@@ -193,6 +194,9 @@ export default function MyCareerPlan({
 
         {/* Checklist */}
         <DocChecklistSection plan={plan} docs={docs} onChanged={refreshDocs} />
+
+        {/* Research pipeline (Phase B) */}
+        <ResearchPipelineSection plan={plan} />
 
         {/* Notes */}
         <div className="pt-3 border-t border-slate-100">
