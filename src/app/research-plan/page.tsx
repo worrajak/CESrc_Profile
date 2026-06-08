@@ -10,7 +10,8 @@ import IngestGrantModal from '@/components/research-plan/IngestGrantModal';
 import TimelineView from '@/components/research-plan/TimelineView';
 import ProposalsList from '@/components/research-plan/ProposalsList';
 import ActionPlanGenerator from '@/components/research-plan/ActionPlanGenerator';
-import CareerPlanView from '@/components/research-plan/career/CareerPlanView';
+// Career plans moved to /career-plans (under "เกี่ยวกับเรา" navbar dropdown).
+// Career tab removed below — link is in the page's empty state for discoverability.
 
 export type GrantCall = {
   id: string;
@@ -66,7 +67,7 @@ export default function ResearchPlanPage() {
   const isAdmin = adminRole === 'superadmin' || adminRole === 'admin' || adminRole === 'legacy';
   const [calls, setCalls] = useState<GrantCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'calendar' | 'timeline' | 'proposals' | 'action_plan' | 'career'>('calendar');
+  const [tab, setTab] = useState<'calendar' | 'timeline' | 'proposals' | 'action_plan'>('calendar');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [showIngest, setShowIngest] = useState(false);
@@ -205,7 +206,7 @@ export default function ResearchPlanPage() {
 
           {/* Tabs */}
           <div className="flex flex-wrap gap-1 mt-6 bg-white/10 backdrop-blur p-1 rounded-xl w-fit max-w-full">
-            {(['calendar', 'timeline', 'proposals', 'action_plan', 'career'] as const).map((tk) => (
+            {(['calendar', 'timeline', 'proposals', 'action_plan'] as const).map((tk) => (
               <button
                 key={tk}
                 onClick={() => setTab(tk)}
@@ -520,7 +521,6 @@ export default function ResearchPlanPage() {
 
         {tab === 'action_plan' && <ActionPlanGenerator />}
 
-        {tab === 'career' && <CareerPlanView />}
       </div>
 
       {showIngest && (

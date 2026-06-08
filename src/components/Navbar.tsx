@@ -11,7 +11,7 @@ import SignInModal from '@/components/SignInModal';
 
 export default function Navbar() {
   const { user, profile, profileLoading, signOut } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { role: adminRole, researcherId } = useAdminAuth();
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -74,6 +74,9 @@ export default function Navbar() {
                   </Link>
                   <Link href="/equipment" onClick={() => setAboutOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 text-sm">
                     🛠️ {t('nav.equipment')}
+                  </Link>
+                  <Link href="/career-plans" onClick={() => setAboutOpen(false)} className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 text-sm">
+                    🎓 {locale === 'en' ? 'Academic career plans' : 'แผนตำแหน่งวิชาการ'}
                   </Link>
                 </div>
               )}
@@ -274,6 +277,7 @@ export default function Navbar() {
             <Link href="/researchers" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">👨‍🔬 {t('nav.researchers')}</Link>
             <Link href="/research-areas" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🔬 {t('nav.research_areas')}</Link>
             <Link href="/equipment" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🛠️ {t('nav.equipment')}</Link>
+            <Link href="/career-plans" onClick={() => setOpen(false)} className="block py-2 pl-4 text-sm hover:text-yellow-300">🎓 {locale === 'en' ? 'Academic career plans' : 'แผนตำแหน่งวิชาการ'}</Link>
           </div>
 
           {/* Outputs group (mobile) */}
