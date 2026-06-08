@@ -202,7 +202,7 @@ export default function PlanSettingsModal({
               className="w-24 px-2 py-1.5 border border-slate-200 rounded text-xs"
             />
             <p className="text-[10px] text-gray-400 mt-0.5">
-              ต้องครบ ≥ {threshold}% ของเอกสารถึงจะกด "ยื่นแล้ว" ได้
+              ต้องครบ ≥ {threshold}% ของเอกสารถึงจะกด “ยื่นแล้ว” ได้
             </p>
           </Section>
 
