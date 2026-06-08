@@ -212,7 +212,7 @@ export default function PipelineAuthorEditor({
               </button>
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
-              💡 Phase C จะมีปุ่ม "+ external (ORCID)" สำหรับเพิ่มผู้ร่วมวิจัยภายนอก
+              💡 Phase C จะมีปุ่ม “+ external (ORCID)” สำหรับเพิ่มผู้ร่วมวิจัยภายนอก
             </p>
           </div>
 

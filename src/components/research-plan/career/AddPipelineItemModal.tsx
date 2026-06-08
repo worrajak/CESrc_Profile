@@ -270,7 +270,7 @@ export default function AddPipelineItemModal({
                 />
               </div>
               <p className="text-[10px] text-gray-400">
-                หลังเพิ่มเสร็จ คลิก "✎ แก้ผู้แต่ง" เพื่อระบุ FA / CA / Co-author
+                หลังเพิ่มเสร็จ คลิก “✎ แก้ผู้แต่ง” เพื่อระบุ FA / CA / Co-author
               </p>
             </div>
           )}

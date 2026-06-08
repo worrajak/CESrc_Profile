@@ -146,7 +146,7 @@ export default function ResearchPipelineSection({ plan }: { plan: CareerPlan }) 
         <div className="px-3 py-6 text-center text-xs text-gray-400">กำลังโหลด...</div>
       ) : items.length === 0 ? (
         <div className="px-3 py-6 text-center text-xs text-gray-400">
-          ยังไม่มีรายการ — กด "+ เพิ่มงานวิจัย" เพื่อเลือกบทความที่มีอยู่ในระบบ หรือเพิ่มบทความที่กำลังเขียน
+          ยังไม่มีรายการ — กด “+ เพิ่มงานวิจัย” เพื่อเลือกบทความที่มีอยู่ในระบบ หรือเพิ่มบทความที่กำลังเขียน
         </div>
       ) : (
         <ul className="divide-y divide-slate-100">
