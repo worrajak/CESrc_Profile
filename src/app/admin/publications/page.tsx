@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAdminAuth } from '@/lib/admin-auth-client';
+import { useAdminAuth, adminJSON } from '@/lib/admin-auth-client';
 
 interface Author {
   given: string;
@@ -137,10 +137,8 @@ export default function AdminPublicationsPage() {
     setMatches([]);
 
     try {
-      const res = await fetch('/api/publications/import-doi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, doi: doiInput.trim() }),
+      const res = await adminJSON('/api/publications/import-doi', 'POST', {
+        doi: doiInput.trim(),
       });
       const data = await res.json();
 
@@ -167,15 +165,10 @@ export default function AdminPublicationsPage() {
     setMatches([]);
 
     try {
-      const res = await fetch('/api/publications/parse-citation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password,
-          citation: citationInput.trim(),
-          ai_provider: aiProvider || undefined,
-          ai_model: aiModel || undefined,
-        }),
+      const res = await adminJSON('/api/publications/parse-citation', 'POST', {
+        citation: citationInput.trim(),
+        ai_provider: aiProvider || undefined,
+        ai_model: aiModel || undefined,
       });
       const data = await res.json();
 
@@ -204,10 +197,8 @@ export default function AdminPublicationsPage() {
     setMatchLoading(true);
 
     try {
-      const res = await fetch('/api/publications/match-authors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, authors: parsedAuthors }),
+      const res = await adminJSON('/api/publications/match-authors', 'POST', {
+        authors: parsedAuthors,
       });
       const data = await res.json();
       if (data.matches) {
@@ -245,19 +236,14 @@ export default function AdminPublicationsPage() {
       }));
 
     try {
-      const res = await fetch('/api/publications/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password,
-          publication: {
-            title, authors_raw: authorsRaw, journal_name: journalName,
-            volume: volume || null, issue: issue || null, pages: pages || null,
-            year: year || null, doi: doi || null, pub_type: pubType,
-            scopus_indexed: scopusIndexed, wos_indexed: wosIndexed, keywords,
-          },
-          author_links: authorLinks,
-        }),
+      const res = await adminJSON('/api/publications/save', 'POST', {
+        publication: {
+          title, authors_raw: authorsRaw, journal_name: journalName,
+          volume: volume || null, issue: issue || null, pages: pages || null,
+          year: year || null, doi: doi || null, pub_type: pubType,
+          scopus_indexed: scopusIndexed, wos_indexed: wosIndexed, keywords,
+        },
+        author_links: authorLinks,
       });
       const data = await res.json();
 
