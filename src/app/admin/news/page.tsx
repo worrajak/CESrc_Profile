@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useAdminAuth } from '@/lib/admin-auth-client';
+import { useAdminAuth, adminJSON, adminFetch } from '@/lib/admin-auth-client';
 
 interface NewsItem {
   id: string;
@@ -181,11 +181,7 @@ export default function AdminNewsPage() {
     if (!title.trim() && !content.trim()) return;
     setSuggesting(true);
     try {
-      const res = await fetch('/api/news/suggest-tags', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
-      });
+      const res = await adminJSON('/api/news/suggest-tags', 'POST', { title, content });
       const data = await res.json();
       if (data.tags) {
         setTags((prev) => Array.from(new Set([...prev, ...data.tags])));
@@ -203,8 +199,8 @@ export default function AdminNewsPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('password', getPassword());
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      // adminFetch auto-attaches Bearer + injects sessionStorage password into FormData
+      const res = await adminFetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.url) {
         if (isCover) setCoverUrl(data.url);
@@ -222,10 +218,9 @@ export default function AdminNewsPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('password', getPassword());
       formData.append('folder', 'travel-approvals');
       formData.append('type', 'document');
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const res = await adminFetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.url) {
         setTravelApprovalDocUrl(data.url);
@@ -311,8 +306,9 @@ export default function AdminNewsPage() {
     setSaving(true);
     setMessage('');
     try {
+      // adminJSON injects access_token + password automatically — no need to
+      // include them in the explicit payload.
       const payload = {
-        password: getPassword(),
         title, content, category,
         author_id: authorId || null,
         cover_image_url: coverUrl || null,
@@ -334,11 +330,11 @@ export default function AdminNewsPage() {
       };
 
       const isEdit = !!editingId;
-      const res = await fetch(isEdit ? `/api/news/${editingId}` : '/api/news', {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await adminJSON(
+        isEdit ? `/api/news/${editingId}` : '/api/news',
+        isEdit ? 'PUT' : 'POST',
+        payload,
+      );
       if (res.ok) {
         setMessage(isEdit ? '✓ แก้ไขข่าวสำเร็จ!' : 'บันทึกข่าวสำเร็จ!');
         resetForm();
@@ -356,11 +352,7 @@ export default function AdminNewsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('ต้องการลบข่าวนี้?')) return;
     try {
-      await fetch(`/api/news/${id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: getPassword() }),
-      });
+      await adminJSON(`/api/news/${id}`, 'DELETE', {});
       fetchNews();
     } catch { /* ignore */ }
   };
