@@ -35,6 +35,13 @@ let dbConfigCache: any[] | null = null;
 let dbConfigTime = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
+/** Force next getDBConfigs() to re-query. Called by ai-config POST/DELETE
+ *  so admin edits take effect immediately instead of waiting for TTL. */
+export function invalidateAIConfigCache() {
+  dbConfigCache = null;
+  dbConfigTime = 0;
+}
+
 async function getDBConfigs() {
   if (dbConfigCache && Date.now() - dbConfigTime < CACHE_TTL) {
     return dbConfigCache;

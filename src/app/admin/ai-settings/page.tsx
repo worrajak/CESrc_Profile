@@ -366,6 +366,11 @@ export default function AISettingsPage() {
         body.is_active = true;
       }
 
+      // ผู้ใช้กด "บันทึก" = เจตนาว่าจะใช้ provider/model นี้ต่อไป
+      // → ตั้งเป็น active + default อัตโนมัติ (clear default อื่น server-side)
+      body.is_active = true;
+      body.is_default = true;
+
       const res = await fetch('/api/admin/ai-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

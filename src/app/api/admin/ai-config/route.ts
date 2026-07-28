@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { invalidateAIConfigCache } from '@/lib/ai-provider';
 
 /**
  * AI Config API — CRUD ตั้งค่า AI Provider + API Key ผ่านหน้า Admin
@@ -206,6 +207,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Bust cache so ai-provider.resolveConfig() sees new default/model on next call
+    invalidateAIConfigCache();
+
     return NextResponse.json({
       success: true,
       config: {
@@ -243,6 +247,8 @@ export async function DELETE(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    invalidateAIConfigCache();
 
     return NextResponse.json({ success: true, message: `ลบ API Key ของ ${provider} แล้ว` });
   } catch (err) {
