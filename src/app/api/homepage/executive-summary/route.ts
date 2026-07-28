@@ -26,7 +26,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { callAIText } from '@/lib/ai-provider';
 import { EVIDENCE_CHAIN_PROMPT_INSTRUCTIONS } from '@/lib/evidence-chain';
-import { authorizeAdminRequest } from '@/lib/admin-auth';
+import { authorizeAdminRequest, extractAdminInputs } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -111,17 +111,38 @@ async function fetchCM108News(): Promise<NewsItem[]> {
 }
 
 // ─────────────────────────────────────────────────────────
-// Service-role client (server-only, bypasses RLS for cache writes)
+// Write client for the cache table.
+//
+// Prefers the service-role key (bypasses RLS). Falls back to a client
+// built from the caller's Supabase access token — migration 052's
+// INSERT/UPDATE policies already allow any signed-in admin, so a SUPER
+// admin hitting ?refresh=1 can persist the cache without the env var.
+//
+// Without this fallback the route silently skipped the write: the
+// response carried a fresh summary but the DB kept the old row, so the
+// admin card re-read stale data right after showing "สำเร็จ".
 // ─────────────────────────────────────────────────────────
-function getAdminClient() {
+function getCacheWriteClient(accessToken: string | null) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY is not set. Add it to .env.local (uncomment the existing line) so this route can write to the cache table.',
-    );
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set.');
+
+  if (serviceKey) {
+    return createClient(url, serviceKey, { auth: { persistSession: false } });
   }
-  return createClient(url, key, { auth: { persistSession: false } });
+
+  if (accessToken && anonKey) {
+    return createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+  }
+
+  throw new Error(
+    'Cannot write cache: set SUPABASE_SERVICE_ROLE_KEY, or sign in as a Supabase Auth admin so the request carries a Bearer token.',
+  );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -307,6 +328,7 @@ export async function GET(req: NextRequest) {
 
   // Force-refresh is admin-only — keeps random visitors from running up AI cost
   let force = false;
+  let accessToken: string | null = null;
   if (refreshRequested) {
     const admin = await authorizeAdminRequest(req);
     if (!admin.authorized || !admin.role) {
@@ -316,6 +338,9 @@ export async function GET(req: NextRequest) {
       );
     }
     force = true;
+    // Kept so the cache write can fall back to the caller's own session
+    // when SUPABASE_SERVICE_ROLE_KEY isn't configured.
+    accessToken = (await extractAdminInputs(req)).accessToken ?? null;
   }
 
   // 1) Read existing cache (anon-readable per RLS)
@@ -347,9 +372,13 @@ export async function GET(req: NextRequest) {
     const now = new Date();
     const expires = new Date(now.getTime() + CACHE_TTL_MS);
 
+    // Surfaced to the caller — a silent skip made the admin card show
+    // "สำเร็จ" and then immediately re-read the old row from the DB.
+    let cacheWarning: string | null = null;
+
     try {
-      const admin = getAdminClient();
-      const { error: upsertErr } = await admin.from('cesru_homepage_cache').upsert(
+      const writer = getCacheWriteClient(accessToken);
+      const { error: upsertErr } = await writer.from('cesru_homepage_cache').upsert(
         {
           id: CACHE_KEY,
           summary_th: fresh.summary_th,
@@ -364,17 +393,18 @@ export async function GET(req: NextRequest) {
         { onConflict: 'id' },
       );
       if (upsertErr) {
-        // Log but don't fail — we still have a fresh summary to return
+        // Don't fail — we still have a fresh summary to return
+        cacheWarning = `บันทึก cache ไม่สำเร็จ: ${upsertErr.message}`;
         console.warn('[executive-summary] cache upsert failed:', upsertErr.message);
       }
     } catch (cacheErr: any) {
-      // Service role key missing or other config issue — log and continue.
-      // The user still gets a fresh response; only the caching is skipped.
+      cacheWarning = `บันทึก cache ไม่สำเร็จ: ${cacheErr.message}`;
       console.warn('[executive-summary] cache write skipped:', cacheErr.message);
     }
 
     return NextResponse.json({
       ...fresh,
+      ...(cacheWarning ? { cache_warning: cacheWarning } : {}),
       generated_at: now.toISOString(),
       cached: false,
     });

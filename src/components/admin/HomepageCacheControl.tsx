@@ -56,6 +56,21 @@ export default function HomepageCacheControl() {
       const json = await res.json();
       if (!res.ok || json.error) {
         setMessage({ kind: 'err', text: json.error || `HTTP ${res.status}` });
+      } else if (json.stale) {
+        // Route fell back to the old cached row — generation itself failed
+        setMessage({
+          kind: 'err',
+          text: json.warning || 'สร้างสรุปใหม่ไม่สำเร็จ — ยังแสดงข้อมูลเดิม',
+        });
+        await fetchCache();
+      } else if (json.cache_warning) {
+        // Fresh summary generated but not persisted — the card below will
+        // still show the OLD row, so say so instead of claiming success.
+        setMessage({
+          kind: 'err',
+          text: `สร้างสรุปใหม่จาก ${json.source} สำเร็จ แต่${json.cache_warning} — การ์ดด้านล่างจึงยังเป็นข้อมูลเดิม`,
+        });
+        await fetchCache();
       } else {
         setMessage({
           kind: 'ok',
