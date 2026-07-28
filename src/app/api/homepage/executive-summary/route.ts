@@ -421,7 +421,8 @@ export async function GET(req: NextRequest) {
         generated_at: cached.generated_at,
         cached: true,
         stale: true,
-        warning: `Regeneration failed: ${e.message}. Serving stale cache.`,
+        // Provider errors already end in a period — don't double it up
+        warning: `Regeneration failed: ${String(e.message).replace(/\.\s*$/, '')}. Serving stale cache.`,
       });
     }
     return NextResponse.json(

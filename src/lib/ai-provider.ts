@@ -121,6 +121,66 @@ async function resolveConfig(overrides?: Partial<AIConfig>): Promise<AIConfig> {
 }
 
 // Universal AI call with vision support
+/**
+ * Token budget shared by every provider branch.
+ *
+ * Reasoning models (o1 · deepseek-r1 · gemini-3.x · claude extended
+ * thinking) spend this budget on a hidden reasoning trace *before*
+ * emitting visible content. At 4096 the visible JSON came back cut
+ * mid-object, JSON.parse failed, and callers saw a bare `data: null`
+ * with no explanation.
+ */
+const AI_MAX_TOKENS = 16000;
+
+/**
+ * Single exit point for every provider branch.
+ *
+ * Turns a raw model response into an AIParseResult with a *diagnosable*
+ * error instead of a silent null. Distinguishes four failure modes:
+ * API-level error · truncation · empty response · unparseable text.
+ */
+function finalizeAIResult(args: {
+  text: string;
+  /** Provider said it stopped because it hit the token cap. */
+  truncated: boolean;
+  source: string;
+  model: string;
+  /** Error surfaced by the provider's own error envelope, if any. */
+  apiError?: string | null;
+}): AIParseResult {
+  const { text, truncated, source, model, apiError } = args;
+
+  if (apiError) {
+    return { data: null, source, model, error: `${source} API error: ${apiError}` };
+  }
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+  if (!jsonMatch) {
+    let error: string;
+    if (truncated) {
+      error =
+        `Response truncated — hit max_tokens (${AI_MAX_TOKENS}). ` +
+        `'${model}' is likely a reasoning model that spent the budget on hidden ` +
+        `reasoning tokens. Pick a non-reasoning model or raise AI_MAX_TOKENS.`;
+    } else if (text.trim().length === 0) {
+      error = `Model '${model}' returned an empty response.`;
+    } else {
+      error = `No JSON object in response from '${model}'. Got: ${text.slice(0, 200)}`;
+    }
+    return { data: null, source, model, error };
+  }
+
+  try {
+    return { data: JSON.parse(jsonMatch[0]), source, model };
+  } catch (err: any) {
+    const hint = truncated
+      ? ` Response was truncated at max_tokens (${AI_MAX_TOKENS}), so the JSON is incomplete.`
+      : '';
+    return { data: null, source, model, error: `Invalid JSON from '${model}': ${err.message}.${hint}` };
+  }
+}
+
 export async function callAIWithVision(
   base64: string,
   mimeType: string,
@@ -160,7 +220,7 @@ async function callClaude(base64: string, mimeType: string, prompt: string, mode
     },
     body: JSON.stringify({
       model: model || 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: AI_MAX_TOKENS,
       messages: [{
         role: 'user',
         content: [
@@ -173,11 +233,13 @@ async function callClaude(base64: string, mimeType: string, prompt: string, mode
 
   if (!response.ok) return { data: null, source: 'Claude', model, error: await response.text() };
   const result = await response.json();
-  const text = result.content?.[0]?.text || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return jsonMatch
-    ? { data: JSON.parse(jsonMatch[0]), source: 'Claude', model }
-    : { data: null, source: 'Claude', model, error: 'No JSON in response' };
+  return finalizeAIResult({
+    text: result.content?.[0]?.text || '',
+    truncated: result.stop_reason === 'max_tokens',
+    apiError: result.error?.message,
+    source: 'Claude',
+    model,
+  });
 }
 
 // === Gemini ===
@@ -199,11 +261,13 @@ async function callGemini(base64: string, mimeType: string, prompt: string, mode
 
   if (!response.ok) return { data: null, source: 'Gemini', model: modelName, error: await response.text() };
   const result = await response.json();
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return jsonMatch
-    ? { data: JSON.parse(jsonMatch[0]), source: 'Gemini', model: modelName }
-    : { data: null, source: 'Gemini', model: modelName, error: 'No JSON in response' };
+  return finalizeAIResult({
+    text: result.candidates?.[0]?.content?.parts?.[0]?.text || '',
+    truncated: result.candidates?.[0]?.finishReason === 'MAX_TOKENS',
+    apiError: result.error?.message,
+    source: 'Gemini',
+    model: modelName,
+  });
 }
 
 // === OpenAI GPT Vision ===
@@ -217,7 +281,7 @@ async function callOpenAI(base64: string, mimeType: string, prompt: string, mode
     },
     body: JSON.stringify({
       model: modelName,
-      max_tokens: 4096,
+      max_tokens: AI_MAX_TOKENS,
       messages: [{
         role: 'user',
         content: [
@@ -230,11 +294,13 @@ async function callOpenAI(base64: string, mimeType: string, prompt: string, mode
 
   if (!response.ok) return { data: null, source: 'OpenAI', model: modelName, error: await response.text() };
   const result = await response.json();
-  const text = result.choices?.[0]?.message?.content || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return jsonMatch
-    ? { data: JSON.parse(jsonMatch[0]), source: 'OpenAI', model: modelName }
-    : { data: null, source: 'OpenAI', model: modelName, error: 'No JSON in response' };
+  return finalizeAIResult({
+    text: result.choices?.[0]?.message?.content || '',
+    truncated: result.choices?.[0]?.finish_reason === 'length',
+    apiError: result.error?.message,
+    source: 'OpenAI',
+    model: modelName,
+  });
 }
 
 // === OpenRouter (Universal Gateway) — รองรับ Claude, GPT, Gemini, Llama, DeepSeek ฯลฯ ===
@@ -250,7 +316,10 @@ async function callOpenRouter(base64: string, mimeType: string, prompt: string, 
     },
     body: JSON.stringify({
       model: modelName,
-      max_tokens: 4096,
+      max_tokens: AI_MAX_TOKENS,
+      // Keep reasoning short so the budget goes to visible content.
+      // Ignored by non-reasoning models.
+      reasoning: { effort: 'low' },
       messages: [{
         role: 'user',
         content: [
@@ -263,11 +332,14 @@ async function callOpenRouter(base64: string, mimeType: string, prompt: string, 
 
   if (!response.ok) return { data: null, source: 'OpenRouter', model: modelName, error: await response.text() };
   const result = await response.json();
-  const text = result.choices?.[0]?.message?.content || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return jsonMatch
-    ? { data: JSON.parse(jsonMatch[0]), source: `OpenRouter (${modelName})`, model: modelName }
-    : { data: null, source: 'OpenRouter', model: modelName, error: 'No JSON in response' };
+  const choice = result.choices?.[0];
+  return finalizeAIResult({
+    text: choice?.message?.content || '',
+    truncated: choice?.finish_reason === 'length' || choice?.native_finish_reason === 'MAX_TOKENS',
+    apiError: result.error?.message,
+    source: `OpenRouter (${modelName})`,
+    model: modelName,
+  });
 }
 
 // === Local AI (Ollama) ===
@@ -281,11 +353,13 @@ async function callLocal(base64: string, _mimeType: string, prompt: string, mode
 
   if (!response.ok) return { data: null, source: 'Local', model: modelName, error: await response.text() };
   const result = await response.json();
-  const text = result.response || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return jsonMatch
-    ? { data: JSON.parse(jsonMatch[0]), source: `Local (${modelName})`, model: modelName }
-    : { data: null, source: 'Local', model: modelName, error: 'No JSON in response' };
+  return finalizeAIResult({
+    text: result.response || '',
+    truncated: result.done_reason === 'length',
+    apiError: result.error,
+    source: `Local (${modelName})`,
+    model: modelName,
+  });
 }
 
 // === Text-only AI call ===
@@ -298,23 +372,31 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': resolved.apiKey!, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: resolved.model || 'claude-sonnet-4-20250514', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify({ model: resolved.model || 'claude-sonnet-4-20250514', max_tokens: AI_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }),
         });
         const result = await res.json();
-        const text = result.content?.[0]?.text || '';
-        const m = text.match(/\{[\s\S]*\}/);
-        return { data: m ? JSON.parse(m[0]) : null, source: 'Claude', model: resolved.model };
+        return finalizeAIResult({
+          text: result.content?.[0]?.text || '',
+          truncated: result.stop_reason === 'max_tokens',
+          apiError: result.error?.message,
+          source: 'Claude',
+          model: resolved.model,
+        });
       }
       case 'openai': {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resolved.apiKey!}` },
-          body: JSON.stringify({ model: resolved.model || 'gpt-4.1', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify({ model: resolved.model || 'gpt-4.1', max_tokens: AI_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }),
         });
         const result = await res.json();
-        const text = result.choices?.[0]?.message?.content || '';
-        const m = text.match(/\{[\s\S]*\}/);
-        return { data: m ? JSON.parse(m[0]) : null, source: 'OpenAI', model: resolved.model };
+        return finalizeAIResult({
+          text: result.choices?.[0]?.message?.content || '',
+          truncated: result.choices?.[0]?.finish_reason === 'length',
+          apiError: result.error?.message,
+          source: 'OpenAI',
+          model: resolved.model,
+        });
       }
       case 'gemini': {
         const modelName = resolved.model || 'gemini-2.5-flash';
@@ -323,9 +405,13 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) },
         );
         const result = await res.json();
-        const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const m = text.match(/\{[\s\S]*\}/);
-        return { data: m ? JSON.parse(m[0]) : null, source: 'Gemini', model: modelName };
+        return finalizeAIResult({
+          text: result.candidates?.[0]?.content?.parts?.[0]?.text || '',
+          truncated: result.candidates?.[0]?.finishReason === 'MAX_TOKENS',
+          apiError: result.error?.message,
+          source: 'Gemini',
+          model: modelName,
+        });
       }
       case 'local': {
         const endpoint = resolved.endpoint || 'http://localhost:11434';
@@ -335,9 +421,13 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
           body: JSON.stringify({ model: modelName, prompt, stream: false }),
         });
         const result = await res.json();
-        const text = result.response || '';
-        const m = text.match(/\{[\s\S]*\}/);
-        return { data: m ? JSON.parse(m[0]) : null, source: `Local (${modelName})`, model: modelName };
+        return finalizeAIResult({
+          text: result.response || '',
+          truncated: result.done_reason === 'length',
+          apiError: result.error,
+          source: `Local (${modelName})`,
+          model: modelName,
+        });
       }
       case 'openrouter': {
         const modelName = resolved.model || 'meta-llama/llama-3.3-70b-instruct:free';
@@ -351,21 +441,22 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
           },
           body: JSON.stringify({
             model: modelName,
-            // Reasoning models (o1/deepseek-r1/gemini-3.x) burn most of the
-            // budget on hidden reasoning tokens — 4096 total leaves visible
-            // content truncated mid-JSON (finish_reason=length). Bump to
-            // 16000 to leave headroom for both.
-            max_tokens: 16000,
-            // Ask OpenRouter to keep reasoning short so more of the budget
-            // goes to visible content. Ignored by non-reasoning models.
+            max_tokens: AI_MAX_TOKENS,
+            // Keep reasoning short so the budget goes to visible content.
+            // Ignored by non-reasoning models.
             reasoning: { effort: 'low' },
             messages: [{ role: 'user', content: prompt }],
           }),
         });
         const result = await res.json();
-        const text = result.choices?.[0]?.message?.content || '';
-        const m = text.match(/\{[\s\S]*\}/);
-        return { data: m ? JSON.parse(m[0]) : null, source: `OpenRouter (${modelName})`, model: modelName };
+        const choice = result.choices?.[0];
+        return finalizeAIResult({
+          text: choice?.message?.content || '',
+          truncated: choice?.finish_reason === 'length' || choice?.native_finish_reason === 'MAX_TOKENS',
+          apiError: result.error?.message,
+          source: `OpenRouter (${modelName})`,
+          model: modelName,
+        });
       }
       default:
         return { data: null, source: resolved.provider, model: resolved.model, error: 'Unknown provider' };
