@@ -106,12 +106,19 @@ export async function adminFetch(input: string, init: RequestInit = {}): Promise
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // If body is FormData and no password set, try to add legacy password
   const legacyPwd = typeof window !== 'undefined' ? sessionStorage.getItem('admin_pwd') : null;
   const body = init.body;
 
+  // FormData → inject password field (multipart uploads)
   if (body instanceof FormData && legacyPwd && !body.has('password')) {
     body.set('password', legacyPwd);
+  }
+
+  // GET / DELETE / body-less requests → send legacy password via header so the
+  // server's extractAdminInputs() can still authenticate. Only fill if the
+  // caller didn't already set Authorization (Bearer takes priority).
+  if (legacyPwd && !headers.has('X-Admin-Password') && !token) {
+    headers.set('X-Admin-Password', legacyPwd);
   }
 
   return fetch(input, { ...init, headers, body });

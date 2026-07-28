@@ -30,31 +30,26 @@ const ENV_MAP: Record<string, string> = {
   openrouter: 'OPENROUTER_API_KEY',
 };
 
-// Cache DB config (reload ทุก 5 นาที)
-let dbConfigCache: any[] | null = null;
-let dbConfigTime = 0;
-const CACHE_TTL = 5 * 60 * 1000;
-
-/** Force next getDBConfigs() to re-query. Called by ai-config POST/DELETE
- *  so admin edits take effect immediately instead of waiting for TTL. */
+/**
+ * No caching. Query is one SELECT on a 5-row table — negligible.
+ * Prior module-scoped cache broke under Vercel serverless: each instance
+ * held its own copy, so a save on instance A invalidated only A's cache
+ * while the next AI call could land on instance B with stale data.
+ * Kept the function name + export invalidateAIConfigCache() as no-op
+ * so existing callers in ai-config/route.ts still compile.
+ */
 export function invalidateAIConfigCache() {
-  dbConfigCache = null;
-  dbConfigTime = 0;
+  // Intentionally empty — no cache to invalidate.
 }
 
 async function getDBConfigs() {
-  if (dbConfigCache && Date.now() - dbConfigTime < CACHE_TTL) {
-    return dbConfigCache;
-  }
   try {
     const { data } = await supabase
       .from('ai_config')
       .select('*')
       .eq('is_active', true)
       .order('is_default', { ascending: false });
-    dbConfigCache = data || [];
-    dbConfigTime = Date.now();
-    return dbConfigCache;
+    return data || [];
   } catch {
     return [];
   }

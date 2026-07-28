@@ -80,14 +80,17 @@ export async function extractAdminInputs(req: NextRequest): Promise<AdminAuthInp
   const contentType = req.headers.get('content-type') || '';
   const headerAuth = req.headers.get('authorization') || req.headers.get('Authorization') || '';
   const headerToken = headerAuth.toLowerCase().startsWith('bearer ') ? headerAuth.slice(7).trim() : null;
+  // Legacy password sent as header — used by adminFetch() for GET/DELETE
+  // requests where there's no body/formData to inject the password into.
+  const headerPassword = req.headers.get('x-admin-password') || req.headers.get('X-Admin-Password') || null;
 
-  let password: string | null = null;
+  let password: string | null = headerPassword;
   let accessToken: string | null = headerToken;
 
   if (contentType.includes('application/json')) {
     try {
       const body = await req.clone().json();
-      password = body?.password ?? null;
+      password = password ?? (body?.password ?? null);
       accessToken = accessToken ?? body?.access_token ?? null;
     } catch {
       // ignore
@@ -95,7 +98,7 @@ export async function extractAdminInputs(req: NextRequest): Promise<AdminAuthInp
   } else if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
     try {
       const fd = await req.clone().formData();
-      password = (fd.get('password') as string) || null;
+      password = password ?? ((fd.get('password') as string) || null);
       accessToken = accessToken ?? ((fd.get('access_token') as string) || null);
     } catch {
       // ignore
