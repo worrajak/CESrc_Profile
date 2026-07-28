@@ -351,7 +351,14 @@ export async function callAIText(prompt: string, config?: Partial<AIConfig>): Pr
           },
           body: JSON.stringify({
             model: modelName,
-            max_tokens: 4096,
+            // Reasoning models (o1/deepseek-r1/gemini-3.x) burn most of the
+            // budget on hidden reasoning tokens — 4096 total leaves visible
+            // content truncated mid-JSON (finish_reason=length). Bump to
+            // 16000 to leave headroom for both.
+            max_tokens: 16000,
+            // Ask OpenRouter to keep reasoning short so more of the budget
+            // goes to visible content. Ignored by non-reasoning models.
+            reasoning: { effort: 'low' },
             messages: [{ role: 'user', content: prompt }],
           }),
         });
