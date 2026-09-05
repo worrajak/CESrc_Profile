@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-  const file = formData.get('file') as File;
-  const password = formData.get('password') as string;
-  const folder = (formData.get('folder') as string) || 'grants';
-
-  if (password !== process.env.ADMIN_PASSWORD) {
+  // Bearer header or the legacy password inside the multipart body — the
+  // helper reads both. Runs before formData() consumes the stream.
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const formData = await request.formData();
+  const file = formData.get('file') as File;
+  const folder = (formData.get('folder') as string) || 'grants';
 
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });

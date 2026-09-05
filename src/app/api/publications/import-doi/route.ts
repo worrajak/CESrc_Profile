@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 const TYPE_MAP: Record<string, string> = {
   'journal-article': 'journal_international',
@@ -18,12 +19,15 @@ function buildAuthorsRaw(authors: { given?: string; family?: string }[]): string
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { password, doi } = body;
-
-  if (password !== process.env.ADMIN_PASSWORD) {
+  // Accepts EITHER a Supabase admin Bearer/access_token OR the legacy
+  // password. Must run before the body is consumed — the helper clones req.
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const body = await request.json();
+  const { doi } = body;
 
   if (!doi) {
     return NextResponse.json({ error: 'DOI is required' }, { status: 400 });

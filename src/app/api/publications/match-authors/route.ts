@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 function normalize(s: string): string {
   return s.toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
@@ -37,12 +38,13 @@ function matchScore(given: string, family: string, researcher: any): number {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { password, authors } = body;
-
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const body = await request.json();
+  const { authors } = body;
 
   const { data: researchers } = await supabase
     .from('researchers')

@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { password, publication, author_links } = body;
-
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const body = await request.json();
+  const { publication, author_links } = body;
 
   // Check duplicate DOI
   if (publication.doi) {

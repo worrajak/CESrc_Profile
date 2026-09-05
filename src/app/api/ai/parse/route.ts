@@ -9,7 +9,8 @@
  *   url?: string,
  *   provider?: 'claude'|'gemini'|'openai'|'openrouter'|'local',
  *   model?: string,
- *   password?: string  // admin password for sensitive operations
+ *   password?: string  // legacy admin password; a Supabase admin
+ *                      // Bearer/access_token works too (see admin-auth)
  * }
  *
  * Body (FormData) — for file upload:
@@ -23,6 +24,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { parseDocument, TEMPLATES, ParseTemplate } from '@/lib/ai-document-parser';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 // GET — list available templates
 export async function GET() {
@@ -39,13 +41,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') || '';
 
+  // Resolve admin identity up front — authorizeAdminRequest clones the
+  // request, so it has to run before formData()/json() consume the stream.
+  // Only enforced further down, and only for sensitive templates.
+  const admin = await authorizeAdminRequest(req);
+
   let templateInput: any;
   let text: string | undefined;
   let url: string | undefined;
   let file: File | undefined;
   let provider: any;
   let model: string | undefined;
-  let password: string | undefined;
 
   try {
     if (contentType.includes('multipart/form-data')) {
@@ -57,7 +63,6 @@ export async function POST(req: NextRequest) {
       file = (fd.get('file') as File) || undefined;
       provider = (fd.get('provider') as string) || undefined;
       model = (fd.get('model') as string) || undefined;
-      password = (fd.get('password') as string) || undefined;
     } else {
       const body = await req.json();
       templateInput = body.template;
@@ -65,13 +70,12 @@ export async function POST(req: NextRequest) {
       url = body.url;
       provider = body.provider;
       model = body.model;
-      password = body.password;
     }
 
     // Auth check (optional for non-sensitive templates)
     const sensitiveTemplates = ['grant_contract', 'travel_approval'];
     if (typeof templateInput === 'string' && sensitiveTemplates.includes(templateInput)) {
-      if (password !== process.env.ADMIN_PASSWORD) {
+      if (!admin.authorized) {
         return NextResponse.json({ error: 'Unauthorized for sensitive template' }, { status: 401 });
       }
     }

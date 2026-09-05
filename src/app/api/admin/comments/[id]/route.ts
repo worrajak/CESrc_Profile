@@ -4,15 +4,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const body = await request.json().catch(() => ({}));
-  if (body.password !== process.env.ADMIN_PASSWORD) {
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const body = await request.json().catch(() => ({}));
 
   const { error } = await supabase
     .from('comments')

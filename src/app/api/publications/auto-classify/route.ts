@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { callAIText } from '@/lib/ai-provider';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 const SDG_KEYWORDS: Record<string, string[]> = {
   'SDG 7': ['energy', 'solar', 'pv', 'photovoltaic', 'battery', 'storage', 'renewable', 'wind', 'biomass', 'electricity', 'power', 'grid', 'hydrogen', 'fuel cell', 'microgrid', 'inverter', 'mppt', 'charger', 'ev', 'electric vehicle', 'wireless power', 'พลังงาน', 'แบตเตอรี่', 'พลังงานสะอาด', 'พลังงานทดแทน'],
@@ -113,10 +114,12 @@ async function fetchOpenAlexConcepts(openalexId: string): Promise<string[]> {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    if (body.password !== process.env.ADMIN_PASSWORD) {
+    const admin = await authorizeAdminRequest(request);
+    if (!admin.authorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const body = await request.json();
 
     const source = body.source || 'all';
     const useAI = body.use_ai === true;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callAIText, getAvailableProviders, AIProvider } from '@/lib/ai-provider';
+import { authorizeAdminRequest } from '@/lib/admin-auth';
 
 function extractDoi(text: string): string | null {
   const match = text.match(/\b(10\.\d{4,}\/[^\s,;"\]>]+)/);
@@ -219,12 +220,13 @@ Notes:
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { password, citation, ai_provider, ai_model } = body;
-
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const admin = await authorizeAdminRequest(request);
+  if (!admin.authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const body = await request.json();
+  const { citation, ai_provider, ai_model } = body;
 
   if (!citation?.trim()) {
     return NextResponse.json({ error: 'Citation is required' }, { status: 400 });
