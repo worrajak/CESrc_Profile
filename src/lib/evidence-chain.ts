@@ -40,7 +40,7 @@ export type SourceType =
 export type Credibility = 'high' | 'medium' | 'low' | 'unverified';
 
 export type EvidenceLink = {
-  /** ผู้พูด / แหล่งที่มา (เช่น "Smith et al. 2024" หรือ "IEEE 802.11-2020" หรือ "ผศ.ดร.อนนท์ Lab Notebook 2024") */
+  /** ผู้พูด / แหล่งที่มา (เช่น "Smith et al. 2024" หรือ "IEEE 802.11-2020" หรือ "รศ.ดร.อนนท์ Lab Notebook 2024") */
   source: string;
   source_type: SourceType;
   /** URL / DOI / patent number / archive locator */

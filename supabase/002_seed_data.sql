@@ -76,8 +76,8 @@ VALUES
 ),
 (
   'a0000001-0000-0000-0000-000000000007',
-  'ผศ.ดร.', 'อนนท์', 'นำอิน',
-  'Asst.Prof.Dr.', 'Anon', 'Namin',
+  'รศ.ดร.', 'อนนท์', 'นำอิน',
+  'Assoc.Prof.Dr.', 'Anon', 'Namin',
   'member',
   'Division of Electrical Engineering', 'Faculty of Engineering',
   'Rajamangala University of Technology Lanna', 'Chiang Mai',
