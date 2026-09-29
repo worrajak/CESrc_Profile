@@ -15,10 +15,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Section order follows academic weighting: international before national,
+// journal before conference. Within a section, newest year first.
 const pubTypeGroups = [
   { types: ['journal_international'], labelKey: 'publications.type.journal_international', color: 'border-blue-500', icon: 'bg-blue-600' },
-  { types: ['journal_national'], labelKey: 'publications.type.journal_national', color: 'border-green-500', icon: 'bg-green-600' },
   { types: ['conference_international'], labelKey: 'publications.type.conference_international', color: 'border-purple-500', icon: 'bg-purple-600' },
+  { types: ['journal_national'], labelKey: 'publications.type.journal_national', color: 'border-green-500', icon: 'bg-green-600' },
   { types: ['conference_national'], labelKey: 'publications.type.conference_national', color: 'border-orange-500', icon: 'bg-orange-600' },
   { types: ['book_chapter', 'book', 'technical_report', 'thesis', 'patent', 'petty_patent'], labelKey: 'publications.type.book', color: 'border-gray-500', icon: 'bg-gray-600' },
 ];
@@ -44,7 +46,12 @@ export default async function PublicationsPage() {
       {pubTypeGroups.map((group) => {
         const items = pubs
           .filter((p: any) => group.types.includes(p.pub_type))
-          .sort((a: any, b: any) => b.year - a.year);
+          // Year desc; title as tie-break so same-year items keep a stable
+          // order instead of whatever the query happened to return.
+          .sort((a: any, b: any) =>
+            (b.year || 0) - (a.year || 0) ||
+            String(a.title || '').localeCompare(String(b.title || ''), 'th'),
+          );
         if (items.length === 0) return null;
 
         // Group by year
