@@ -458,6 +458,7 @@ export const TRANSLATIONS = {
 
   // === Phase 6: Timeline + Proposals tab + Action Plan ===
   'rplan.tab.timeline': { th: 'ปฏิทินรายเดือน', en: 'Timeline' },
+  'rplan.tab.annual': { th: 'รอบเปิดรับประจำปี', en: 'Annual Cycle' },
   'rplan.tab.action_plan': { th: 'แผนการ AI', en: 'AI Action Plan' },
   'rplan.timeline.range_3': { th: 'รายไตรมาส (3 เดือน)', en: 'Quarter (3 mo)' },
   'rplan.timeline.range_6': { th: 'ครึ่งปี (6 เดือน)', en: 'Half year (6 mo)' },
