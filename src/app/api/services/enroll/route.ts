@@ -165,7 +165,6 @@ export async function POST(request: NextRequest) {
           tracking_code: trackingCode,
           enrollment_id: existingEnroll.id,
           trainee_id: traineeId,
-      skc_user_id: skcUserId,
           skc_user_id: skcUserId,
           message: 'ลงทะเบียนใหม่สำเร็จ (เคยยกเลิกก่อนหน้า)',
         });
@@ -184,7 +183,6 @@ export async function POST(request: NextRequest) {
       .insert({
         session_id,
         trainee_id: traineeId,
-      skc_user_id: skcUserId,
         skc_user_id: skcUserId,
         tracking_code: trackingCode,
         fee_type: fee_type || 'external',
