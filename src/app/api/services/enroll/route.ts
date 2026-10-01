@@ -3,9 +3,15 @@ import { supabase } from '@/lib/supabase';
 
 /**
  * Enrollment API — ลงทะเบียนอบรม
- * 1. สร้าง/อัพเดท trainee record
- * 2. สร้าง enrollment record
- * 3. สร้าง tracking code
+ *
+ * SkillChain (skc_users) เป็นเจ้าของข้อมูลคน ลำดับการทำงานจึงเป็น
+ *   1. หาอีเมลใน skc_users ก่อน — เจอแล้วผูก enrollment ไปที่บัญชีนั้น
+ *      ไม่ต้องคัดลอกชื่อ/คณะมาเก็บซ้ำ
+ *   2. ไม่เจอ → เป็นบุคคลภายนอกที่ยังไม่มีบัญชี เก็บเป็น trainees ตามเดิม
+ *   3. สร้าง enrollment + tracking code
+ *
+ * ตั้งใจไม่สร้างแถวใน skc_users จากที่นี่ เพราะฝั่ง SkillChain มีขั้นตอน
+ * อนุมัติและ PDPA ของตัวเอง การสมัครอบรมไม่ควรข้ามขั้นตอนนั้น
  */
 
 function generateTrackingCode(): string {
@@ -71,17 +77,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'รุ่นนี้เต็มแล้ว กรุณาเลือกรุ่นอื่น' }, { status: 400 });
     }
 
-    // Find or create trainee
-    let traineeId: string;
-
-    // Try find existing by email
-    const { data: existingTrainee } = await supabase
-      .from('trainees')
+    // ── 1. SkillChain เป็นเจ้าของข้อมูลคน — หาที่นั่นก่อน ──
+    let skcUserId: string | null = null;
+    const { data: skcUser } = await supabase
+      .from('skc_users')
       .select('id')
-      .eq('email', email)
-      .single();
+      .ilike('email', email)
+      .maybeSingle();
+    if (skcUser) skcUserId = skcUser.id;
 
-    if (existingTrainee) {
+    // ── 2. ไม่มีบัญชี SkillChain → เก็บเป็นผู้เข้าอบรมภายนอก ──
+    let traineeId: string | null = null;
+
+    const { data: existingTrainee } = skcUserId
+      ? { data: null }
+      : await supabase
+          .from('trainees')
+          .select('id')
+          .eq('email', email)
+          .single();
+
+    if (skcUserId) {
+      // ผูกกับบัญชี SkillChain แล้ว ไม่สร้าง trainees ซ้ำ
+    } else if (existingTrainee) {
       traineeId = existingTrainee.id;
 
       // Update trainee info
@@ -128,7 +146,7 @@ export async function POST(request: NextRequest) {
       .from('enrollments')
       .select('id, tracking_code, status')
       .eq('session_id', session_id)
-      .eq('trainee_id', traineeId)
+      .eq(skcUserId ? 'skc_user_id' : 'trainee_id', skcUserId ?? traineeId)
       .single();
 
     if (existingEnroll) {
@@ -147,6 +165,8 @@ export async function POST(request: NextRequest) {
           tracking_code: trackingCode,
           enrollment_id: existingEnroll.id,
           trainee_id: traineeId,
+      skc_user_id: skcUserId,
+          skc_user_id: skcUserId,
           message: 'ลงทะเบียนใหม่สำเร็จ (เคยยกเลิกก่อนหน้า)',
         });
       }
@@ -164,6 +184,8 @@ export async function POST(request: NextRequest) {
       .insert({
         session_id,
         trainee_id: traineeId,
+      skc_user_id: skcUserId,
+        skc_user_id: skcUserId,
         tracking_code: trackingCode,
         fee_type: fee_type || 'external',
         fee_amount: fee_amount || 0,
@@ -182,6 +204,7 @@ export async function POST(request: NextRequest) {
       tracking_code: trackingCode,
       enrollment_id: enrollment.id,
       trainee_id: traineeId,
+      skc_user_id: skcUserId,
       session: {
         code: session.session_code,
         course: session.training_courses?.title_th,
