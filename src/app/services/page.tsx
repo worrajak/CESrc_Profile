@@ -184,6 +184,58 @@ export default async function ServicesPage() {
         </div>
       </section>
 
+      {/* ===== SkillChain — ระบบจับคู่งานช่างนักศึกษา มทร.ล้านนา =====
+           ตอนนี้เชื่อมแบบ deep link เท่านั้น ยังไม่แลกข้อมูลระหว่างระบบ
+           SkillChain ใช้เลขใบรับรองรูปแบบ TC-YYYY-NNNNNN ส่วนหน่วยวิจัยใช้
+           ENR-25xx / SR-25xx การตรวจสอบข้ามระบบจึงยังทำไม่ได้จนกว่าจะตกลง
+           รูปแบบรหัสหรือเปิด API ร่วมกัน */}
+      <section className="bg-slate-50 border-b">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="flex items-start gap-3 flex-wrap mb-4">
+            <span className="text-2xl">🔗</span>
+            <div className="flex-1 min-w-[260px]">
+              <h2 className="font-bold text-gray-800">
+                ทำงานร่วมกับ SkillChain มทร.ล้านนา
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                ระบบกลางที่จับคู่งานซ่อมบำรุงของมหาวิทยาลัยกับนักศึกษาช่าง
+                นักศึกษาที่ผ่านหลักสูตรของหน่วยวิจัยสามารถนำทักษะไปรับงานจริงผ่าน SkillChain
+                และผู้ว่าจ้างตรวจสอบประวัติงานย้อนหลังได้
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <a href="https://skillchain-rmutl.vercel.app/jobs" target="_blank" rel="noopener noreferrer"
+              className="group bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-slate-300 transition">
+              <h3 className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">🛠 งานที่เปิดรับ</h3>
+              <p className="text-xs text-gray-500 mt-1">ดูงานซ่อมบำรุงที่นักศึกษารับได้ตอนนี้</p>
+              <span className="text-[11px] text-blue-600 mt-2 inline-block group-hover:underline">เปิด SkillChain /jobs ↗</span>
+            </a>
+
+            <a href="https://skillchain-rmutl.vercel.app/training" target="_blank" rel="noopener noreferrer"
+              className="group bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-slate-300 transition">
+              <h3 className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">📚 หลักสูตรบน SkillChain</h3>
+              <p className="text-xs text-gray-500 mt-1">หลักสูตรฝั่ง SkillChain ใช้คู่กับหลักสูตรของหน่วยวิจัย</p>
+              <span className="text-[11px] text-blue-600 mt-2 inline-block group-hover:underline">เปิด SkillChain /training ↗</span>
+            </a>
+
+            <a href="https://skillchain-rmutl.vercel.app/verify" target="_blank" rel="noopener noreferrer"
+              className="group bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-slate-300 transition">
+              <h3 className="font-semibold text-gray-800 text-sm group-hover:text-blue-700">✅ ตรวจสอบใบรับรอง</h3>
+              <p className="text-xs text-gray-500 mt-1">ตรวจใบรับรอง SkillChain ด้วยเลขที่ TC-YYYY-NNNNNN</p>
+              <span className="text-[11px] text-blue-600 mt-2 inline-block group-hover:underline">เปิด SkillChain /verify ↗</span>
+            </a>
+          </div>
+
+          <p className="text-[11px] text-gray-400 mt-3">
+            ใบรับรองของหน่วยวิจัยตรวจสอบได้ที่{' '}
+            <Link href="/services/training" className="text-blue-500 hover:underline">หน้าหลักสูตรอบรม</Link>{' '}
+            — ยังเป็นคนละระบบกับ SkillChain
+          </p>
+        </div>
+      </section>
+
       {/* ===== OUR EXPERIENCES INTRO ===== */}
       <section className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-4 py-12">
