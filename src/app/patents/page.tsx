@@ -22,6 +22,7 @@ const statusLabels: Record<string, string> = {
   granted: 'ได้รับแล้ว',
   expired: 'หมดอายุ',
   rejected: 'ถูกปฏิเสธ',
+  abandoned: 'ละทิ้งคำขอ',
 };
 
 const statusColors: Record<string, string> = {
@@ -30,6 +31,7 @@ const statusColors: Record<string, string> = {
   granted: 'bg-green-50 text-green-700',
   expired: 'bg-gray-50 text-gray-500',
   rejected: 'bg-red-50 text-red-700',
+  abandoned: 'bg-gray-50 text-gray-500',
 };
 
 const typeColors: Record<string, string> = {

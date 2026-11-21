@@ -331,7 +331,8 @@ export async function GET(
           p.patent_type === 'copyright' ? 'ลิขสิทธิ์' : 'ความลับทางการค้า';
       const statusLabel = p.status === 'granted' ? 'ได้รับแล้ว' :
         p.status === 'pending' ? 'อยู่ในระหว่างการดำเนินการ' :
-          p.status === 'filed' ? 'ยื่นคำขอแล้ว' : p.status;
+          p.status === 'filed' ? 'ยื่นคำขอแล้ว' :
+            p.status === 'abandoned' ? 'ละทิ้งคำขอ' : p.status;
       const appNo = p.application_no ? ` (${p.application_no})` : '';
 
       children.push(new Paragraph({
