@@ -121,6 +121,13 @@ export default async function PublicationsPage() {
                         )}
                         {pub.scopus_indexed && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Scopus</span>}
                         {pub.wos_indexed && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">Web of Science</span>}
+                        {pub.tci_indexed && <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded">TCI</span>}
+                        {/* บทความที่ตอบรับแล้วแต่ยังไม่ออกเล่ม — ปีที่แสดงคือปีของฉบับที่จะลง */}
+                        {pub.status && pub.status !== 'published' && (
+                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                            {{ accepted: 'ตอบรับตีพิมพ์', in_press: 'In press', submitted: 'ส่งพิจารณา', draft: 'ฉบับร่าง' }[pub.status as string] || pub.status}
+                          </span>
+                        )}
                       </div>
 
                       {pub.keywords && pub.keywords.length > 0 && (
