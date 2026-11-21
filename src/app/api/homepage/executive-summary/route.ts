@@ -111,6 +111,69 @@ async function fetchCM108News(): Promise<NewsItem[]> {
 }
 
 // ─────────────────────────────────────────────────────────
+// RMUTL university-news fetcher
+// ─────────────────────────────────────────────────────────
+// ข่าวของมหาวิทยาลัยเอง — ใกล้ตัวหน่วยวิจัยกว่าข่าวท้องถิ่น (MOU,
+// กิจกรรมคณะวิศวะ, เครือข่ายมหาวิทยาลัย)
+//
+// รูปแบบ feed ต่างจาก RSS มาตรฐานสองจุด:
+//   · pubDate เป็น "2026-10-02 13:27:00" เวลาไทย ไม่มี timezone
+//   · ไม่ได้เรียงตามวันที่ (โพสต์ปักหมุดขึ้นก่อน) ต้องเรียงเอง
+// และราวครึ่งหนึ่งเป็นประกาศจัดซื้อจัดจ้าง/ประกวดราคา ซึ่งไม่ใช่ข่าว
+// สำหรับหน้าแรก จึงกรองทิ้งด้วยชื่อเรื่อง
+const RMUTL_RSS = 'https://www.rmutl.ac.th/rss';
+const RMUTL_NOISE = /จัดซื้อ|จัดจ้าง|ประกวดราคา|ราคากลาง|ผู้ชนะ|ได้รับการคัดเลือก|สอบราคา|e-?bidding/i;
+const RMUTL_WINDOW_DAYS = 14;
+let rmutlCache: { ts: number; items: NewsItem[] } | null = null;
+
+async function fetchRMUTLNews(): Promise<NewsItem[]> {
+  if (rmutlCache && Date.now() - rmutlCache.ts < CM108_CACHE_TTL_MS) {
+    return rmutlCache.items;
+  }
+  try {
+    const res = await fetch(RMUTL_RSS, {
+      headers: { 'User-Agent': 'CESRU-Homepage/1.0' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const xml = await res.text();
+
+    const field = (block: string, tag: string) =>
+      (block.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`)) || [, ''])[1];
+
+    const cutoff = Date.now() - RMUTL_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const rows: { ts: number; item: NewsItem }[] = [];
+
+    for (const block of xml.match(/<item>[\s\S]*?<\/item>/g) || []) {
+      // ชื่อเรื่องตัวแรกใน <item> คือของข่าว — <image> ข้างในมี <title> ซ้ำแต่อยู่ทีหลัง
+      const title = stripHtml(field(block, 'title'));
+      if (!title || RMUTL_NOISE.test(title)) continue;
+
+      const raw = field(block, 'pubDate').trim();               // "2026-10-02 13:27:00"
+      const ts = Date.parse(raw.replace(' ', 'T') + '+07:00');   // เวลาไทย
+      if (!Number.isFinite(ts) || ts < cutoff) continue;
+
+      rows.push({
+        ts,
+        item: {
+          title,
+          link: field(block, 'link').trim(),
+          pubDate: new Date(ts).toISOString(),
+          description: stripHtml(field(block, 'description')).slice(0, 300),
+          categories: ['มทร.ล้านนา'],
+        },
+      });
+    }
+
+    const items = rows.sort((a, b) => b.ts - a.ts).slice(0, 8).map((r) => r.item);
+    rmutlCache = { ts: Date.now(), items };
+    return items;
+  } catch {
+    return rmutlCache?.items || [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // Write client for the cache table.
 //
 // Prefers the service-role key (bypasses RLS). Falls back to a client
@@ -148,7 +211,7 @@ function getCacheWriteClient(accessToken: string | null) {
 // ─────────────────────────────────────────────────────────
 // Prompt
 // ─────────────────────────────────────────────────────────
-function buildPrompt(kpi: any, activity: any[], news: NewsItem[]) {
+function buildPrompt(kpi: any, activity: any[], news: NewsItem[], uniNews: NewsItem[] = []) {
   // Bucket activity by kind so the AI can lead with the most credible
   // (and most informative for collaborators) signals.
   //   Primary   : grants + publications  — funded work + peer-reviewed output
@@ -193,10 +256,17 @@ Write a focused snapshot of what CESRU is doing now.
 ──────────────────────────────────────────────────────────
 PARAGRAPH 2 — Research-news bridge (300+ words each language)
 ──────────────────────────────────────────────────────────
-THIS IS THE NEW PARAGRAPH. Read the latest Chiang Mai news headlines below
-and weave 3-5 of them into a substantive narrative showing HOW CESRU's
-expertise (IoT, clean energy, sensor networks, EV, energy audit, etc) could
-contribute to those local issues.
+Two news sources are given below:
+  (a) RMUTL university news — the unit's own university (MOUs, faculty
+      events, university networks, student activities).
+  (b) Chiang Mai local news.
+Weave 1-2 relevant RMUTL items and 2-3 Chiang Mai items into ONE
+substantive narrative showing HOW CESRU's expertise (IoT, clean energy,
+sensor networks, EV, energy audit, etc) connects to them. Prefer RMUTL
+items that touch engineering, energy, technology, community enterprise or
+inter-university collaboration; skip ceremonial items (royal ceremonies,
+contests) unless they genuinely relate to the unit's work. If no RMUTL item
+is relevant, use none — do not force it.
 
 EDITORIAL VOICE — important:
 - Refer to events NATURALLY, in your own words, as part of the unit's
@@ -204,6 +274,8 @@ EDITORIAL VOICE — important:
   เข้าสู่ฤดูฝน…", "การระบาดของไข้เลือดออกในหลายอำเภอ…", "ภัยจาก
   ซูเปอร์เอลนีโญที่คาดการณ์ปีนี้…"
 - DO NOT name "CM108" or any other news outlet INSIDE the paragraph.
+- You MAY say "มหาวิทยาลัย" / "มทร.ล้านนา" naturally for RMUTL items — it
+  is the unit's own university, not an outside outlet.
 - DO NOT introduce events with phrases like "ข่าวจาก…" or "รายงานจาก…".
   Just write about the situation, like a unit perspective piece.
 - Sources are tracked separately in evidence_chain — the UI shows them as
@@ -241,7 +313,10 @@ ${JSON.stringify(primary.slice(0, 8), null, 2)}
 DATA — SECONDARY activity (patents + innovations, mention briefly — sorted by occurred_at DESC):
 ${JSON.stringify(secondary.slice(0, 4), null, 2)}
 
-DATA — Latest CM108 Chiang Mai news (use 3-5 in paragraph 2):
+DATA — RMUTL university news, last 14 days, procurement notices removed (use 0-2):
+${JSON.stringify(uniNews.slice(0, 8), null, 2)}
+
+DATA — Latest CM108 Chiang Mai news (use 2-3 in paragraph 2):
 ${JSON.stringify(news.slice(0, 12), null, 2)}
 
 ──────────────────────────────────────────────────────────
@@ -263,6 +338,10 @@ EVIDENCE CHAIN REQUIREMENTS
     credibility  = "low"
     credibility_reason = "Local Chiang Mai news outlet — useful for
                          context but not a primary source for technical claims".
+  For RMUTL university items use the same shape but
+    credibility  = "medium"
+    credibility_reason = "Official RMUTL university news".
+  Keep source_type = "media" for both so the credit footer lists them.
   The UI extracts every evidence_chain entry where source_type='media' and
   renders them as a small "ข่าวที่อ้างอิง" credit footer with clickable links.
 - DO NOT invent achievements, news, or news details not present above.
@@ -283,7 +362,7 @@ async function generate(): Promise<{
   model: string;
   kpi_snapshot: any;
 }> {
-  const [kpiRes, activityRes, news] = await Promise.all([
+  const [kpiRes, activityRes, news, uniNews] = await Promise.all([
     supabase.from('cesru_kpi_summary').select('*').maybeSingle(),
     supabase
       .from('cesru_activity_stream')
@@ -291,6 +370,7 @@ async function generate(): Promise<{
       .order('occurred_at', { ascending: false })
       .limit(10),
     fetchCM108News(),
+    fetchRMUTLNews(),
   ]);
 
   if (kpiRes.error) {
@@ -303,7 +383,7 @@ async function generate(): Promise<{
   const kpi = kpiRes.data || {};
   const activity = activityRes.data || [];
 
-  const result = await callAIText(buildPrompt(kpi, activity, news || []));
+  const result = await callAIText(buildPrompt(kpi, activity, news || [], uniNews || []));
   if (result.error || !result.data) {
     throw new Error(result.error || 'AI returned no data');
   }
@@ -326,10 +406,18 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const refreshRequested = url.searchParams.get('refresh') === '1';
 
+  // Vercel Cron เรียก endpoint นี้ทุกวัน 10:00 น. (ดู vercel.json) และแนบ
+  // "Authorization: Bearer <CRON_SECRET>" มาให้เองเมื่อตั้ง env นี้ไว้
+  // ตั้ง 10:00 เพราะข่าว CM108 ไม่มีลงเลยช่วง 23:00–09:00 ข่าวแรกของวัน
+  // ลงราว 09:05–09:25 ทุกวัน (ไล่จาก RSS ย้อนหลัง 408 ข่าว) ส่วนข่าว
+  // มทร.ล้านนา ลงช่วงเวลาราชการ 10:00–16:00
+  const cronSecret = process.env.CRON_SECRET;
+  const isCron = !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`;
+
   // Force-refresh is admin-only — keeps random visitors from running up AI cost
-  let force = false;
+  let force = isCron;
   let accessToken: string | null = null;
-  if (refreshRequested) {
+  if (refreshRequested && !isCron) {
     const admin = await authorizeAdminRequest(req);
     if (!admin.authorized || !admin.role) {
       return NextResponse.json(
